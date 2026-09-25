@@ -71,10 +71,10 @@ const EntityCard: React.FC<{
         e.preventDefault();
         onOpenHologram(entity);
       }}
-      className={`relative bg-white dark:bg-slate-900/90 border rounded-2xl p-3.5 transition-all duration-200 select-none shadow-sm space-y-2.5 cursor-pointer ${
+      className={`relative bg-white dark:bg-slate-900/90 border rounded-2xl p-3.5 transition-all duration-200 select-none shadow-sm space-y-2.5 cursor-pointer touch-pan-y ${
         isPressing
           ? 'scale-[0.98] border-pink-500/80 bg-slate-50 dark:bg-slate-900 ring-2 ring-pink-500/30'
-          : 'border-slate-200 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700/80 active:scale-[0.99]'
+          : 'border-slate-200 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700/80'
       }`}
     >
       {/* Top Header */}

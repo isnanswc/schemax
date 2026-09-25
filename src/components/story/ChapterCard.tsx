@@ -72,10 +72,10 @@ export const ChapterCard: React.FC<ChapterCardProps> = ({
         e.preventDefault();
         onOpenActionSheet(chapter, index);
       }}
-      className={`group relative bg-white dark:bg-slate-900/90 border rounded-2xl p-3.5 transition-all duration-200 cursor-pointer select-none shadow-sm flex flex-col justify-between gap-2.5 ${
+      className={`group relative bg-white dark:bg-slate-900/90 border rounded-2xl p-3.5 transition-all duration-200 cursor-pointer select-none shadow-sm flex flex-col justify-between gap-2.5 touch-pan-y ${
         isPressing
           ? 'scale-[0.98] border-amber-500/80 bg-amber-50/50 dark:bg-slate-900 ring-2 ring-amber-500/30'
-          : 'border-slate-200/90 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700/80 active:scale-[0.99]'
+          : 'border-slate-200/90 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700/80'
       }`}
     >
       <div className="flex items-start justify-between gap-2">
