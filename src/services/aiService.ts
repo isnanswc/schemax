@@ -556,19 +556,35 @@ function extractSection(text: string, title: string): string {
   return match ? match[1].trim() : '';
 }
 
-// 3. Chapter Auto-Scene Decomposition Engine
+// 3. Chapter Auto-Scene Decomposition Engine with Smart Timeline
 export async function generateChapterAutoScenes(
   chapterTitle: string,
   bookTitle: string,
   contentText: string
-): Promise<Array<{ id: string; sceneNumber: number; title: string; setting: string; characters: string[]; summary: string; goalConflict?: string }>> {
-  const prompt = `Bedah dan uraikan naskah bab berikut menjadi daftar adegan-adegan (scenes breakdown) berurutan.
+): Promise<Array<{
+  id: string;
+  sceneNumber: number;
+  title: string;
+  setting: string;
+  characters: string[];
+  summary: string;
+  goalConflict?: string;
+  timelineType?: 'linear' | 'parallel' | 'flashback' | 'branched';
+  timeMarker?: string;
+  branchGroup?: string;
+}>> {
+  const prompt = `Bedah dan uraikan naskah bab berikut menjadi daftar adegan-adegan (scenes breakdown) berurutan beserta analisis alur kronologis waktu (timeline).
 
 Judul Buku: "${bookTitle}"
 Judul Bab: "${chapterTitle}"
 
 Isi Naskah Bab:
 ${contentText.slice(0, 7000)}
+
+Instruksi Timeline:
+- Tentukan apakah alur adegan berjalan lurus ("linear"), terjadi bersamaan/simultan di tempat berbeda ("parallel" atau "branched"), atau kilas balik masa lalu ("flashback").
+- timeMarker: Keterangan waktu (misal: "Pagi hari", "Terjadi bersamaan dengan Adegan 1", "Kilas balik 3 tahun lalu", "Malam hari").
+- branchGroup: Kelompok garis waktu (misal: "Garis Waktu Utama", "Garis Waktu B (Simultan)", "Flashback").
 
 Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
 [
@@ -578,11 +594,15 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
     "setting": "Latar tempat & waktu adegan",
     "characters": ["Nama Tokoh 1", "Nama Tokoh 2"],
     "summary": "Rangkuman kejadian dalam adegan ini",
-    "goalConflict": "Tujuan tokoh atau konflik yang terjadi di adegan"
+    "goalConflict": "Tujuan tokoh atau konflik yang terjadi di adegan",
+    "timelineType": "linear",
+    "timeMarker": "Pagi hari di Dermaga",
+    "branchGroup": "Garis Waktu Utama"
   }
 ]`;
 
-  const systemPrompt = 'Anda adalah script reader dan editor adegan novel. Berikan HANYA format JSON array valid.';
+  const systemPrompt =
+    'Anda adalah script reader dan editor adegan novel. Berikan HANYA format JSON array valid.';
   const res = await generateWithSmartFallback(prompt, systemPrompt);
 
   try {
@@ -597,6 +617,9 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
         characters: Array.isArray(item.characters) ? item.characters : [],
         summary: item.summary || '',
         goalConflict: item.goalConflict || '',
+        timelineType: item.timelineType || 'linear',
+        timeMarker: item.timeMarker || '',
+        branchGroup: item.branchGroup || 'Garis Waktu Utama',
       }));
     }
   } catch (err) {
@@ -613,6 +636,9 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
       characters: [],
       summary: res.text.slice(0, 250),
       goalConflict: '',
+      timelineType: 'linear',
+      timeMarker: 'Awal Bab',
+      branchGroup: 'Garis Waktu Utama',
     },
   ];
 }
@@ -642,5 +668,96 @@ Instruksi:
   const systemPrompt = 'Anda adalah novelis masterclass yang ahli menyulap coretan mentah menjadi prosa sastra yang memukau.';
   const res = await generateWithSmartFallback(prompt, systemPrompt);
   return res.text.trim();
+}
+
+// 5. Worldbuilding Entity & Alias Detection Engine
+export async function detectEntitiesAndAliases(
+  chapterText: string,
+  bookTitle: string,
+  existingEntities: Array<{ id: string; name: string; category: string; aliases?: string[] }>
+): Promise<Array<{
+  id: string;
+  name: string;
+  category: 'character' | 'location' | 'item' | 'lore';
+  shortDescription: string;
+  isExisting: boolean;
+  existingEntityId?: string;
+  detectedAliasOf?: string;
+  suggestedAction: 'register_new' | 'add_alias';
+}>> {
+  const existingListStr =
+    existingEntities.length > 0
+      ? existingEntities
+          .map(
+            (e) =>
+              `- [ID: ${e.id}] [${e.category.toUpperCase()}] ${e.name}${
+                e.aliases && e.aliases.length > 0 ? ` (Alias yang sudah ada: ${e.aliases.join(', ')})` : ''
+              }`
+          )
+          .join('\n')
+      : '(Belum ada entitas di Glosarium buku ini)';
+
+  const prompt = `Anda adalah asisten kontinuitas cerita (story continuity expert) dan pengelola lore worldbuilding.
+
+Analisis naskah bab berikut terhadap daftar Glosarium yang sudah ada di buku ini:
+
+Judul Buku: "${bookTitle}"
+
+Daftar Entitas Glosarium yang Sudah Ada di Buku:
+${existingListStr}
+
+Isi Naskah Bab:
+${chapterText.slice(0, 7000)}
+
+Tugas Analisis:
+1. DETEKSI ENTITAS BARU:
+   Cari karakter, lokasi, item/senjata, atau istilah lore penting yang muncul di bab ini TAPI BELUM ADA di daftar entitas buku di atas.
+2. DETEKSI ALIAS / SEBUTAN LAIN:
+   Cari sebutan lain, julukan, gelar, atau istilah pengganti dari entitas yang SUDAH ADA. Contoh: Jika di naskah ada julukan "Sang Pendekar Jubah Hitam" dan konteksnya merujuk pada Karakter "Ahmad", deteksi bahwa itu adalah ALIAS dari Ahmad!
+
+Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
+[
+  {
+    "name": "Nama entitas atau sebutan alias yang ditemukan",
+    "category": "character",
+    "shortDescription": "Penjelasan singkat siapa/apa ini di bab ini",
+    "isExisting": false,
+    "existingEntityId": "",
+    "detectedAliasOf": "",
+    "suggestedAction": "register_new"
+  }
+]
+
+Aturan:
+- category HANYA boleh salah satu dari: "character", "location", "item", "lore"
+- suggestedAction HANYA boleh: "register_new" (untuk entitas baru) atau "add_alias" (untuk julukan/alias entitas yang sudah ada)
+- Jika alias, sertakan existingEntityId dari daftar di atas dan isi detectedAliasOf dengan nama entitas asli.`;
+
+  const systemPrompt =
+    'Anda adalah editor kontinuitas sastra profesional. Hasilkan HANYA JSON array valid.';
+  const res = await generateWithSmartFallback(prompt, systemPrompt);
+
+  try {
+    const cleanJson = res.text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(cleanJson);
+    if (Array.isArray(parsed)) {
+      return parsed.map((item) => ({
+        id: 'det_' + Math.random().toString(36).substring(2, 9),
+        name: item.name || '',
+        category: ['character', 'location', 'item', 'lore'].includes(item.category)
+          ? item.category
+          : 'character',
+        shortDescription: item.shortDescription || '',
+        isExisting: Boolean(item.isExisting),
+        existingEntityId: item.existingEntityId || undefined,
+        detectedAliasOf: item.detectedAliasOf || undefined,
+        suggestedAction: item.suggestedAction === 'add_alias' ? 'add_alias' : 'register_new',
+      }));
+    }
+  } catch (err) {
+    console.warn('Gagal parse JSON deteksi entitas:', err);
+  }
+
+  return [];
 }
 

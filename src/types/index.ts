@@ -38,6 +38,20 @@ export interface ChapterSceneItem {
   characters: string[];
   summary: string;
   goalConflict?: string;
+  timelineType?: 'linear' | 'parallel' | 'flashback' | 'branched';
+  timeMarker?: string;
+  branchGroup?: string;
+}
+
+export interface DetectedEntityCandidate {
+  id: string;
+  name: string;
+  category: WorldCategory;
+  shortDescription: string;
+  isExisting: boolean;
+  existingEntityId?: string;
+  detectedAliasOf?: string;
+  suggestedAction: 'register_new' | 'add_alias';
 }
 
 export interface StoryChapter {
@@ -56,6 +70,7 @@ export interface StoryChapter {
   aiSummary?: string;
   aiPlot?: ChapterPlotBreakdown;
   aiScenes?: ChapterSceneItem[];
+  aiDetectedEntities?: DetectedEntityCandidate[];
   createdAt: number;
   updatedAt: number;
 }
@@ -73,6 +88,7 @@ export interface WorldEntity {
   bookId: string;
   category: WorldCategory;
   name: string;
+  aliases?: string[];
   shortDescription: string;
   detailedNotes: string;
   tags: string[];
