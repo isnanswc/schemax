@@ -13,7 +13,7 @@
     background-color: #f8fafc;
     color: #0f172a;
     -webkit-tap-highlight-color: transparent;
-    transition: background-color 0.2s ease, color 0.2s ease;
+    transition: background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1), color 0.25s ease;
   }
 
   html.dark body {
@@ -22,82 +22,118 @@
   }
 }
 
-/* Light mode dynamic surface overrides */
-html:not(.dark) body {
-  background-color: #f8fafc;
-  color: #0f172a;
-}
+/* ========================================================
+   1. GLOBAL ULTRA-POLISHED LIGHT MODE OVERRIDES
+   Ensures 0 residual dark artifacts when light mode is active
+   ======================================================== */
 
-html:not(.dark) .bg-slate-950 {
+/* App background */
+html:not(.dark) body,
+html:not(.dark) [class*="bg-slate-950"] {
   background-color: #f8fafc !important;
 }
 
-html:not(.dark) .bg-slate-950\/85,
-html:not(.dark) .bg-slate-950\/90,
-html:not(.dark) .bg-slate-950\/95 {
-  background-color: rgba(248, 250, 252, 0.92) !important;
-}
-
-html:not(.dark) .bg-slate-900 {
+/* Primary surface / cards / modals / sheets / headers / nav */
+html:not(.dark) [class*="bg-slate-900"] {
   background-color: #ffffff !important;
 }
 
-html:not(.dark) .bg-slate-900\/90,
-html:not(.dark) .bg-slate-900\/80,
-html:not(.dark) .bg-slate-900\/70,
-html:not(.dark) .bg-slate-900\/60,
-html:not(.dark) .bg-slate-900\/50,
-html:not(.dark) .bg-slate-900\/40 {
-  background-color: rgba(255, 255, 255, 0.95) !important;
-}
-
-html:not(.dark) .bg-slate-800 {
+/* Secondary surfaces / chip bars / search pads / badges */
+html:not(.dark) [class*="bg-slate-800"] {
   background-color: #f1f5f9 !important;
 }
 
-html:not(.dark) .bg-slate-800\/90,
-html:not(.dark) .bg-slate-800\/80,
-html:not(.dark) .bg-slate-800\/60,
-html:not(.dark) .bg-slate-800\/50 {
-  background-color: #f1f5f9 !important;
-}
-
-html:not(.dark) .border-slate-800,
-html:not(.dark) .border-slate-800\/80,
-html:not(.dark) .border-slate-800\/60,
-html:not(.dark) .border-slate-800\/50 {
+/* All borders */
+html:not(.dark) [class*="border-slate-800"],
+html:not(.dark) [class*="border-slate-700"] {
   border-color: #e2e8f0 !important;
 }
 
-html:not(.dark) .border-slate-700,
-html:not(.dark) .border-slate-700\/80,
-html:not(.dark) .border-slate-700\/60 {
+/* Text primary & titles */
+html:not(.dark) [class*="text-white"],
+html:not(.dark) [class*="text-slate-100"],
+html:not(.dark) [class*="text-slate-200"] {
+  color: #0f172a !important;
+}
+
+/* Text secondary & descriptions */
+html:not(.dark) [class*="text-slate-300"],
+html:not(.dark) [class*="text-slate-400"] {
+  color: #475569 !important;
+}
+
+/* Text muted & micro-hints */
+html:not(.dark) [class*="text-slate-500"],
+html:not(.dark) [class*="text-slate-600"] {
+  color: #64748b !important;
+}
+
+/* Inputs, textareas, selects */
+html:not(.dark) input,
+html:not(.dark) textarea,
+html:not(.dark) select {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+html:not(.dark) input:focus,
+html:not(.dark) textarea:focus,
+html:not(.dark) select:focus {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15) !important;
+}
+
+html:not(.dark) input::placeholder,
+html:not(.dark) textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Gradients with dark stops transform into elegant dawn/aurora pastels in light mode */
+html:not(.dark) [class*="from-indigo-950"],
+html:not(.dark) [class*="from-slate-900"] {
+  background-image: linear-gradient(135deg, #eef2ff 0%, #fdf4ff 50%, #fffbeb 100%) !important;
   border-color: #cbd5e1 !important;
 }
 
-html:not(.dark) .text-white {
+html:not(.dark) [class*="from-slate-900"][class*="via-indigo-950"] {
+  background-image: linear-gradient(135deg, #f8fafc 0%, #e0e7ff 50%, #fef3c7 100%) !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Fixed Navigation bar & Header in light mode */
+html:not(.dark) nav.fixed,
+html:not(.dark) header.sticky,
+html:not(.dark) footer.sticky {
+  background-color: rgba(255, 255, 255, 0.88) !important;
+  border-color: #e2e8f0 !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05) !important;
+}
+
+/* Modal Backdrops in light mode */
+html:not(.dark) .fixed.inset-0.bg-black\/80,
+html:not(.dark) .fixed.inset-0.bg-black\/85,
+html:not(.dark) [class*="bg-black\/"] {
+  background-color: rgba(15, 23, 42, 0.45) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+
+/* Card drop shadows in light mode for crisp depth */
+html:not(.dark) [class*="bg-slate-900"]:not([class*="fixed"]):not(header):not(footer):not(nav) {
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 1px 3px 0 rgba(15, 23, 42, 0.03) !important;
+}
+
+/* Light mode Editor typography */
+html:not(.dark) [contenteditable] {
   color: #0f172a !important;
-}
-
-html:not(.dark) .text-slate-100 {
-  color: #0f172a !important;
-}
-
-html:not(.dark) .text-slate-200 {
-  color: #1e293b !important;
-}
-
-html:not(.dark) .text-slate-300 {
-  color: #334155 !important;
-}
-
-html:not(.dark) .text-slate-400 {
-  color: #64748b !important;
 }
 
 html:not(.dark) [contenteditable] h2 {
   color: #0f172a !important;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
 }
 
 html:not(.dark) [contenteditable] h3 {
@@ -111,10 +147,94 @@ html:not(.dark) [contenteditable] p {
 html:not(.dark) [contenteditable] blockquote {
   color: #92400e !important;
   background: rgba(245, 158, 11, 0.08) !important;
+  border-left-color: #d97706 !important;
 }
 
 html:not(.dark) [contenteditable]:empty:before {
   color: #94a3b8 !important;
+}
+
+/* Proactive reset for editor prose invert in light mode */
+html:not(.dark) .prose-invert {
+  color: #1e293b !important;
+}
+
+html:not(.dark) .prose-invert h1,
+html:not(.dark) .prose-invert h2,
+html:not(.dark) .prose-invert h3,
+html:not(.dark) .prose-invert strong {
+  color: #0f172a !important;
+}
+
+
+/* ========================================================
+   2. SMOOTH ANIMATIONS & MICRO-INTERACTIONS
+   ======================================================== */
+
+/* Global transition for theme switching */
+html body,
+html [class*="bg-slate-"],
+html [class*="border-slate-"],
+html header,
+html nav,
+html footer {
+  transition: background-color 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+              color 0.2s ease,
+              box-shadow 0.28s ease;
+}
+
+/* Smooth fade-in and slide-up entrance for cards */
+@keyframes fadeInUpSpring {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUpSpring 0.35s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+/* Glowing ambient aura for AI features */
+@keyframes aiAuraGlow {
+  0%, 100% {
+    box-shadow: 0 0 16px -2px rgba(245, 158, 11, 0.25), 0 0 8px -2px rgba(99, 102, 241, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 28px 2px rgba(245, 158, 11, 0.4), 0 0 14px 1px rgba(99, 102, 241, 0.35);
+  }
+}
+
+.animate-ai-glow {
+  animation: aiAuraGlow 3.5s ease-in-out infinite;
+}
+
+/* Floating bounce for pill toasts */
+@keyframes toastSlideUp {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 16px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+.animate-toast-in {
+  animation: toastSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Button & Card interactive tap feedback */
+button:active:not(:disabled),
+.interactive-card:active {
+  transform: scale(0.975);
+  transition: transform 0.1s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Safe area insets for notched mobile devices */
@@ -135,7 +255,7 @@ html:not(.dark) [contenteditable]:empty:before {
   scrollbar-width: none;
 }
 
-/* Rich Text Editor Styling */
+/* Rich Text Editor Core Styling */
 [contenteditable]:empty:before {
   content: attr(data-placeholder);
   color: #64748b;
@@ -164,8 +284,8 @@ html:not(.dark) [contenteditable]:empty:before {
 }
 
 [contenteditable] p {
-  margin-bottom: 1rem;
-  line-height: 1.8;
+  margin-bottom: 1.15rem;
+  line-height: 1.85;
 }
 
 [contenteditable] blockquote {

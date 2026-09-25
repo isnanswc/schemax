@@ -94,15 +94,15 @@ export const BookListDashboard: React.FC<BookListDashboardProps> = ({
       {recentChapter && recentBook && onResumeChapter && (
         <div
           onClick={() => onResumeChapter(recentBook, recentChapter)}
-          className="group relative bg-gradient-to-r from-amber-500/10 via-slate-900 to-indigo-500/10 border border-amber-500/30 hover:border-amber-400 rounded-3xl p-4 sm:p-5 shadow-lg shadow-black/40 cursor-pointer transition-all active:scale-[0.99]"
+          className="group relative bg-gradient-to-r from-amber-500/10 via-slate-900 to-indigo-500/10 border border-amber-500/30 hover:border-amber-400 rounded-3xl p-4 sm:p-5 shadow-lg shadow-black/30 cursor-pointer transition-all duration-300 hover:translate-y-[-2px] hover:shadow-xl active:scale-[0.99] animate-fade-in-up"
         >
           <div className="flex items-center justify-between gap-2 mb-2">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/40">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
                 Lanjutkan Menulis
               </span>
-              <span className="text-[11px] text-slate-400 truncate max-w-[150px] sm:max-w-xs">
+              <span className="text-[11px] text-slate-400 truncate max-w-[150px] sm:max-w-xs font-semibold">
                 {recentBook.title}
               </span>
             </div>
@@ -114,7 +114,7 @@ export const BookListDashboard: React.FC<BookListDashboardProps> = ({
 
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <h3 className="text-base sm:text-lg font-black text-white group-hover:text-amber-300 transition-colors truncate">
+              <h3 className="text-base sm:text-lg font-black text-white group-hover:text-amber-400 transition-colors truncate">
                 Bab {recentChapter.order || 1}: {recentChapter.title || 'Bab Tanpa Judul'}
               </h3>
               <p className="text-xs text-slate-400 truncate mt-0.5">
@@ -125,7 +125,7 @@ export const BookListDashboard: React.FC<BookListDashboardProps> = ({
 
             <button
               type="button"
-              className="py-2 px-3.5 rounded-2xl bg-amber-500 group-hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/20 transition flex items-center gap-1.5 flex-shrink-0 group-hover:translate-x-0.5"
+              className="py-2 px-3.5 rounded-2xl bg-amber-500 group-hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/20 transition flex items-center gap-1.5 flex-shrink-0 group-hover:translate-x-0.5 active:scale-95"
             >
               <span>Tulis</span>
               <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -133,7 +133,7 @@ export const BookListDashboard: React.FC<BookListDashboardProps> = ({
           </div>
 
           {/* Micro Progress Bar */}
-          <div className="w-full bg-slate-950/80 rounded-full h-1.5 mt-3 overflow-hidden border border-slate-800">
+          <div className="w-full bg-slate-800/80 rounded-full h-1.5 mt-3 overflow-hidden border border-slate-700/60">
             <div
               className="bg-gradient-to-r from-amber-500 to-amber-400 h-full rounded-full transition-all duration-300"
               style={{
@@ -153,7 +153,7 @@ export const BookListDashboard: React.FC<BookListDashboardProps> = ({
 
       {/* 🚀 AI Story Architect Card (From 1 Idea to Full Project) */}
       {onOpenStoryArchitect && (
-        <div className="bg-gradient-to-r from-indigo-950/70 via-slate-900 to-amber-950/40 border border-indigo-500/30 hover:border-indigo-400/50 rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 shadow-md">
+        <div className="animate-ai-glow animate-fade-in-up bg-gradient-to-r from-indigo-950/70 via-slate-900 to-amber-950/40 border border-indigo-500/40 hover:border-indigo-400 rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 shadow-lg transition-all duration-300 hover:translate-y-[-2px]">
           <div className="flex items-start gap-3 min-w-0">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center text-white font-black shadow-md shadow-indigo-500/20 flex-shrink-0">
               <Sparkles className="w-5 h-5 text-amber-200" />

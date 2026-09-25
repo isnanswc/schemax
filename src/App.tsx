@@ -287,8 +287,8 @@ export function App() {
 
           {/* Toast Notification for back button exit guard */}
           {toastMessage && (
-            <div className="fixed bottom-16 sm:bottom-8 left-1/2 -translate-x-1/2 z-[100] px-4 py-2 rounded-full bg-slate-900/95 border border-slate-700/80 text-white text-xs font-semibold shadow-2xl backdrop-blur-md transition flex items-center gap-2 pointer-events-none">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+            <div className="fixed bottom-16 sm:bottom-8 left-1/2 -translate-x-1/2 z-[100] px-4 py-2.5 rounded-full bg-slate-900/95 dark:bg-slate-900/95 border border-slate-300 dark:border-slate-700/80 text-slate-900 dark:text-white text-xs font-bold shadow-2xl backdrop-blur-md flex items-center gap-2 pointer-events-none animate-toast-in">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
               <span>{toastMessage}</span>
             </div>
           )}

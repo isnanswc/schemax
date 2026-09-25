@@ -42,11 +42,11 @@ export const ThemeToggle: React.FC = () => {
   const getIcon = () => {
     switch (mode) {
       case 'dark':
-        return <Moon className="w-3.5 h-3.5 text-indigo-400" />;
+        return <Moon className="w-3.5 h-3.5 text-indigo-400 transition-transform duration-300 group-hover:rotate-12" />;
       case 'light':
-        return <Sun className="w-3.5 h-3.5 text-amber-500" />;
+        return <Sun className="w-3.5 h-3.5 text-amber-500 transition-transform duration-500 group-hover:rotate-90" />;
       case 'auto':
-        return <Monitor className="w-3.5 h-3.5 text-cyan-400" />;
+        return <Monitor className="w-3.5 h-3.5 text-cyan-500 transition-transform duration-300 group-hover:scale-110" />;
     }
   };
 
@@ -54,7 +54,7 @@ export const ThemeToggle: React.FC = () => {
     <button
       type="button"
       onClick={cycleTheme}
-      className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white text-xs font-semibold active:scale-95 transition shadow-sm"
+      className="group flex items-center gap-1.5 py-1.5 px-2.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white text-xs font-semibold active:scale-95 transition-all shadow-sm"
       title={`Tema: ${getLabel()} (Klik untuk mengganti: Gelap ➔ Terang ➔ Auto)`}
       aria-label="Ganti mode tema"
     >
