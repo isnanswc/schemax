@@ -15,6 +15,31 @@ export interface Book {
 
 export type ChapterStatus = 'planned' | 'in_progress' | 'completed';
 
+export interface ChapterRawDraft {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ChapterPlotBreakdown {
+  hook: string;
+  risingAction: string;
+  climax: string;
+  resolution: string;
+}
+
+export interface ChapterSceneItem {
+  id: string;
+  sceneNumber: number;
+  title: string;
+  setting: string;
+  characters: string[];
+  summary: string;
+  goalConflict?: string;
+}
+
 export interface StoryChapter {
   id: string;
   bookId: string;
@@ -26,6 +51,11 @@ export interface StoryChapter {
   contentHtml: string;
   wordCount: number;
   targetWordCount?: number;
+  rawDrafts?: ChapterRawDraft[];
+  activeRawDraftId?: string;
+  aiSummary?: string;
+  aiPlot?: ChapterPlotBreakdown;
+  aiScenes?: ChapterSceneItem[];
   createdAt: number;
   updatedAt: number;
 }

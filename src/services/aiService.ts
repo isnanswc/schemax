@@ -471,3 +471,176 @@ export async function testSlotConnection(
     };
   }
 }
+
+// ==========================================
+// 📖 CHAPTER STUDIO AI INTELLIGENCE ENGINES
+// ==========================================
+
+// 1. Chapter Auto-Summary Engine
+export async function generateChapterSummary(
+  chapterTitle: string,
+  bookTitle: string,
+  contentText: string
+): Promise<string> {
+  const prompt = `Anda adalah asisten editor novel profesional. Rangkum inti naskah bab berikut ini secara jelas, padat, dan menarik dalam 1 sampai 2 paragraf.
+
+Judul Buku: "${bookTitle}"
+Judul Bab: "${chapterTitle}"
+
+Naskah Cerita Bab:
+${contentText.slice(0, 7000)}
+
+Instruksi:
+- Fokus pada kejadian utama, perkembangan karakter, dan perubahan situasi penting dalam bab ini.
+- Tulis langsung teks rangkumannya dalam Bahasa Indonesia sastrawi tanpa kata pengantar atau judul tambahan.`;
+
+  const systemPrompt = 'Anda adalah editor sastra profesional yang ahli merangkum isi cerita.';
+  const res = await generateWithSmartFallback(prompt, systemPrompt);
+  return res.text.trim();
+}
+
+// 2. Chapter Auto-Plot Engine (Hook, Rising Action, Climax, Resolution)
+export async function generateChapterAutoPlot(
+  chapterTitle: string,
+  bookTitle: string,
+  contentText: string,
+  premise?: string
+): Promise<{ hook: string; risingAction: string; climax: string; resolution: string }> {
+  const prompt = `Analisis atau petakan alur struktur plot untuk bab berikut ini menjadi 4 komponen dramatik:
+1. Hook (Pemicu / Awal bab yang memikat)
+2. Rising Action (Eskalasi masalah atau ketegangan)
+3. Climax (Puncak konflik, keputusan besar, atau insiden genting)
+4. Resolution (Penutup, transisi, atau cliffhanger)
+
+Judul Buku: "${bookTitle}"
+Judul Bab: "${chapterTitle}"
+Premis Bab: ${premise || 'Tidak ada premis awal'}
+
+Isi Naskah Bab:
+${contentText ? contentText.slice(0, 7000) : (premise || 'Gunakan premis bab')}
+
+Berikan output HANYA berupa JSON valid persis dengan struktur ini tanpa teks pembuka atau penutup lain:
+{
+  "hook": "deskripsi hook...",
+  "risingAction": "deskripsi eskalasi...",
+  "climax": "deskripsi puncak ketegangan...",
+  "resolution": "deskripsi penutup atau cliffhanger..."
+}`;
+
+  const systemPrompt = 'Anda adalah konsultan plot dan story analyst profesional. Hasilkan hanya JSON yang valid.';
+  const res = await generateWithSmartFallback(prompt, systemPrompt);
+
+  try {
+    const cleanJson = res.text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(cleanJson);
+    return {
+      hook: parsed.hook || '',
+      risingAction: parsed.risingAction || '',
+      climax: parsed.climax || '',
+      resolution: parsed.resolution || '',
+    };
+  } catch (err) {
+    // Regex or fallback parser if JSON was surrounded by text
+    return {
+      hook: extractSection(res.text, 'Hook') || res.text.slice(0, 150),
+      risingAction: extractSection(res.text, 'Rising Action') || extractSection(res.text, 'Eskalasi') || '',
+      climax: extractSection(res.text, 'Climax') || extractSection(res.text, 'Puncak') || '',
+      resolution: extractSection(res.text, 'Resolution') || extractSection(res.text, 'Penutup') || '',
+    };
+  }
+}
+
+// Helper to extract section in fallback
+function extractSection(text: string, title: string): string {
+  const match = text.match(new RegExp(`${title}[:\\s*-]+([\\s\\S]*?)(?=(?:Hook|Rising|Climax|Resolution|Eskalasi|Puncak|Penutup|$))`, 'i'));
+  return match ? match[1].trim() : '';
+}
+
+// 3. Chapter Auto-Scene Decomposition Engine
+export async function generateChapterAutoScenes(
+  chapterTitle: string,
+  bookTitle: string,
+  contentText: string
+): Promise<Array<{ id: string; sceneNumber: number; title: string; setting: string; characters: string[]; summary: string; goalConflict?: string }>> {
+  const prompt = `Bedah dan uraikan naskah bab berikut menjadi daftar adegan-adegan (scenes breakdown) berurutan.
+
+Judul Buku: "${bookTitle}"
+Judul Bab: "${chapterTitle}"
+
+Isi Naskah Bab:
+${contentText.slice(0, 7000)}
+
+Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
+[
+  {
+    "sceneNumber": 1,
+    "title": "Judul Singkat Adegan",
+    "setting": "Latar tempat & waktu adegan",
+    "characters": ["Nama Tokoh 1", "Nama Tokoh 2"],
+    "summary": "Rangkuman kejadian dalam adegan ini",
+    "goalConflict": "Tujuan tokoh atau konflik yang terjadi di adegan"
+  }
+]`;
+
+  const systemPrompt = 'Anda adalah script reader dan editor adegan novel. Berikan HANYA format JSON array valid.';
+  const res = await generateWithSmartFallback(prompt, systemPrompt);
+
+  try {
+    const cleanJson = res.text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(cleanJson);
+    if (Array.isArray(parsed)) {
+      return parsed.map((item, idx) => ({
+        id: 'scene_' + Math.random().toString(36).substring(2, 9),
+        sceneNumber: item.sceneNumber || idx + 1,
+        title: item.title || `Adegan ${idx + 1}`,
+        setting: item.setting || '',
+        characters: Array.isArray(item.characters) ? item.characters : [],
+        summary: item.summary || '',
+        goalConflict: item.goalConflict || '',
+      }));
+    }
+  } catch (err) {
+    console.warn('Gagal parse JSON auto scenes, fallback to basic list:', err);
+  }
+
+  // Graceful fallback if JSON fails
+  return [
+    {
+      id: 'scene_fallback_1',
+      sceneNumber: 1,
+      title: 'Adegan Pembuka Bab',
+      setting: 'Sesuai naskah',
+      characters: [],
+      summary: res.text.slice(0, 250),
+      goalConflict: '',
+    },
+  ];
+}
+
+// 4. Polish Raw Draft to Prose Engine
+export async function enhanceRawToProse(
+  rawText: string,
+  bookTitle: string,
+  chapterTitle: string,
+  genre?: string
+): Promise<string> {
+  const prompt = `Anda adalah novelis dan ghostwriter berpengalaman. Ubah tulisan kasar / coretan ide (raw draft) berikut menjadi naskah cerita fiksi yang mengalir indah, deskriptif, dan memiliki dialog yang hidup.
+
+Informasi Karya:
+- Judul Buku: "${bookTitle}"
+- Judul Bab: "${chapterTitle}"
+- Genre: ${genre || 'Fiksi'}
+
+Tulisan Kasar (Raw Draft):
+${rawText}
+
+Instruksi:
+- Kembangkan poin-poin mentah menjadi adegan bernyawa (show, don't tell).
+- Jaga konsistensi tone dan suasana cerita.
+- Berikan HANYA hasil naskah cerita polesan dalam Bahasa Indonesia tanpa catatan pengantar.`;
+
+  const systemPrompt = 'Anda adalah novelis masterclass yang ahli menyulap coretan mentah menjadi prosa sastra yang memukau.';
+  const res = await generateWithSmartFallback(prompt, systemPrompt);
+  return res.text.trim();
+}
+

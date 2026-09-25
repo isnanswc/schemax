@@ -77,7 +77,7 @@ export const ChapterActionSheet: React.FC<ChapterActionSheetProps> = ({
           </button>
         </div>
 
-        {/* Primary Action Button: Open Writer */}
+        {/* Primary Action Button: Open Writer / Studio */}
         <button
           onClick={() => {
             onClose();
@@ -85,8 +85,8 @@ export const ChapterActionSheet: React.FC<ChapterActionSheetProps> = ({
           }}
           className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm shadow-lg shadow-amber-500/20 active:scale-95 transition flex items-center justify-center gap-2 mb-4"
         >
-          <Edit3 className="w-4 h-4" />
-          <span>Buka Editor & Tulis Bab Ini</span>
+          <BookOpen className="w-4 h-4" />
+          <span>Buka Studio &amp; Naskah Bab Ini</span>
           <ArrowRight className="w-4 h-4" />
         </button>
 

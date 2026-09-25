@@ -9,6 +9,7 @@ import { WorksView } from './components/works/WorksView';
 import { BookOverviewTab } from './components/books/BookOverviewTab';
 import { StoryPlannerView } from './components/story/StoryPlannerView';
 import { RichTextEditor } from './components/story/RichTextEditor';
+import { ChapterStudioView } from './components/story/ChapterStudioView';
 import { WorldBuildingView } from './components/world/WorldBuildingView';
 import { MediaGalleryView } from './components/media/MediaGalleryView';
 import { CreateBookModal } from './components/books/CreateBookModal';
@@ -23,6 +24,7 @@ export function App() {
   const [currentBook, setCurrentBook] = useState<Book | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('chapters');
   const [editingChapter, setEditingChapter] = useState<StoryChapter | null>(null);
+  const [studioChapter, setStudioChapter] = useState<StoryChapter | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createModalInitialStatus, setCreateModalInitialStatus] = useState<BookStatus>('draft');
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
@@ -84,6 +86,7 @@ export function App() {
   const handleSelectBook = (book: Book) => {
     navStack.push('book', () => {
       setCurrentBook(null);
+      setStudioChapter(null);
       setEditingChapter(null);
     });
     setCurrentBook(book);
@@ -93,7 +96,20 @@ export function App() {
   const handleBackToHome = () => {
     navStack.pop('book');
     setCurrentBook(null);
+    setStudioChapter(null);
     setEditingChapter(null);
+  };
+
+  const handleOpenChapterStudio = (chapter: StoryChapter) => {
+    navStack.push('chapter-studio', () => {
+      setStudioChapter(null);
+    });
+    setStudioChapter(chapter);
+  };
+
+  const handleBackFromChapterStudio = () => {
+    navStack.pop('chapter-studio');
+    setStudioChapter(null);
   };
 
   const handleOpenEditor = (chapter: StoryChapter) => {
@@ -164,12 +180,25 @@ export function App() {
           onBack={handleBackFromEditor}
           onChapterUpdated={(updated) => {
             setEditingChapter((prev) => (prev ? updated : null));
+            setStudioChapter((prev) => (prev?.id === updated.id ? updated : prev));
+            triggerRefresh();
+          }}
+        />
+      ) : studioChapter && currentBook ? (
+        /* 2. Chapter Studio Workspace Hub */
+        <ChapterStudioView
+          chapter={studioChapter}
+          book={currentBook}
+          onBack={handleBackFromChapterStudio}
+          onOpenEditor={handleOpenEditor}
+          onChapterUpdated={(updated) => {
+            setStudioChapter(updated);
             triggerRefresh();
           }}
         />
       ) : (
         <>
-          {/* 2. Mobile-first Header */}
+          {/* 3. Mobile-first Header */}
           <MobileHeader
             currentBook={currentBook}
             onBack={currentBook ? handleBackToHome : undefined}
@@ -225,7 +254,7 @@ export function App() {
                     onSelectBook={handleSelectBook}
                     onResumeChapter={(book, chapter) => {
                       setCurrentBook(book);
-                      handleOpenEditor(chapter);
+                      handleOpenChapterStudio(chapter);
                     }}
                     onOpenCreateModal={() => handleOpenCreateModal('draft')}
                     onOpenStoryArchitect={handleOpenArchitect}
@@ -262,7 +291,7 @@ export function App() {
                   <StoryPlannerView
                     bookId={currentBook.id}
                     chapters={bookChapters}
-                    onOpenEditor={handleOpenEditor}
+                    onOpenEditor={handleOpenChapterStudio}
                     onRefresh={triggerRefresh}
                   />
                 )}
