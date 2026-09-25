@@ -11,7 +11,6 @@ export const ThemeToggle: React.FC = () => {
 
     // Listen to OS system theme changes if in 'auto' mode
     const cleanup = initThemeListener(() => {
-      // Re-trigger update if needed
       setMode(getStoredThemeMode());
     });
 
@@ -46,7 +45,7 @@ export const ThemeToggle: React.FC = () => {
       case 'light':
         return <Sun className="w-3.5 h-3.5 text-amber-500 transition-transform duration-500 group-hover:rotate-90" />;
       case 'auto':
-        return <Monitor className="w-3.5 h-3.5 text-cyan-500 transition-transform duration-300 group-hover:scale-110" />;
+        return <Monitor className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400 transition-transform duration-300 group-hover:scale-110" />;
     }
   };
 
@@ -54,7 +53,7 @@ export const ThemeToggle: React.FC = () => {
     <button
       type="button"
       onClick={cycleTheme}
-      className="group flex items-center gap-1.5 py-1.5 px-2.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white text-xs font-semibold active:scale-95 transition-all shadow-sm"
+      className="group flex items-center gap-1.5 py-1.5 px-2 sm:px-2.5 rounded-xl bg-slate-100 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs font-semibold active:scale-95 transition-all shadow-sm"
       title={`Tema: ${getLabel()} (Klik untuk mengganti: Gelap ➔ Terang ➔ Auto)`}
       aria-label="Ganti mode tema"
     >

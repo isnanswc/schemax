@@ -51,6 +51,8 @@ export const BookCard: React.FC<BookCardProps> = ({ book, onSelect, chapterCount
     }
   };
 
+  const isPublished = book.status === 'released';
+
   return (
     <div
       {...longPressEvents}
@@ -58,10 +60,10 @@ export const BookCard: React.FC<BookCardProps> = ({ book, onSelect, chapterCount
         e.preventDefault();
         setShowMenu(true);
       }}
-      className={`group relative bg-slate-900/90 hover:bg-slate-900 border rounded-2xl p-3 sm:p-3.5 transition-all duration-200 cursor-pointer select-none flex gap-3 sm:gap-4 shadow-sm hover:shadow-lg hover:shadow-black/40 ${
+      className={`group relative bg-white dark:bg-slate-900/90 hover:bg-slate-50 dark:hover:bg-slate-900 border rounded-2xl p-3 sm:p-3.5 transition-all duration-200 cursor-pointer select-none flex gap-3 sm:gap-4 shadow-sm hover:shadow-md dark:shadow-sm dark:hover:shadow-lg dark:hover:shadow-black/40 ${
         isPressing
-          ? 'scale-[0.98] border-amber-500/80 bg-slate-900 ring-2 ring-amber-500/30'
-          : 'border-slate-800/80 hover:border-slate-700/80 active:scale-[0.99]'
+          ? 'scale-[0.98] border-amber-500/80 bg-amber-50/50 dark:bg-slate-900 ring-2 ring-amber-500/30'
+          : 'border-slate-200/90 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700/80 active:scale-[0.99]'
       }`}
     >
       {/* Visual Cover Thumbnail */}
@@ -70,7 +72,7 @@ export const BookCard: React.FC<BookCardProps> = ({ book, onSelect, chapterCount
           mediaId={book.coverMediaId}
           title={book.title}
           aspectRatio="book"
-          className="rounded-xl ring-1 ring-white/5"
+          className="rounded-xl ring-1 ring-slate-200 dark:ring-white/5"
         />
       </div>
 
@@ -81,17 +83,17 @@ export const BookCard: React.FC<BookCardProps> = ({ book, onSelect, chapterCount
           <div className="flex items-center justify-between gap-1.5 mb-1">
             <span
               className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase ${
-                book.status === 'released'
-                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                  : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                isPublished
+                  ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30'
+                  : 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30'
               }`}
             >
               <span
                 className={`w-1.5 h-1.5 rounded-full ${
-                  book.status === 'released' ? 'bg-emerald-400' : 'bg-amber-400'
+                  isPublished ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-amber-500 dark:bg-amber-400'
                 }`}
               />
-              {book.status === 'released' ? 'Released' : 'Draft'}
+              {isPublished ? 'Published' : 'Draft'}
             </span>
 
             {/* Dropdown Menu Trigger */}
@@ -102,7 +104,7 @@ export const BookCard: React.FC<BookCardProps> = ({ book, onSelect, chapterCount
                   e.stopPropagation();
                   setShowMenu(!showMenu);
                 }}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
                 title="Pilihan Buku"
               >
                 <MoreVertical className="w-4 h-4" />
@@ -111,18 +113,18 @@ export const BookCard: React.FC<BookCardProps> = ({ book, onSelect, chapterCount
               {showMenu && (
                 <div 
                   onClick={(e) => e.stopPropagation()}
-                  className="absolute right-0 top-6 w-44 bg-slate-950 border border-slate-800 rounded-2xl shadow-2xl z-30 py-1 text-xs animate-in fade-in zoom-in-95"
+                  className="absolute right-0 top-6 w-44 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-30 py-1 text-xs animate-in fade-in zoom-in-95 text-slate-700 dark:text-slate-200"
                 >
                   <button
                     onClick={toggleStatus}
-                    className="w-full text-left px-3 py-2 text-slate-300 hover:bg-slate-800 flex items-center gap-2"
+                    className="w-full text-left px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2 transition"
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Ubah ke {book.status === 'draft' ? 'Released' : 'Draft'}</span>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Ubah ke {book.status === 'draft' ? 'Published' : 'Draft'}</span>
                   </button>
                   <button
                     onClick={deleteBook}
-                    className="w-full text-left px-3 py-2 text-red-400 hover:bg-red-500/10 flex items-center gap-2"
+                    className="w-full text-left px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center gap-2 transition"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Hapus Buku</span>
@@ -133,30 +135,30 @@ export const BookCard: React.FC<BookCardProps> = ({ book, onSelect, chapterCount
           </div>
 
           {/* Book Title */}
-          <h3 className="font-bold text-sm sm:text-base text-white group-hover:text-amber-300 transition-colors line-clamp-1 leading-snug">
+          <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-300 transition-colors line-clamp-1 leading-snug">
             {book.title}
           </h3>
 
           {/* Synopsis */}
-          <p className="text-xs text-slate-400 line-clamp-2 mt-0.5 leading-relaxed">
+          <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 mt-0.5 leading-relaxed">
             {book.synopsis || 'Belum ada sinopsis. Ketuk untuk mulai menulis naskah.'}
           </p>
         </div>
 
         {/* Bottom Metadata */}
-        <div className="pt-1.5 border-t border-slate-800/60 mt-1 flex items-center justify-between text-[11px] text-slate-400">
+        <div className="pt-1.5 border-t border-slate-100 dark:border-slate-800/60 mt-1 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
           <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1 font-semibold text-slate-300">
-              <FileText className="w-3 h-3 text-amber-400/80" />
+            <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
+              <FileText className="w-3 h-3 text-amber-500" />
               {chapterCount} Bab
             </span>
-            <span className="text-slate-600">•</span>
-            <span className="text-slate-400 truncate max-w-[90px] sm:max-w-none">
+            <span className="text-slate-300 dark:text-slate-600">•</span>
+            <span className="text-slate-500 dark:text-slate-400 truncate max-w-[90px] sm:max-w-none">
               {book.genre || 'Fiksi'}
             </span>
           </div>
 
-          <div className="flex items-center gap-1 text-amber-400 font-semibold group-hover:translate-x-0.5 transition-transform text-xs">
+          <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-semibold group-hover:translate-x-0.5 transition-transform text-xs">
             <span>Buka</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </div>

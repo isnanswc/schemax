@@ -95,9 +95,12 @@
       /* Rich Text Editor Styling */
       [contenteditable]:empty:before {
         content: attr(data-placeholder);
-        color: #64748b;
+        color: #94a3b8;
         cursor: text;
         pointer-events: none;
+      }
+      html.dark [contenteditable]:empty:before {
+        color: #64748b;
       }
 
       [contenteditable] {
@@ -109,9 +112,13 @@
         font-weight: 800;
         margin-top: 1.5rem;
         margin-bottom: 0.75rem;
+        color: #0f172a;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+        padding-bottom: 0.25rem;
+      }
+      html.dark [contenteditable] h2 {
         color: #f1f5f9;
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        padding-bottom: 0.25rem;
       }
 
       [contenteditable] h3 {
@@ -119,6 +126,9 @@
         font-weight: 700;
         margin-top: 1.25rem;
         margin-bottom: 0.5rem;
+        color: #b45309;
+      }
+      html.dark [contenteditable] h3 {
         color: #fbbf24;
       }
 
@@ -128,15 +138,20 @@
       }
 
       [contenteditable] blockquote {
-        border-left: 3px solid #f59e0b;
+        border-left: 3px solid #d97706;
         padding-left: 1rem;
         margin: 1.25rem 0;
         font-style: italic;
-        color: #fde68a;
-        background: rgba(245, 158, 11, 0.05);
+        color: #92400e;
+        background: rgba(245, 158, 11, 0.08);
         padding-top: 0.5rem;
         padding-bottom: 0.5rem;
         border-radius: 0 0.5rem 0.5rem 0;
+      }
+      html.dark [contenteditable] blockquote {
+        border-left-color: #f59e0b;
+        color: #fde68a;
+        background: rgba(245, 158, 11, 0.05);
       }
 
       [contenteditable] ul {

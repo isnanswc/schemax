@@ -139,26 +139,26 @@ Berikan tepat 3 ide bernomor (1, 2, 3), masing-masing 2-3 kalimat tajam tanpa ka
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"
+        className="fixed inset-0 bg-slate-900/40 dark:bg-black/75 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"
         onClick={onClose}
       />
 
       {/* Modal Container */}
-      <div className="relative w-full sm:max-w-xl bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-3xl shadow-2xl z-10 max-h-[92vh] flex flex-col animate-in slide-in-from-bottom duration-250 safe-bottom">
+      <div className="relative w-full sm:max-w-xl bg-white dark:bg-slate-900 border-t sm:border border-slate-200 dark:border-slate-800 rounded-t-3xl sm:rounded-3xl shadow-2xl z-10 max-h-[92vh] flex flex-col animate-in slide-in-from-bottom duration-250 safe-bottom">
         {/* Swipe Handle */}
-        <div className="w-12 h-1.5 bg-slate-700/80 rounded-full mx-auto mt-3 mb-1 sm:hidden flex-shrink-0" />
+        <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700/80 rounded-full mx-auto mt-3 mb-1 sm:hidden flex-shrink-0" />
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800/80 bg-slate-950/60 flex-shrink-0">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-950/60 flex-shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-600 flex items-center justify-center text-slate-950 font-black shadow-md shadow-amber-500/20">
               <Lightbulb className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-extrabold text-sm sm:text-base text-white">
+              <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">
                 Inkubator Ide & Plot Spark
               </h3>
-              <p className="text-[10px] text-slate-400">
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">
                 Pancingan ide kreatif instan bertenaga AI Multi-Fallback
               </p>
             </div>
@@ -166,7 +166,7 @@ Berikan tepat 3 ide bernomor (1, 2, 3), masing-masing 2-3 kalimat tajam tanpa ka
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-full bg-slate-800 text-slate-400 hover:text-white transition"
+            className="p-1.5 rounded-full bg-slate-150 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition"
           >
             <X className="w-4 h-4" />
           </button>
@@ -177,13 +177,13 @@ Berikan tepat 3 ide bernomor (1, 2, 3), masing-masing 2-3 kalimat tajam tanpa ka
           {/* Target Book Selector if multiple books exist */}
           {books.length > 1 && (
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-1">
                 Konteks Buku:
               </label>
               <select
                 value={selectedBookId}
                 onChange={(e) => setSelectedBookId(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400 font-semibold"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400 font-semibold"
               >
                 {books.map((b) => (
                   <option key={b.id} value={b.id}>
@@ -196,7 +196,7 @@ Berikan tepat 3 ide bernomor (1, 2, 3), masing-masing 2-3 kalimat tajam tanpa ka
 
           {/* Spark Type Grid */}
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-1.5">
               Pilih Jenis Pancingan Ide:
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
@@ -211,7 +211,7 @@ Berikan tepat 3 ide bernomor (1, 2, 3), masing-masing 2-3 kalimat tajam tanpa ka
                     className={`flex items-center gap-2 p-2 rounded-xl border text-xs font-semibold transition active:scale-95 text-left ${
                       isSelected
                         ? `${preset.color} font-bold shadow-sm`
-                        : 'bg-slate-950/70 border-slate-800 text-slate-400 hover:text-slate-200'
+                        : 'bg-slate-50 dark:bg-slate-950/70 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                     }`}
                   >
                     <Icon className="w-3.5 h-3.5 flex-shrink-0" />
@@ -224,7 +224,7 @@ Berikan tepat 3 ide bernomor (1, 2, 3), masing-masing 2-3 kalimat tajam tanpa ka
 
           {/* Specific Topic Input */}
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-1">
               Fokus Topik / Kata Kunci (Opsional):
             </label>
             <input
@@ -232,7 +232,7 @@ Berikan tepat 3 ide bernomor (1, 2, 3), masing-masing 2-3 kalimat tajam tanpa ka
               value={topicInput}
               onChange={(e) => setTopicInput(e.target.value)}
               placeholder="Misal: artefak jam kuno, pertarungan di jembatan kabut..."
-              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-400"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-amber-400"
             />
           </div>
 
@@ -258,7 +258,7 @@ Berikan tepat 3 ide bernomor (1, 2, 3), masing-masing 2-3 kalimat tajam tanpa ka
 
           {/* Error Message */}
           {error && (
-            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-300">
+            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-600 dark:text-red-300">
               {error}
             </div>
           )}
@@ -266,33 +266,33 @@ Berikan tepat 3 ide bernomor (1, 2, 3), masing-masing 2-3 kalimat tajam tanpa ka
           {/* Generated Ideas Cards */}
           {sparks.length > 0 && (
             <div className="space-y-2.5 pt-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 block">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 block">
                 3 Alternatif Ide yang Dihasilkan:
               </span>
               {sparks.map((spark, idx) => (
                 <div
                   key={idx}
-                  className="bg-slate-950 border border-slate-800/90 rounded-2xl p-3.5 space-y-2.5 transition hover:border-amber-500/40"
+                  className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800/90 rounded-2xl p-3.5 space-y-2.5 transition hover:border-amber-500/40"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300">
+                    <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-800 dark:text-amber-300">
                       Opsi {idx + 1}
                     </span>
                     <button
                       type="button"
                       onClick={() => handleCopy(spark, idx)}
-                      className="p-1 rounded-lg text-slate-400 hover:text-white transition"
+                      className="p-1 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition"
                       title="Salin Ide"
                     >
                       {copiedIndex === idx ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                       ) : (
                         <Copy className="w-3.5 h-3.5" />
                       )}
                     </button>
                   </div>
 
-                  <p className="text-xs text-slate-200 leading-relaxed font-serif italic">
+                  <p className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed font-serif italic">
                     "{spark}"
                   </p>
                 </div>

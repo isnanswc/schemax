@@ -91,70 +91,70 @@ export const CreateBookModal: React.FC<CreateBookModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 dark:bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
       <div 
-        className="w-full sm:max-w-lg max-h-[92vh] flex flex-col bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300"
+        className="w-full sm:max-w-lg max-h-[92vh] flex flex-col bg-white dark:bg-slate-900 border-t sm:border border-slate-200 dark:border-slate-800 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300"
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800/80 bg-slate-900/90 sticky top-0 z-10">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/80 dark:bg-slate-900/90 sticky top-0 z-10">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400">
               <BookOpen className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white leading-tight">Buat Karya / Buku Baru</h2>
-              <p className="text-xs text-slate-400">Simpan otomatis di IndexedDB lokal</p>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white leading-tight">Buat Karya / Buku Baru</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Simpan otomatis di IndexedDB lokal</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Modal Form Scrollable Body */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-5">
-          {/* Status Selection Pill (Mobile First Segmented Control) */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4">
+          {/* Status Selection Pill */}
           <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
               Status Buku *
             </label>
-            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-950/80 rounded-xl border border-slate-800">
+            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-slate-950/80 rounded-xl border border-slate-200 dark:border-slate-800">
               <button
                 type="button"
                 onClick={() => setStatus('draft')}
-                className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-sm font-semibold transition-all ${
+                className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all ${
                   status === 'draft'
-                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-white dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                 }`}
               >
-                <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                <span className="w-2 h-2 rounded-full bg-amber-500 dark:bg-amber-400"></span>
                 <span>Draft (Draf)</span>
-                {status === 'draft' && <Check className="w-3.5 h-3.5 ml-1 text-amber-400" />}
+                {status === 'draft' && <Check className="w-3.5 h-3.5 ml-1 text-amber-600 dark:text-amber-400" />}
               </button>
 
               <button
                 type="button"
                 onClick={() => setStatus('released')}
-                className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-sm font-semibold transition-all ${
+                className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all ${
                   status === 'released'
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-white dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30 shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                 }`}
               >
-                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                <span>Released (Rilis)</span>
-                {status === 'released' && <Check className="w-3.5 h-3.5 ml-1 text-emerald-400" />}
+                <span className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400"></span>
+                <span>Published (Rilis)</span>
+                {status === 'released' && <Check className="w-3.5 h-3.5 ml-1 text-emerald-600 dark:text-emerald-400" />}
               </button>
             </div>
           </div>
 
           {/* Book Title */}
           <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
               Judul Cerita / Buku *
             </label>
             <input
@@ -163,17 +163,17 @@ export const CreateBookModal: React.FC<CreateBookModalProps> = ({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Contoh: Petualangan Menembus Dimensi"
-              className="w-full px-3.5 py-2.5 bg-slate-950/70 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/40 text-sm"
+              className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-amber-500 text-sm shadow-sm"
             />
           </div>
 
           {/* Cover Image Upload (IndexedDB Blob) */}
           <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
               Sampul Buku (Visual Media)
             </label>
             <div className="flex items-center gap-4">
-              <div className="relative w-20 h-28 rounded-xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center flex-shrink-0 group">
+              <div className="relative w-20 h-28 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-center justify-center flex-shrink-0 group shadow-sm">
                 {coverPreviewUrl ? (
                   <img
                     src={coverPreviewUrl}
@@ -181,16 +181,16 @@ export const CreateBookModal: React.FC<CreateBookModalProps> = ({
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="flex flex-col items-center justify-center text-slate-500 p-2 text-center">
-                    <ImageIcon className="w-6 h-6 mb-1 text-slate-600" />
+                  <div className="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 p-2 text-center">
+                    <ImageIcon className="w-6 h-6 mb-1 text-slate-400 dark:text-slate-600" />
                     <span className="text-[10px] leading-tight">Auto Gradient</span>
                   </div>
                 )}
               </div>
 
               <div className="flex-1 space-y-2">
-                <label className="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700/80 active:scale-95 text-slate-200 text-xs font-medium rounded-xl cursor-pointer border border-slate-700 transition">
-                  <ImageIcon className="w-4 h-4 text-amber-400" />
+                <label className="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl cursor-pointer border border-slate-200 dark:border-slate-700 transition shadow-sm">
+                  <ImageIcon className="w-4 h-4 text-amber-500" />
                   <span>Pilih Gambar Sampul</span>
                   <input
                     type="file"
@@ -199,7 +199,7 @@ export const CreateBookModal: React.FC<CreateBookModalProps> = ({
                     className="hidden"
                   />
                 </label>
-                <p className="text-[11px] text-slate-400 leading-normal">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-normal">
                   Disimpan langsung sebagai <strong>Blob di IndexedDB</strong> lokal tanpa upload ke server luar.
                 </p>
               </div>
@@ -208,7 +208,7 @@ export const CreateBookModal: React.FC<CreateBookModalProps> = ({
 
           {/* Synopsis */}
           <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
               Sinopsis / Logline Singkat
             </label>
             <textarea
@@ -216,22 +216,22 @@ export const CreateBookModal: React.FC<CreateBookModalProps> = ({
               value={synopsis}
               onChange={(e) => setSynopsis(e.target.value)}
               placeholder="Ceritakan premis utama cerita dalam 1-2 paragraf..."
-              className="w-full px-3.5 py-2.5 bg-slate-950/70 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/40 text-sm resize-none"
+              className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-amber-500 text-sm resize-none shadow-sm"
             />
           </div>
 
           {/* Genre Selection */}
           <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
               Genre / Kategori Cerita
             </label>
             <select
               value={genre}
               onChange={(e) => setGenre(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-slate-950/70 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-amber-500/60 text-sm mb-2"
+              className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-amber-500 text-sm mb-2 shadow-sm"
             >
               {GENRE_SUGGESTIONS.map((g) => (
-                <option key={g} value={g} className="bg-slate-900 text-white">
+                <option key={g} value={g} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
                   {g}
                 </option>
               ))}
@@ -240,7 +240,7 @@ export const CreateBookModal: React.FC<CreateBookModalProps> = ({
 
           {/* Target Words */}
           <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
               Target Jumlah Kata (Opsional)
             </label>
             <input
@@ -248,7 +248,7 @@ export const CreateBookModal: React.FC<CreateBookModalProps> = ({
               value={wordTarget}
               onChange={(e) => setWordTarget(e.target.value)}
               placeholder="50000"
-              className="w-full px-3.5 py-2.5 bg-slate-950/70 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/60 text-sm"
+              className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-amber-500 text-sm shadow-sm"
             />
           </div>
 
@@ -264,7 +264,7 @@ export const CreateBookModal: React.FC<CreateBookModalProps> = ({
               ) : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  <span>Buat Buku Sekarang</span>
+                  <span>Simpan Buku</span>
                 </>
               )}
             </button>

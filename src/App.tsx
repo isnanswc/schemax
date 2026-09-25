@@ -4,7 +4,8 @@ import { Book, StoryChapter, WorldEntity, MediaItem, ActiveTab, BookStatus } fro
 import { db, seedInitialDataIfNeeded } from './db';
 import { MobileHeader } from './components/layout/MobileHeader';
 import { BottomNavigation } from './components/layout/BottomNavigation';
-import { BookListDashboard } from './components/books/BookListDashboard';
+import { DashboardView } from './components/dashboard/DashboardView';
+import { WorksView } from './components/works/WorksView';
 import { BookOverviewTab } from './components/books/BookOverviewTab';
 import { StoryPlannerView } from './components/story/StoryPlannerView';
 import { RichTextEditor } from './components/story/RichTextEditor';
@@ -15,8 +16,10 @@ import { SyncStatusModal } from './components/sync/SyncStatusModal';
 import { AISettingsModal } from './components/settings/AISettingsModal';
 import { AIStoryArchitectModal } from './components/story/AIStoryArchitectModal';
 import { navStack } from './services/backNavigationService';
+import { LayoutDashboard, BookOpen } from 'lucide-react';
 
 export function App() {
+  const [mainMenu, setMainMenu] = useState<'dashboard' | 'works'>('dashboard');
   const [currentBook, setCurrentBook] = useState<Book | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('chapters');
   const [editingChapter, setEditingChapter] = useState<StoryChapter | null>(null);
@@ -177,22 +180,67 @@ export function App() {
           {/* 3. Main Body Container - Compact & Edge-to-Edge on Mobile */}
           <main className="flex-1 w-full max-w-4xl mx-auto px-2.5 sm:px-4 py-3 sm:py-6">
             {!currentBook ? (
-              /* Home Screen / Studio Dashboard (Quick Resume, AI Spark, Draft & Released) */
-              <BookListDashboard
-                books={books}
-                allChapters={allChapters}
-                recentChapter={recentChapter}
-                recentBook={recentBook}
-                chapterCounts={chapterCounts}
-                onSelectBook={handleSelectBook}
-                onResumeChapter={(book, chapter) => {
-                  setCurrentBook(book);
-                  handleOpenEditor(chapter);
-                }}
-                onOpenCreateModal={handleOpenCreateModal}
-                onOpenStoryArchitect={handleOpenArchitect}
-                onOpenAISettings={handleOpenAISettings}
-              />
+              /* Home Screen: Toggle between Dashboard & Works */
+              <div className="space-y-4">
+                {/* 🌟 Top Navigation Switcher: [ Dashboard ] [ Works ] */}
+                <div className="flex items-center justify-center pt-0.5 pb-1">
+                  <div className="inline-flex p-1 rounded-2xl bg-slate-200/80 dark:bg-slate-900 border border-slate-300/80 dark:border-slate-800 shadow-inner">
+                    <button
+                      type="button"
+                      onClick={() => setMainMenu('dashboard')}
+                      className={`flex items-center gap-2 py-2 px-5 sm:px-6 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                        mainMenu === 'dashboard'
+                          ? 'bg-white dark:bg-amber-500 text-slate-900 dark:text-slate-950 shadow-sm border border-slate-200/60 dark:border-transparent'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <LayoutDashboard className="w-4 h-4" />
+                      <span>Dashboard</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMainMenu('works')}
+                      className={`flex items-center gap-2 py-2 px-5 sm:px-6 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                        mainMenu === 'works'
+                          ? 'bg-white dark:bg-amber-500 text-slate-900 dark:text-slate-950 shadow-sm border border-slate-200/60 dark:border-transparent'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <BookOpen className="w-4 h-4" />
+                      <span>Works</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 font-mono">
+                        {books.length}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                {mainMenu === 'dashboard' ? (
+                  <DashboardView
+                    books={books}
+                    allChapters={allChapters}
+                    recentChapter={recentChapter}
+                    recentBook={recentBook}
+                    chapterCounts={chapterCounts}
+                    onSelectBook={handleSelectBook}
+                    onResumeChapter={(book, chapter) => {
+                      setCurrentBook(book);
+                      handleOpenEditor(chapter);
+                    }}
+                    onOpenCreateModal={() => handleOpenCreateModal('draft')}
+                    onOpenStoryArchitect={handleOpenArchitect}
+                    onOpenAISettings={handleOpenAISettings}
+                    onNavigateToWorks={() => setMainMenu('works')}
+                  />
+                ) : (
+                  <WorksView
+                    books={books}
+                    chapterCounts={chapterCounts}
+                    onSelectBook={handleSelectBook}
+                    onOpenCreateModal={handleOpenCreateModal}
+                  />
+                )}
+              </div>
             ) : (
               /* Inside Book Workspace */
               <div className="space-y-4">

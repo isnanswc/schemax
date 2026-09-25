@@ -103,24 +103,24 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full sm:max-w-md max-h-[90vh] flex flex-col bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/40 dark:bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="w-full sm:max-w-md max-h-[90vh] flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800/80 bg-slate-900/90 sticky top-0 z-10">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-900/90 sticky top-0 z-10">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
               <HardDrive className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white leading-tight">
+              <h2 className="text-base font-bold text-slate-900 dark:text-white leading-tight">
                 Penyimpanan & Sinkronisasi
               </h2>
-              <p className="text-xs text-slate-400">Arsitektur Full Client-Side Local First</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Arsitektur Full Client-Side Local First</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="p-1.5 rounded-full text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
           >
             <X className="w-5 h-5" />
           </button>
@@ -129,39 +129,39 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({
         {/* Content */}
         <div className="p-5 space-y-4 overflow-y-auto">
           {/* Status Badge */}
-          <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-start gap-3">
-            <ShieldCheck className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+          <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 flex items-start gap-3">
+            <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
             <div className="text-xs">
-              <span className="font-bold text-emerald-300 block mb-0.5">
+              <span className="font-bold text-emerald-800 dark:text-emerald-300 block mb-0.5">
                 Mode Offline / Local-First Aktif
               </span>
-              <p className="text-emerald-200/80 leading-relaxed">
+              <p className="text-emerald-700 dark:text-emerald-200/80 leading-relaxed">
                 Seluruh data naskah, bab, worldbuilding, dan binary foto disimpan aman di browser Anda via <strong>IndexedDB</strong> tanpa memerlukan koneksi internet.
               </p>
             </div>
           </div>
 
           {/* Storage Statistics */}
-          <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-2.5">
-            <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+          <div className="bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-2.5">
+            <h4 className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
               Statistik Database Lokal
             </h4>
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800/80">
-                <span className="text-slate-400 block text-[11px]">Total Buku</span>
-                <span className="text-base font-bold text-white">{stats.books}</span>
+              <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800/80">
+                <span className="text-slate-500 dark:text-slate-400 block text-[11px]">Total Buku</span>
+                <span className="text-base font-bold text-slate-900 dark:text-white">{stats.books}</span>
               </div>
-              <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800/80">
-                <span className="text-slate-400 block text-[11px]">Bab & Plot</span>
-                <span className="text-base font-bold text-white">{stats.chapters}</span>
+              <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800/80">
+                <span className="text-slate-500 dark:text-slate-400 block text-[11px]">Bab & Plot</span>
+                <span className="text-base font-bold text-slate-900 dark:text-white">{stats.chapters}</span>
               </div>
-              <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800/80">
-                <span className="text-slate-400 block text-[11px]">Entitas Lore</span>
-                <span className="text-base font-bold text-white">{stats.entities}</span>
+              <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800/80">
+                <span className="text-slate-500 dark:text-slate-400 block text-[11px]">Entitas Lore</span>
+                <span className="text-base font-bold text-slate-900 dark:text-white">{stats.entities}</span>
               </div>
-              <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800/80">
-                <span className="text-slate-400 block text-[11px]">Media Gambar</span>
-                <span className="text-base font-bold text-white">
+              <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800/80">
+                <span className="text-slate-500 dark:text-slate-400 block text-[11px]">Media Gambar</span>
+                <span className="text-base font-bold text-slate-900 dark:text-white">
                   {stats.media} ({(stats.mediaBytes / (1024 * 1024)).toFixed(1)} MB)
                 </span>
               </div>
@@ -170,13 +170,13 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({
           </div>
 
           {/* Future Cloud Sync Roadmap */}
-          <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-start gap-3">
-            <Cloud className="w-5 h-5 text-indigo-400 flex-shrink-0 mt-0.5" />
+          <div className="p-3.5 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 flex items-start gap-3">
+            <Cloud className="w-5 h-5 text-indigo-600 dark:text-indigo-400 flex-shrink-0 mt-0.5" />
             <div className="text-xs">
-              <span className="font-bold text-indigo-300 block mb-0.5">
+              <span className="font-bold text-indigo-800 dark:text-indigo-300 block mb-0.5">
                 Kesiapan Sinkronisasi Cloud
               </span>
-              <p className="text-indigo-200/80 leading-relaxed">
+              <p className="text-indigo-700 dark:text-indigo-200/80 leading-relaxed">
                 Struktur ID berbasis timestamp dan isolasi media siap dihubungkan ke backend cloud (Supabase, Firebase, CouchDB, atau Google Drive) kapan pun Anda siap.
               </p>
             </div>
@@ -186,15 +186,15 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({
           <div className="space-y-2 pt-1">
             <button
               onClick={exportAllData}
-              className="w-full py-2.5 px-3.5 bg-slate-800 hover:bg-slate-700 active:scale-[0.99] text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-2 border border-slate-700 transition"
+              className="w-full py-2.5 px-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-[0.99] text-slate-800 dark:text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-700 transition shadow-sm"
             >
-              <Download className="w-4 h-4 text-amber-400" />
+              <Download className="w-4 h-4 text-amber-500" />
               <span>Unduh Cadangan Semua Data (JSON)</span>
             </button>
 
             <button
               onClick={handleResetData}
-              className="w-full py-2 px-3 text-slate-500 hover:text-slate-300 text-[11px] flex items-center justify-center gap-1.5 transition"
+              className="w-full py-2 px-3 text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 text-[11px] flex items-center justify-center gap-1.5 transition"
             >
               <RefreshCw className="w-3 h-3" />
               <span>Muat Ulang Data Contoh Awal</span>

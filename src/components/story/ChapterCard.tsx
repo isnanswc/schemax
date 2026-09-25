@@ -46,23 +46,23 @@ export const ChapterCard: React.FC<ChapterCardProps> = ({
   const statusConfig = {
     planned: {
       label: 'Direncanakan',
-      bg: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
-      dot: 'bg-purple-400',
+      bg: 'bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-500/30',
+      dot: 'bg-purple-500 dark:bg-purple-400',
     },
     in_progress: {
       label: 'Sedang Ditulis',
-      bg: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
-      dot: 'bg-amber-400',
+      bg: 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30',
+      dot: 'bg-amber-500 dark:bg-amber-400',
     },
     completed: {
       label: 'Selesai',
-      bg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-      dot: 'bg-emerald-400',
+      bg: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30',
+      dot: 'bg-emerald-500 dark:bg-emerald-400',
     },
   }[chapter.status] || {
     label: 'Direncanakan',
-    bg: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
-    dot: 'bg-purple-400',
+    bg: 'bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-500/30',
+    dot: 'bg-purple-500 dark:bg-purple-400',
   };
 
   return (
@@ -72,17 +72,17 @@ export const ChapterCard: React.FC<ChapterCardProps> = ({
         e.preventDefault();
         onOpenActionSheet(chapter, index);
       }}
-      className={`group relative bg-slate-900/90 border rounded-2xl p-3.5 transition-all duration-200 cursor-pointer select-none shadow-sm flex flex-col justify-between gap-2.5 ${
+      className={`group relative bg-white dark:bg-slate-900/90 border rounded-2xl p-3.5 transition-all duration-200 cursor-pointer select-none shadow-sm flex flex-col justify-between gap-2.5 ${
         isPressing
-          ? 'scale-[0.98] border-amber-500/80 bg-slate-900 ring-2 ring-amber-500/30'
-          : 'border-slate-800/80 hover:border-slate-700/80 active:scale-[0.99]'
+          ? 'scale-[0.98] border-amber-500/80 bg-amber-50/50 dark:bg-slate-900 ring-2 ring-amber-500/30'
+          : 'border-slate-200/90 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700/80 active:scale-[0.99]'
       }`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           {/* Badge & Order */}
           <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-            <span className="text-[11px] font-extrabold text-amber-400/90 tracking-wide uppercase">
+            <span className="text-[11px] font-extrabold text-amber-600 dark:text-amber-400/90 tracking-wide uppercase">
               Bab {chapter.order || index + 1}
             </span>
 
@@ -98,26 +98,26 @@ export const ChapterCard: React.FC<ChapterCardProps> = ({
           </div>
 
           {/* Title */}
-          <h4 className="font-bold text-sm sm:text-base text-white group-hover:text-amber-300 transition-colors line-clamp-1">
+          <h4 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-300 transition-colors line-clamp-1">
             {chapter.title || 'Bab Tanpa Judul'}
           </h4>
 
           {/* Premise preview */}
           {chapter.premise && (
-            <p className="text-xs text-slate-400 line-clamp-2 mt-1 leading-relaxed">
+            <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 mt-1 leading-relaxed">
               {chapter.premise}
             </p>
           )}
         </div>
 
-        {/* Action Button for 3 dots (Accessibility fallback) */}
+        {/* Action Button for 3 dots */}
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             onOpenActionSheet(chapter, index);
           }}
-          className="p-1.5 rounded-xl text-slate-500 hover:text-amber-400 hover:bg-slate-800 transition -mr-1"
+          className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition -mr-1"
           title="Menu Cepat"
         >
           <MoreVertical className="w-4 h-4" />
@@ -125,19 +125,19 @@ export const ChapterCard: React.FC<ChapterCardProps> = ({
       </div>
 
       {/* Bottom Footer Stats */}
-      <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-xs text-slate-400">
+      <div className="pt-2 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-slate-200 flex items-center gap-1.5 text-[11px] sm:text-xs">
-            <FileText className="w-3.5 h-3.5 text-amber-400" />
+          <span className="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 text-[11px] sm:text-xs">
+            <FileText className="w-3.5 h-3.5 text-amber-500" />
             {(chapter.wordCount || 0).toLocaleString()} kata
           </span>
-          <span className="text-slate-600">•</span>
+          <span className="text-slate-300 dark:text-slate-600">•</span>
           <span className="text-slate-500 text-[10px] sm:text-[11px]">
             Target {chapter.targetWordCount || 1500}
           </span>
         </div>
 
-        <div className="inline-flex items-center gap-1 text-amber-400 font-bold group-hover:translate-x-0.5 transition-transform text-[11px] sm:text-xs">
+        <div className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold group-hover:translate-x-0.5 transition-transform text-[11px] sm:text-xs">
           <span>Tulis</span>
           <ChevronRight className="w-3.5 h-3.5" />
         </div>

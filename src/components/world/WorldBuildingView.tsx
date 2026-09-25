@@ -71,16 +71,16 @@ const EntityCard: React.FC<{
         e.preventDefault();
         onOpenHologram(entity);
       }}
-      className={`relative bg-slate-900/90 border rounded-2xl p-3.5 transition-all duration-200 select-none shadow-sm space-y-2.5 cursor-pointer ${
+      className={`relative bg-white dark:bg-slate-900/90 border rounded-2xl p-3.5 transition-all duration-200 select-none shadow-sm space-y-2.5 cursor-pointer ${
         isPressing
-          ? 'scale-[0.98] border-pink-500/80 bg-slate-900 ring-2 ring-pink-500/30'
-          : 'border-slate-800/80 hover:border-slate-700/80 active:scale-[0.99]'
+          ? 'scale-[0.98] border-pink-500/80 bg-slate-50 dark:bg-slate-900 ring-2 ring-pink-500/30'
+          : 'border-slate-200 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700/80 active:scale-[0.99]'
       }`}
     >
       {/* Top Header */}
       <div className="flex items-start gap-3">
         {/* Avatar / Visual preview */}
-        <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden bg-slate-950 border border-slate-800 flex-shrink-0 flex items-center justify-center">
+        <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex-shrink-0 flex items-center justify-center">
           {url ? (
             <img src={url} alt={entity.name} className="w-full h-full object-cover" />
           ) : (
@@ -103,7 +103,7 @@ const EntityCard: React.FC<{
                   e.stopPropagation();
                   onOpenHologram(entity);
                 }}
-                className="p-1 rounded-lg text-slate-500 hover:text-amber-300 transition"
+                className="p-1 rounded-lg text-slate-400 hover:text-amber-600 dark:hover:text-amber-300 transition"
                 title="Intip Hologram"
               >
                 <Eye className="w-3.5 h-3.5" />
@@ -114,7 +114,7 @@ const EntityCard: React.FC<{
                   e.stopPropagation();
                   onDelete(entity.id, entity.name);
                 }}
-                className="p-1 rounded-lg text-slate-500 hover:text-red-400 transition"
+                className="p-1 rounded-lg text-slate-400 hover:text-red-500 transition"
                 title="Hapus Entitas"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -122,9 +122,9 @@ const EntityCard: React.FC<{
             </div>
           </div>
 
-          <h4 className="font-bold text-sm sm:text-base text-white truncate">{entity.name}</h4>
+          <h4 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate">{entity.name}</h4>
           {entity.shortDescription && (
-            <p className="text-xs text-slate-400 line-clamp-2 mt-0.5 leading-snug">
+            <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5 leading-snug">
               {entity.shortDescription}
             </p>
           )}
@@ -137,10 +137,10 @@ const EntityCard: React.FC<{
           {entity.attributes.slice(0, isExpanded ? undefined : 2).map((attr) => (
             <div
               key={attr.id}
-              className="bg-slate-950/70 border border-slate-800/80 rounded-lg px-2 py-1 text-[11px] flex items-center justify-between"
+              className="bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800/80 rounded-lg px-2 py-1 text-[11px] flex items-center justify-between"
             >
-              <span className="text-slate-400 truncate mr-1">{attr.label}</span>
-              <span className="font-medium text-white truncate max-w-[85px]">{attr.value}</span>
+              <span className="text-slate-500 dark:text-slate-400 truncate mr-1">{attr.label}</span>
+              <span className="font-medium text-slate-900 dark:text-white truncate max-w-[85px]">{attr.value}</span>
             </div>
           ))}
         </div>
@@ -148,11 +148,11 @@ const EntityCard: React.FC<{
 
       {/* Expanded Detailed Notes & Tags */}
       {isExpanded && (
-        <div className="pt-2 border-t border-slate-800/80 space-y-2 text-xs animate-in fade-in">
+        <div className="pt-2 border-t border-slate-200 dark:border-slate-800/80 space-y-2 text-xs animate-in fade-in">
           {entity.detailedNotes && (
             <div>
-              <span className="font-semibold text-slate-300 block mb-1 text-[11px]">Catatan Lore & Latar:</span>
-              <p className="text-slate-300 leading-relaxed whitespace-pre-wrap bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/60 text-xs">
+              <span className="font-semibold text-slate-700 dark:text-slate-300 block mb-1 text-[11px]">Catatan Lore & Latar:</span>
+              <p className="text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap bg-slate-50 dark:bg-slate-950/60 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800/60 text-xs">
                 {entity.detailedNotes}
               </p>
             </div>
@@ -163,7 +163,7 @@ const EntityCard: React.FC<{
               {entity.tags.map((t, idx) => (
                 <span
                   key={idx}
-                  className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 text-[10px] font-medium"
+                  className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-medium"
                 >
                   #{t}
                 </span>
@@ -181,7 +181,7 @@ const EntityCard: React.FC<{
             e.stopPropagation();
             setIsExpanded(!isExpanded);
           }}
-          className="w-full pt-1 flex items-center justify-center gap-1 text-[11px] font-medium text-pink-400/90 hover:text-pink-300 transition"
+          className="w-full pt-1 flex items-center justify-center gap-1 text-[11px] font-medium text-pink-600 dark:text-pink-400/90 hover:text-pink-700 dark:hover:text-pink-300 transition"
         >
           <span>{isExpanded ? 'Tutup Rincian' : 'Lihat Rincian Lore & Atribut'}</span>
           {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -256,7 +256,7 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition active:scale-95 ${
                   isSelected
                     ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
-                    : 'bg-slate-900/90 border border-slate-800 text-slate-400 hover:text-white'
+                    : 'bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white shadow-sm'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -285,24 +285,24 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
       {/* Helpful Mobile Micro-Hint */}
       {filteredEntities.length > 0 && (
         <div className="flex items-center gap-1.5 px-1 text-[11px] text-slate-500">
-          <Info className="w-3.5 h-3.5 text-pink-400/80 flex-shrink-0" />
+          <Info className="w-3.5 h-3.5 text-pink-500 dark:text-pink-400/80 flex-shrink-0" />
           <span>Tip: <strong>Tekan & tahan</strong> kartu untuk intip profil hologram instan.</span>
         </div>
       )}
 
       {/* Entities Grid */}
       {filteredEntities.length === 0 ? (
-        <div className="text-center py-12 px-4 border border-dashed border-slate-800 rounded-2xl bg-slate-900/30">
-          <Compass className="w-9 h-9 mx-auto text-slate-600 mb-2" />
-          <h3 className="text-sm font-bold text-white mb-1">Belum Ada Entitas di Kategori Ini</h3>
-          <p className="text-xs text-slate-400 max-w-sm mx-auto mb-4">
+        <div className="text-center py-12 px-4 border border-dashed border-slate-300 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-900/30">
+          <Compass className="w-9 h-9 mx-auto text-slate-400 dark:text-slate-600 mb-2" />
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">Belum Ada Entitas di Kategori Ini</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-4">
             Mulai bangun ensiklopedia duniamu: karakter utama, kastil tua, senjata legendaris, atau sistem sihir.
           </p>
           <button
             onClick={handleOpenAddModal}
-            className="inline-flex items-center gap-2 py-2 px-4 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-xl text-xs border border-slate-700 transition"
+            className="inline-flex items-center gap-2 py-2 px-4 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-900 dark:text-white font-semibold rounded-xl text-xs border border-slate-300 dark:border-slate-700 transition shadow-sm"
           >
-            <Plus className="w-4 h-4 text-pink-400" />
+            <Plus className="w-4 h-4 text-pink-500 dark:text-pink-400" />
             <span>Tambah Entitas Baru</span>
           </button>
         </div>
