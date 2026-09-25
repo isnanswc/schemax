@@ -30,6 +30,12 @@ import {
   Link2,
   CheckCheck,
   PlusCircle,
+  Settings,
+  Image as ImageIcon,
+  RotateCcw,
+  Sliders,
+  X,
+  Share2,
 } from 'lucide-react';
 import {
   Book,
@@ -38,6 +44,8 @@ import {
   ChapterRawDraft,
   ChapterPlotBreakdown,
   ChapterSceneItem,
+  SceneGlosariumItem,
+  ImagePromptSettings,
   DetectedEntityCandidate,
   WorldEntity,
   WorldCategory,
@@ -47,6 +55,7 @@ import {
   generateChapterSummary,
   generateChapterAutoPlot,
   generateChapterAutoScenes,
+  generateSingleSceneImagePrompt,
   enhanceRawToProse,
   detectEntitiesAndAliases,
 } from '../../services/aiService';
@@ -60,6 +69,15 @@ interface ChapterStudioViewProps {
 }
 
 type StudioTab = 'premise' | 'raw' | 'main' | 'ai';
+type AISubSheet = 'summary' | 'plot' | 'scenes' | 'glosarium';
+
+const DEFAULT_IMAGE_SETTINGS: ImagePromptSettings = {
+  aspectRatio: '9:16 (Layar HP)',
+  style: 'Hyper realistic, natural scene, 8k resolution, cinematic lighting, photorealistic textures',
+  characterNaming: 'person1, person2 (sesuai foto/referensi karakter yang dilampirkan)',
+  additionalKeywords: 'candid scene photography, authentic emotions, high detail, volumetric lighting',
+  language: 'en',
+};
 
 export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
   chapter: initialChapter,
@@ -70,6 +88,7 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
 }) => {
   const [chapter, setChapter] = useState<StoryChapter>(initialChapter);
   const [activeTab, setActiveTab] = useState<StudioTab>('premise');
+  const [aiSubSheet, setAiSubSheet] = useState<AISubSheet>('summary');
 
   // 1. Premis State
   const [premiseText, setPremiseText] = useState(initialChapter.premise || '');
@@ -107,6 +126,22 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
   const [isDetectingEntities, setIsDetectingEntities] = useState(false);
   const [aiStudioError, setAiStudioError] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+
+  // 3b. Global Image Prompt Settings State
+  const [imagePromptSettings, setImagePromptSettings] = useState<ImagePromptSettings>(() => {
+    try {
+      const saved = localStorage.getItem('schemax_image_prompt_settings');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return DEFAULT_IMAGE_SETTINGS;
+  });
+  const [tempImageSettings, setTempImageSettings] = useState<ImagePromptSettings>(imagePromptSettings);
+  const [showImageSettingsModal, setShowImageSettingsModal] = useState(false);
+
+  // 3c. Single Scene Image Prompt Operations
+  const [regeneratingPromptSceneId, setRegeneratingPromptSceneId] = useState<string | null>(null);
+  const [editingPromptSceneId, setEditingPromptSceneId] = useState<string | null>(null);
+  const [editingPromptText, setEditingPromptText] = useState<string>('');
 
   // 4. Glosarium Candidate States
   const [detectedEntities, setDetectedEntities] = useState<DetectedEntityCandidate[]>(
@@ -431,7 +466,14 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
     setIsGeneratingScenes(true);
     setAiStudioError(null);
     try {
-      const scenes = await generateChapterAutoScenes(chapter.title, book.title, text);
+      const existingEntities = await db.worldEntities.where('bookId').equals(book.id).toArray();
+      const scenes = await generateChapterAutoScenes(
+        chapter.title,
+        book.title,
+        text,
+        existingEntities,
+        imagePromptSettings
+      );
       await updateChapterField('aiScenes', scenes);
     } catch (err: any) {
       setAiStudioError(err.message || 'Gagal membedah adegan AI.');
@@ -482,13 +524,19 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
       await db.chapters.update(chapter.id, { aiPlot: plot, updatedAt: Date.now() });
 
       // Step 3: Scenes
-      setGenerateAllStep('3/4 Mengurai timeline adegan sinematik...');
-      const scenes = await generateChapterAutoScenes(chapter.title, book.title, text || premiseText);
+      setGenerateAllStep('3/4 Mengurai timeline adegan & prompt visual...');
+      const existingEntities = await db.worldEntities.where('bookId').equals(book.id).toArray();
+      const scenes = await generateChapterAutoScenes(
+        chapter.title,
+        book.title,
+        text || premiseText,
+        existingEntities,
+        imagePromptSettings
+      );
       await db.chapters.update(chapter.id, { aiScenes: scenes, updatedAt: Date.now() });
 
       // Step 4: Entities & Aliases
       setGenerateAllStep('4/4 Memindai entitas baru & alias...');
-      const existingEntities = await db.worldEntities.where('bookId').equals(book.id).toArray();
       const detected = await detectEntitiesAndAliases(text || premiseText, book.title, existingEntities);
       await db.chapters.update(chapter.id, { aiDetectedEntities: detected, updatedAt: Date.now() });
 
@@ -506,6 +554,55 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
       setIsGeneratingAll(false);
       setGenerateAllStep('');
     }
+  };
+
+  // Regenerate prompt for a single scene
+  const handleRegenerateScenePrompt = async (scene: ChapterSceneItem) => {
+    setRegeneratingPromptSceneId(scene.id);
+    setAiStudioError(null);
+    try {
+      const newPrompt = await generateSingleSceneImagePrompt(
+        scene,
+        book.title,
+        chapter.title,
+        imagePromptSettings
+      );
+      const updatedScenes = (chapter.aiScenes || []).map((s) =>
+        s.id === scene.id ? { ...s, imagePrompt: newPrompt } : s
+      );
+      await updateChapterField('aiScenes', updatedScenes);
+    } catch (err: any) {
+      setAiStudioError(err.message || 'Gagal generate prompt gambar adegan.');
+    } finally {
+      setRegeneratingPromptSceneId(null);
+    }
+  };
+
+  // Start editing prompt
+  const handleStartEditPrompt = (scene: ChapterSceneItem) => {
+    setEditingPromptSceneId(scene.id);
+    setEditingPromptText(scene.imagePrompt || '');
+  };
+
+  // Save edited prompt
+  const handleSaveEditedPrompt = async (sceneId: string) => {
+    const updatedScenes = (chapter.aiScenes || []).map((s) =>
+      s.id === sceneId ? { ...s, imagePrompt: editingPromptText } : s
+    );
+    await updateChapterField('aiScenes', updatedScenes);
+    setEditingPromptSceneId(null);
+  };
+
+  // Save global image prompt settings
+  const handleSaveImageSettings = (newSettings: ImagePromptSettings) => {
+    setImagePromptSettings(newSettings);
+    localStorage.setItem('schemax_image_prompt_settings', JSON.stringify(newSettings));
+    setShowImageSettingsModal(false);
+  };
+
+  // Reset image prompt settings to default
+  const handleResetImageSettings = () => {
+    setTempImageSettings(DEFAULT_IMAGE_SETTINGS);
   };
 
   // Register New Entity to Glosarium
@@ -1049,512 +1146,1013 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 4: AI INTELLIGENCE STUDIO (Generate All, Summary, Plot, Scenes, Lore) */}
+        {/* TAB 4: AI INTELLIGENCE STUDIO (4 Sub-Sheets, Compact Generate All, Prompt) */}
         {/* ========================================================================= */}
         {activeTab === 'ai' && (
-          <div className="space-y-6 animate-in fade-in duration-150">
-            {/* 🚀 0. GENERATE ALL MASTER BANNER */}
-            <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-indigo-900/40 via-purple-900/30 to-amber-900/20 border border-indigo-400/30 dark:border-indigo-500/40 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-start gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center text-white font-black shadow-md shadow-indigo-500/30 flex-shrink-0">
-                  <Zap className="w-5 h-5 text-amber-200" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">
-                      Generate Semua Analisis AI (1-Klik)
-                    </h3>
-                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-                      Otomatis
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                    Jalankan sekaligus: Rangkum naskah cerita, petakan 4 dinamika plot, susun timeline adegan, dan pindai entitas baru &amp; alias glosarium.
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleGenerateAll}
-                disabled={isGeneratingAll}
-                className="py-3 px-5 rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-amber-500 hover:opacity-95 active:scale-95 text-white font-black text-xs shadow-lg shadow-indigo-500/30 transition flex items-center justify-center gap-2 flex-shrink-0 disabled:opacity-50"
-              >
-                {isGeneratingAll ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin text-amber-200" />
-                    <span>{generateAllStep || 'Sedang Menganalisis...'}</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4 text-amber-300" />
-                    <span>Generate All ✨</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* 📑 1. RINGKASAN CERITA UTAMA BAB (AI Summary) */}
-            <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-6 shadow-sm space-y-3.5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
-                    <FileText className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
-                      Ringkasan AI Bab Cerita
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Rangkuman otomatis dari naskah bab untuk review dan konsistensi cerita
-                    </p>
-                  </div>
-                </div>
+          <div className="space-y-4 animate-in fade-in duration-150">
+            {/* 🚀 COMPACT TOOLBAR: 4 SUB-SHEETS SWITCHER + SPACE-EFFICIENT GENERATE ALL */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+              {/* 4 Sheets Segmented Navigation */}
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                <button
+                  type="button"
+                  onClick={() => setAiSubSheet('summary')}
+                  className={`py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
+                    aiSubSheet === 'summary'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>1. Ringkasan</span>
+                  {chapter.aiSummary && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+                </button>
 
                 <button
                   type="button"
-                  onClick={handleGenerateSummary}
-                  disabled={isGeneratingSummary || isGeneratingAll}
-                  className="py-2 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold text-xs shadow-md shadow-indigo-500/20 transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  onClick={() => setAiSubSheet('plot')}
+                  className={`py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
+                    aiSubSheet === 'plot'
+                      ? 'bg-amber-500 text-slate-950 shadow-sm font-extrabold'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
                 >
-                  {isGeneratingSummary ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Meringkas...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                      <span>{chapter.aiSummary ? 'Perbarui Ringkasan ✨' : 'Generate Ringkasan AI ✨'}</span>
-                    </>
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  <span>2. Auto Plot</span>
+                  {chapter.aiPlot && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setAiSubSheet('scenes')}
+                  className={`py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
+                    aiSubSheet === 'scenes'
+                      ? 'bg-purple-600 text-white shadow-sm'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  <Film className="w-3.5 h-3.5" />
+                  <span>3. Auto Scene &amp; Visual</span>
+                  {chapter.aiScenes && chapter.aiScenes.length > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-purple-200 dark:bg-purple-900/60 text-purple-900 dark:text-purple-200 font-extrabold">
+                      {chapter.aiScenes.length}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setAiSubSheet('glosarium')}
+                  className={`py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
+                    aiSubSheet === 'glosarium'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  <Shield className="w-3.5 h-3.5" />
+                  <span>4. Glosarium &amp; Alias</span>
+                  {detectedEntities && detectedEntities.length > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-200 dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-200 font-extrabold">
+                      {detectedEntities.length}
+                    </span>
                   )}
                 </button>
               </div>
 
-              {chapter.aiSummary ? (
-                <div className="p-4 rounded-2xl bg-indigo-50/60 dark:bg-slate-950/60 border border-indigo-200/80 dark:border-indigo-500/20 text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed space-y-2">
-                  <p className="whitespace-pre-line">{chapter.aiSummary}</p>
-                  <div className="flex justify-end pt-1">
+              {/* Compact Generate All Button (Space-efficient) */}
+              <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-auto">
+                <button
+                  type="button"
+                  onClick={handleGenerateAll}
+                  disabled={isGeneratingAll}
+                  title="Jalankan otomatis 4 modul: Ringkasan, Plot, Auto Scene &amp; Prompt Gambar, Glosarium &amp; Alias"
+                  className="py-1.5 px-3.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-amber-500 hover:opacity-95 active:scale-95 text-white font-black text-xs shadow-sm transition flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {isGeneratingAll ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-200" />
+                      <span className="text-[11px] truncate max-w-[170px]">
+                        {generateAllStep || 'Menganalisis...'}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Generate All ✨</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Error Message if any */}
+            {aiStudioError && (
+              <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs flex items-center justify-between gap-2 animate-in fade-in">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{aiStudioError}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAiStudioError(null)}
+                  className="text-xs font-bold hover:underline"
+                >
+                  Tutup
+                </button>
+              </div>
+            )}
+
+            {/* ============================================================ */}
+            {/* SHEET 1: RINGKASAN CERITA BAB (AI Summary)                   */}
+            {/* ============================================================ */}
+            {aiSubSheet === 'summary' && (
+              <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-6 shadow-sm space-y-4 animate-in fade-in">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                        Ringkasan AI Bab Cerita
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Rangkuman esensial dari isi bab untuk menjaga kontinuitas &amp; memori alur
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleGenerateSummary}
+                    disabled={isGeneratingSummary || isGeneratingAll}
+                    className="py-2 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold text-xs shadow-md shadow-indigo-500/20 transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  >
+                    {isGeneratingSummary ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Meringkas...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                        <span>{chapter.aiSummary ? 'Perbarui Ringkasan ✨' : 'Generate Ringkasan AI ✨'}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {chapter.aiSummary ? (
+                  <div className="p-4 sm:p-5 rounded-2xl bg-indigo-50/60 dark:bg-slate-950/60 border border-indigo-200/80 dark:border-indigo-500/20 text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed space-y-3">
+                    <p className="whitespace-pre-line">{chapter.aiSummary}</p>
+                    <div className="flex justify-end pt-2 border-t border-indigo-100 dark:border-indigo-950">
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(chapter.aiSummary || '', 'summary')}
+                        className="py-1 px-3 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-xs font-semibold hover:bg-indigo-200 dark:hover:bg-indigo-800 transition flex items-center gap-1.5"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>{copyFeedback === 'summary' ? '✓ Tersalin!' : 'Salin Ringkasan'}</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-10 px-4 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-950/20 text-xs text-slate-500 dark:text-slate-400 space-y-2">
+                    <FileText className="w-8 h-8 mx-auto text-slate-400 dark:text-slate-600" />
+                    <p>Belum ada ringkasan AI untuk bab ini.</p>
+                    <p className="text-[11px] text-slate-400">
+                      Ketuk tombol <strong>Generate Ringkasan AI</strong> di kanan atas atau gunakan <strong>Generate All</strong>.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ============================================================ */}
+            {/* SHEET 2: AUTO PLOT BY AI (Hook, Rising, Climax, Resolution)  */}
+            {/* ============================================================ */}
+            {aiSubSheet === 'plot' && (
+              <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-6 shadow-sm space-y-4 animate-in fade-in">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                      <TrendingUp className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                        Auto Plot by AI
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Pemetaan 4 dinamika struktur cerita: Hook, Eskalasi, Puncak Konflik, &amp; Penutup
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleGeneratePlot}
+                    disabled={isGeneratingPlot || isGeneratingAll}
+                    className="py-2 px-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 active:scale-95 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  >
+                    {isGeneratingPlot ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Memetakan Plot...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>{chapter.aiPlot ? 'Petakan Ulang Plot ✨' : 'Petakan Struktur Plot ✨'}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {chapter.aiPlot ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                    {/* Hook */}
+                    <div className="p-4 rounded-2xl bg-cyan-50/70 dark:bg-cyan-950/20 border border-cyan-200/80 dark:border-cyan-500/30 space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-xs font-black uppercase text-cyan-800 dark:text-cyan-400">
+                        <span className="w-2 h-2 rounded-full bg-cyan-500" />
+                        <span>1. Hook (Pemicu &amp; Daya Tarik)</span>
+                      </div>
+                      <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                        {chapter.aiPlot.hook || 'Belum terdeteksi'}
+                      </p>
+                    </div>
+
+                    {/* Rising Action */}
+                    <div className="p-4 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/20 border border-indigo-200/80 dark:border-indigo-500/30 space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-xs font-black uppercase text-indigo-800 dark:text-indigo-400">
+                        <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                        <span>2. Rising Action (Eskalasi Ketegangan)</span>
+                      </div>
+                      <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                        {chapter.aiPlot.risingAction || 'Belum terdeteksi'}
+                      </p>
+                    </div>
+
+                    {/* Climax */}
+                    <div className="p-4 rounded-2xl bg-rose-50/70 dark:bg-rose-950/20 border border-rose-200/80 dark:border-rose-500/30 space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-xs font-black uppercase text-rose-800 dark:text-rose-400">
+                        <span className="w-2 h-2 rounded-full bg-rose-500" />
+                        <span>3. Climax (Puncak Konflik)</span>
+                      </div>
+                      <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                        {chapter.aiPlot.climax || 'Belum terdeteksi'}
+                      </p>
+                    </div>
+
+                    {/* Resolution */}
+                    <div className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-500/30 space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-xs font-black uppercase text-emerald-800 dark:text-emerald-400">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        <span>4. Resolution (Penutup / Cliffhanger)</span>
+                      </div>
+                      <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                        {chapter.aiPlot.resolution || 'Belum terdeteksi'}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-10 px-4 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-950/20 text-xs text-slate-500 dark:text-slate-400 space-y-2">
+                    <TrendingUp className="w-8 h-8 mx-auto text-slate-400 dark:text-slate-600" />
+                    <p>Belum ada analisis plot untuk bab ini.</p>
+                    <p className="text-[11px] text-slate-400">
+                      Ketuk tombol <strong>Petakan Struktur Plot</strong> untuk menganalisis 4 titik ketegangan cerita.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ============================================================ */}
+            {/* SHEET 3: AUTO SCENE & VISUAL PROMPT (Glosarium & Image Prompt)*/}
+            {/* ============================================================ */}
+            {aiSubSheet === 'scenes' && (
+              <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-6 shadow-sm space-y-4 animate-in fade-in">
+                {/* Header Controls */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                      <Film className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                        Auto Scene by AI (Timeline, Glosarium &amp; Visual Prompt)
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Pembedahan adegan berurutan, informasi glosarium terkait, dan prompt gambar AI untuk tiap adegan
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                    {/* Settings Trigger Button */}
                     <button
                       type="button"
-                      onClick={() => copyToClipboard(chapter.aiSummary || '', 'summary')}
-                      className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold hover:underline"
+                      onClick={() => {
+                        setTempImageSettings(imagePromptSettings);
+                        setShowImageSettingsModal(true);
+                      }}
+                      className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs transition flex items-center gap-1.5"
                     >
-                      {copyFeedback === 'summary' ? '✓ Tersalin' : 'Salin Ringkasan'}
+                      <Settings className="w-3.5 h-3.5 text-purple-500" />
+                      <span>Setting Prompt Gambar</span>
+                    </button>
+
+                    {/* Generate Scenes Button */}
+                    <button
+                      type="button"
+                      onClick={handleGenerateScenes}
+                      disabled={isGeneratingScenes || isGeneratingAll}
+                      className="py-2 px-3.5 rounded-xl bg-purple-600 hover:bg-purple-500 active:scale-95 text-white font-bold text-xs shadow-md shadow-purple-500/20 transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    >
+                      {isGeneratingScenes ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Membedah Adegan...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                          <span>
+                            {chapter.aiScenes && chapter.aiScenes.length > 0
+                              ? 'Bedah Ulang Adegan ✨'
+                              : 'Bedah Pembagian Adegan ✨'}
+                          </span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
-              ) : (
-                <div className="text-center py-6 px-4 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-950/20 text-xs text-slate-500 dark:text-slate-400">
-                  Belum ada ringkasan AI untuk bab ini. Ketuk tombol di atas atau gunakan Generate All.
-                </div>
-              )}
-            </div>
 
-            {/* 📈 2. AUTO PLOT BY AI (Hook, Rising Action, Climax, Resolution) */}
-            <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-6 shadow-sm space-y-3.5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                    <TrendingUp className="w-5 h-5" />
+                {/* Global Image Prompt Preset Indicator Bar */}
+                <div className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-purple-50/60 dark:bg-purple-950/20 border border-purple-200/60 dark:border-purple-500/20 text-xs text-purple-900 dark:text-purple-200">
+                  <div className="flex items-center gap-2 overflow-hidden flex-wrap">
+                    <span className="font-bold flex items-center gap-1.5 text-purple-800 dark:text-purple-300">
+                      <ImageIcon className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                      <span>Preset Gambar Global:</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-purple-200/70 dark:bg-purple-900/50 font-mono text-[11px] font-bold">
+                      {imagePromptSettings.aspectRatio}
+                    </span>
+                    <span className="text-slate-600 dark:text-slate-300 text-[11px] truncate max-w-sm">
+                      {imagePromptSettings.style}
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 font-mono">
+                      [person1/person2]
+                    </span>
                   </div>
-                  <div>
-                    <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
-                      Auto Plot by AI
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Pemetaan dinamika 4 struktur plot bab: Hook, Eskalasi, Klimaks, &amp; Penutup
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleGeneratePlot}
-                  disabled={isGeneratingPlot || isGeneratingAll}
-                  className="py-2 px-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 active:scale-95 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 transition flex items-center justify-center gap-1.5 disabled:opacity-50"
-                >
-                  {isGeneratingPlot ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Memetakan Plot...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>{chapter.aiPlot ? 'Petakan Ulang Plot ✨' : 'Petakan Struktur Plot ✨'}</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {chapter.aiPlot ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  {/* Hook */}
-                  <div className="p-3.5 rounded-2xl bg-cyan-50/70 dark:bg-cyan-950/20 border border-cyan-200/80 dark:border-cyan-500/30 space-y-1">
-                    <div className="flex items-center gap-1.5 text-xs font-black uppercase text-cyan-800 dark:text-cyan-400">
-                      <span className="w-2 h-2 rounded-full bg-cyan-500" />
-                      <span>1. Hook (Pemicu)</span>
-                    </div>
-                    <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
-                      {chapter.aiPlot.hook || 'Belum terdeteksi'}
-                    </p>
-                  </div>
-
-                  {/* Rising Action */}
-                  <div className="p-3.5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/20 border border-indigo-200/80 dark:border-indigo-500/30 space-y-1">
-                    <div className="flex items-center gap-1.5 text-xs font-black uppercase text-indigo-800 dark:text-indigo-400">
-                      <span className="w-2 h-2 rounded-full bg-indigo-500" />
-                      <span>2. Rising Action (Eskalasi)</span>
-                    </div>
-                    <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
-                      {chapter.aiPlot.risingAction || 'Belum terdeteksi'}
-                    </p>
-                  </div>
-
-                  {/* Climax */}
-                  <div className="p-3.5 rounded-2xl bg-rose-50/70 dark:bg-rose-950/20 border border-rose-200/80 dark:border-rose-500/30 space-y-1">
-                    <div className="flex items-center gap-1.5 text-xs font-black uppercase text-rose-800 dark:text-rose-400">
-                      <span className="w-2 h-2 rounded-full bg-rose-500" />
-                      <span>3. Climax (Puncak Konflik)</span>
-                    </div>
-                    <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
-                      {chapter.aiPlot.climax || 'Belum terdeteksi'}
-                    </p>
-                  </div>
-
-                  {/* Resolution */}
-                  <div className="p-3.5 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-500/30 space-y-1">
-                    <div className="flex items-center gap-1.5 text-xs font-black uppercase text-emerald-800 dark:text-emerald-400">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                      <span>4. Resolution (Penutup / Cliffhanger)</span>
-                    </div>
-                    <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
-                      {chapter.aiPlot.resolution || 'Belum terdeteksi'}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-6 px-4 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-950/20 text-xs text-slate-500 dark:text-slate-400">
-                  Belum ada analisis plot. Ketuk tombol di atas agar AI menganalisis titik-titik ketegangan bab cerita.
-                </div>
-              )}
-            </div>
-
-            {/* 🎬 3. AUTO SCENE BY AI (Smart Timeline: Linier, Simultan/Bercabang, Flashback) */}
-            <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-6 shadow-sm space-y-3.5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
-                    <Film className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
-                      Auto Scene by AI (Kronologi &amp; Timeline)
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Urutan adegan sinematik dengan deteksi alur waktu lurus, simultan/bercabang, atau kilas balik
-                    </p>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTempImageSettings(imagePromptSettings);
+                      setShowImageSettingsModal(true);
+                    }}
+                    className="text-xs font-bold text-purple-700 dark:text-purple-300 hover:underline flex items-center gap-1 flex-shrink-0"
+                  >
+                    <Sliders className="w-3 h-3" />
+                    <span>Ubah</span>
+                  </button>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleGenerateScenes}
-                  disabled={isGeneratingScenes || isGeneratingAll}
-                  className="py-2 px-3.5 rounded-xl bg-purple-600 hover:bg-purple-500 active:scale-95 text-white font-bold text-xs shadow-md shadow-purple-500/20 transition flex items-center justify-center gap-1.5 disabled:opacity-50"
-                >
-                  {isGeneratingScenes ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Membedah Adegan...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                      <span>
-                        {chapter.aiScenes && chapter.aiScenes.length > 0
-                          ? 'Bedah Ulang Adegan ✨'
-                          : 'Bedah Pembagian Adegan ✨'}
-                      </span>
-                    </>
-                  )}
-                </button>
-              </div>
+                {/* Scene Blocks List */}
+                {chapter.aiScenes && chapter.aiScenes.length > 0 ? (
+                  <div className="space-y-4 pt-1 relative">
+                    {/* Desktop timeline guide line */}
+                    <div className="hidden sm:block absolute left-5 top-6 bottom-6 w-0.5 bg-gradient-to-b from-purple-500/30 via-indigo-500/30 to-amber-500/30 pointer-events-none" />
 
-              {chapter.aiScenes && chapter.aiScenes.length > 0 ? (
-                <div className="space-y-3.5 pt-1 relative">
-                  {/* Timeline connector visual guide */}
-                  <div className="hidden sm:block absolute left-5 top-6 bottom-6 w-0.5 bg-gradient-to-b from-purple-500/30 via-indigo-500/30 to-amber-500/30 pointer-events-none" />
+                    {chapter.aiScenes.map((scene, idx) => {
+                      const isParallel = scene.timelineType === 'parallel' || scene.timelineType === 'branched';
+                      const isFlashback = scene.timelineType === 'flashback';
+                      const isRegeneratingThis = regeneratingPromptSceneId === scene.id;
+                      const isEditingThis = editingPromptSceneId === scene.id;
 
-                  {chapter.aiScenes.map((scene, idx) => {
-                    const isParallel = scene.timelineType === 'parallel' || scene.timelineType === 'branched';
-                    const isFlashback = scene.timelineType === 'flashback';
-
-                    return (
-                      <div
-                        key={scene.id || idx}
-                        className={`relative sm:ml-9 p-4 rounded-2xl border transition space-y-2.5 shadow-sm ${
-                          isParallel
-                            ? 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-300/80 dark:border-amber-500/30 hover:border-amber-400'
-                            : isFlashback
-                            ? 'bg-cyan-50/60 dark:bg-cyan-950/20 border-cyan-300/80 dark:border-cyan-500/30 hover:border-cyan-400'
-                            : 'bg-slate-50 dark:bg-slate-950/70 border-slate-200 dark:border-slate-800/80 hover:border-purple-300 dark:hover:border-purple-500/40'
-                        }`}
-                      >
-                        {/* Timeline node marker for desktop */}
+                      return (
                         <div
-                          className={`hidden sm:flex absolute -left-[27px] top-4 w-5 h-5 rounded-full items-center justify-center text-[10px] font-bold text-white shadow-sm ${
+                          key={scene.id || idx}
+                          className={`relative sm:ml-9 p-4 sm:p-5 rounded-2xl border transition space-y-3.5 shadow-sm ${
                             isParallel
-                              ? 'bg-amber-500 ring-4 ring-amber-500/20'
+                              ? 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-300/80 dark:border-amber-500/30 hover:border-amber-400'
                               : isFlashback
-                              ? 'bg-cyan-500 ring-4 ring-cyan-500/20'
-                              : 'bg-purple-600 ring-4 ring-purple-500/20'
+                              ? 'bg-cyan-50/50 dark:bg-cyan-950/20 border-cyan-300/80 dark:border-cyan-500/30 hover:border-cyan-400'
+                              : 'bg-slate-50 dark:bg-slate-950/70 border-slate-200 dark:border-slate-800/80 hover:border-purple-300 dark:hover:border-purple-500/40'
                           }`}
                         >
-                          {scene.sceneNumber || idx + 1}
-                        </div>
-
-                        {/* Top Meta: Number, Title & Timeline Type Badge */}
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="sm:hidden px-2 py-0.5 rounded-lg bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 text-[10px] font-black uppercase">
-                              Adegan {scene.sceneNumber || idx + 1}
-                            </span>
-                            <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                              {scene.title}
-                            </h4>
-
-                            {/* Timeline Type Pill */}
-                            <span
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                                isParallel
-                                  ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-500/30'
-                                  : isFlashback
-                                  ? 'bg-cyan-100 dark:bg-cyan-500/20 text-cyan-800 dark:text-cyan-300 border-cyan-300 dark:border-cyan-500/30'
-                                  : 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30'
-                              }`}
-                            >
-                              {isParallel ? (
-                                <>
-                                  <GitBranch className="w-3 h-3 text-amber-500" />
-                                  <span>Simultan / Bersamaan</span>
-                                </>
-                              ) : isFlashback ? (
-                                <>
-                                  <History className="w-3 h-3 text-cyan-500" />
-                                  <span>Kilas Balik (Flashback)</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Check className="w-3 h-3 text-emerald-500" />
-                                  <span>Linier (Kronologis)</span>
-                                </>
-                              )}
-                            </span>
+                          {/* Desktop node marker */}
+                          <div
+                            className={`hidden sm:flex absolute -left-[27px] top-4 w-5 h-5 rounded-full items-center justify-center text-[10px] font-bold text-white shadow-sm ${
+                              isParallel
+                                ? 'bg-amber-500 ring-4 ring-amber-500/20'
+                                : isFlashback
+                                ? 'bg-cyan-500 ring-4 ring-cyan-500/20'
+                                : 'bg-purple-600 ring-4 ring-purple-500/20'
+                            }`}
+                          >
+                            {scene.sceneNumber || idx + 1}
                           </div>
 
-                          {/* Time Marker or Location Pill */}
-                          {(scene.timeMarker || scene.setting) && (
-                            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-800">
-                              {scene.timeMarker && (
-                                <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
-                                  <Clock className="w-3 h-3 text-amber-500" />
-                                  <span>{scene.timeMarker}</span>
+                          {/* 1. Header: Number, Title & Timeline Pill */}
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="sm:hidden px-2 py-0.5 rounded-lg bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 text-[10px] font-black uppercase">
+                                Adegan {scene.sceneNumber || idx + 1}
+                              </span>
+                              <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white">
+                                {scene.title}
+                              </h4>
+
+                              {/* Timeline Type Badge */}
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                  isParallel
+                                    ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-500/30'
+                                    : isFlashback
+                                    ? 'bg-cyan-100 dark:bg-cyan-500/20 text-cyan-800 dark:text-cyan-300 border-cyan-300 dark:border-cyan-500/30'
+                                    : 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30'
+                                }`}
+                              >
+                                {isParallel ? (
+                                  <>
+                                    <GitBranch className="w-3 h-3 text-amber-500" />
+                                    <span>Simultan / Bersamaan</span>
+                                  </>
+                                ) : isFlashback ? (
+                                  <>
+                                    <History className="w-3 h-3 text-cyan-500" />
+                                    <span>Kilas Balik (Flashback)</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Check className="w-3 h-3 text-emerald-500" />
+                                    <span>Linier (Kronologis)</span>
+                                  </>
+                                )}
+                              </span>
+                            </div>
+
+                            {/* Time Marker & Setting Badge */}
+                            {(scene.timeMarker || scene.setting) && (
+                              <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-800">
+                                {scene.timeMarker && (
+                                  <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
+                                    <Clock className="w-3 h-3 text-amber-500" />
+                                    <span>{scene.timeMarker}</span>
+                                  </span>
+                                )}
+                                {scene.timeMarker && scene.setting && <span>•</span>}
+                                {scene.setting && (
+                                  <span className="flex items-center gap-1">
+                                    <MapPin className="w-3 h-3 text-rose-500" />
+                                    <span>{scene.setting}</span>
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 2. Scene Story Summary */}
+                          <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800/80">
+                            <p className="text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 leading-relaxed">
+                              {scene.summary}
+                            </p>
+                            {scene.goalConflict && (
+                              <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
+                                <span className="font-bold text-amber-600 dark:text-amber-400">Tujuan &amp; Konflik: </span>
+                                <span>{scene.goalConflict}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 3. 🛡️ INFORMASI GLOSARIUM DI ADEGAN INI (Tokoh, Latar, Item, Lore) */}
+                          <div className="p-3 rounded-xl bg-slate-100/70 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-800 space-y-2">
+                            <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                              <Shield className="w-3.5 h-3.5 text-emerald-500" />
+                              <span>Informasi Glosarium di Adegan Ini:</span>
+                            </div>
+
+                            {scene.entitiesPresent && scene.entitiesPresent.length > 0 ? (
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {scene.entitiesPresent.map((ent, eIdx) => {
+                                  const iconMap: Record<WorldCategory, any> = {
+                                    character: User,
+                                    location: MapPin,
+                                    item: Shield,
+                                    lore: Tag,
+                                  };
+                                  const colorMap: Record<WorldCategory, string> = {
+                                    character: 'text-pink-600 dark:text-pink-400 bg-pink-50 dark:bg-pink-950/40 border-pink-200 dark:border-pink-800',
+                                    location: 'text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/40 border-cyan-200 dark:border-cyan-800',
+                                    item: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800',
+                                    lore: 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-800',
+                                  };
+                                  const EntIcon = iconMap[ent.category] || User;
+                                  const badgeClass = colorMap[ent.category] || colorMap.character;
+
+                                  return (
+                                    <span
+                                      key={eIdx}
+                                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border shadow-xs ${badgeClass}`}
+                                    >
+                                      <EntIcon className="w-3 h-3" />
+                                      <span>{ent.name}</span>
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            ) : scene.characters && scene.characters.length > 0 ? (
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {scene.characters.map((char, cIdx) => (
+                                  <span
+                                    key={cIdx}
+                                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border bg-pink-50 dark:bg-pink-950/40 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-800"
+                                  >
+                                    <User className="w-3 h-3" />
+                                    <span>{char}</span>
+                                  </span>
+                                ))}
+                                {scene.setting && (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800">
+                                    <MapPin className="w-3 h-3" />
+                                    <span>{scene.setting}</span>
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-[11px] text-slate-400 italic">
+                                Belum ada rincian entitas spesifik di adegan ini.
+                              </span>
+                            )}
+                          </div>
+
+                          {/* 4. 🎨 PROMPT PEMBUATAN GAMBAR ADEGAN (AI Image Generator) */}
+                          <div className="p-3.5 rounded-xl bg-slate-900 text-slate-100 dark:bg-slate-950 border border-slate-800 space-y-2.5">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div className="flex items-center gap-2">
+                                <span className="p-1 rounded-md bg-purple-500/20 text-purple-400">
+                                  <ImageIcon className="w-3.5 h-3.5" />
                                 </span>
-                              )}
-                              {scene.timeMarker && scene.setting && <span>•</span>}
-                              {scene.setting && (
-                                <span className="flex items-center gap-1">
-                                  <MapPin className="w-3 h-3 text-rose-500" />
-                                  <span>{scene.setting}</span>
+                                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                                  <span>Prompt Gambar Adegan (AI Image Generator)</span>
+                                </span>
+                                <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-purple-500/30 text-purple-300 border border-purple-500/40">
+                                  {imagePromptSettings.aspectRatio}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-1.5">
+                                {scene.imagePrompt && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => copyToClipboard(scene.imagePrompt || '', `prompt_${scene.id}`)}
+                                      className="py-1 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition flex items-center gap-1"
+                                      title="Salin Prompt untuk Midjourney, Flux, Stable Diffusion"
+                                    >
+                                      {copyFeedback === `prompt_${scene.id}` ? (
+                                        <>
+                                          <Check className="w-3 h-3 text-emerald-400" />
+                                          <span className="text-emerald-400">Tersalin!</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Copy className="w-3 h-3" />
+                                          <span>Salin Prompt</span>
+                                        </>
+                                      )}
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleStartEditPrompt(scene)}
+                                      className="py-1 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition"
+                                      title="Edit manual prompt"
+                                    >
+                                      <Edit3 className="w-3 h-3" />
+                                    </button>
+                                  </>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleRegenerateScenePrompt(scene)}
+                                  disabled={isRegeneratingThis}
+                                  className="py-1 px-2.5 rounded-lg bg-purple-600 hover:bg-purple-500 active:scale-95 text-white text-xs font-bold transition flex items-center gap-1 disabled:opacity-50"
+                                  title="Buat ulang prompt khusus adegan ini sesuai pengaturan gambar global"
+                                >
+                                  {isRegeneratingThis ? (
+                                    <>
+                                      <Loader2 className="w-3 h-3 animate-spin" />
+                                      <span>Membuat...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <RotateCcw className="w-3 h-3" />
+                                      <span>{scene.imagePrompt ? 'Generate Ulang' : 'Buat Prompt Gambar'}</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Prompt text display or editing mode */}
+                            {isEditingThis ? (
+                              <div className="space-y-2 pt-1">
+                                <textarea
+                                  value={editingPromptText}
+                                  onChange={(e) => setEditingPromptText(e.target.value)}
+                                  rows={3}
+                                  className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs font-mono text-slate-100 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                />
+                                <div className="flex items-center justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingPromptSceneId(null)}
+                                    className="px-2.5 py-1 text-xs text-slate-400 hover:text-slate-200"
+                                  >
+                                    Batal
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSaveEditedPrompt(scene.id)}
+                                    className="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-lg"
+                                  >
+                                    Simpan Perubahan
+                                  </button>
+                                </div>
+                              </div>
+                            ) : scene.imagePrompt ? (
+                              <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-[11px] font-mono text-slate-300 leading-relaxed whitespace-pre-wrap select-all">
+                                {scene.imagePrompt}
+                              </div>
+                            ) : (
+                              <div className="text-[11px] text-slate-400 italic">
+                                Belum ada prompt gambar untuk adegan ini. Ketuk tombol &quot;Buat Prompt Gambar&quot; di atas.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-10 px-4 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-950/20 text-xs text-slate-500 dark:text-slate-400 space-y-2">
+                    <Film className="w-8 h-8 mx-auto text-slate-400 dark:text-slate-600" />
+                    <p>Belum ada pembagian adegan.</p>
+                    <p className="text-[11px] text-slate-400">
+                      Ketuk tombol <strong>Bedah Pembagian Adegan</strong> atau gunakan <strong>Generate All</strong>.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ============================================================ */}
+            {/* SHEET 4: DETEKSI GLOSARIUM & ALIAS (Entity & Alias Detection)*/}
+            {/* ============================================================ */}
+            {aiSubSheet === 'glosarium' && (
+              <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-6 shadow-sm space-y-4 animate-in fade-in">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                      <Shield className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                        Deteksi Glosarium &amp; Alias (Tokoh, Latar, Item)
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Pindai entitas baru untuk didaftarkan ke Worldbuilding serta julukan/alias dari objek yang sudah ada
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleDetectEntities}
+                    disabled={isDetectingEntities || isGeneratingAll}
+                    className="py-2 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs shadow-md shadow-emerald-500/20 transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  >
+                    {isDetectingEntities ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Memindai Naskah...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                        <span>
+                          {detectedEntities.length > 0 ? 'Pindai Ulang Glosarium ✨' : 'Pindai Entitas & Alias ✨'}
+                        </span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {detectedEntities.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    {detectedEntities.map((item) => {
+                      const isNew = item.suggestedAction === 'register_new';
+                      const isRegistered = registeredEntityIds[item.id];
+                      const isAliasSaved = registeredAliasIds[item.id];
+
+                      const categoryBadgeMap: Record<WorldCategory, { label: string; color: string; icon: any }> = {
+                        character: { label: 'Karakter', color: 'text-pink-600 dark:text-pink-400 bg-pink-500/10 border-pink-500/30', icon: User },
+                        location: { label: 'Lokasi', color: 'text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 border-cyan-500/30', icon: MapPin },
+                        item: { label: 'Item / Senjata', color: 'text-yellow-600 dark:text-yellow-400 bg-yellow-500/10 border-yellow-500/30', icon: Shield },
+                        lore: { label: 'Lore / Istilah', color: 'text-purple-600 dark:text-purple-400 bg-purple-500/10 border-purple-500/30', icon: Tag },
+                      };
+
+                      const catMeta = categoryBadgeMap[item.category] || categoryBadgeMap.character;
+                      const CatIcon = catMeta.icon;
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800/80 flex flex-col justify-between gap-3 shadow-sm hover:border-slate-300 dark:hover:border-slate-700 transition"
+                        >
+                          <div className="space-y-1.5">
+                            {/* Category Badge & Action Type */}
+                            <div className="flex items-center justify-between gap-1 flex-wrap">
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${catMeta.color}`}
+                              >
+                                <CatIcon className="w-3 h-3" />
+                                <span>{catMeta.label}</span>
+                              </span>
+
+                              {isNew ? (
+                                <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                                  🆕 Entitas Baru
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                                  🔗 Alias Terdeteksi
                                 </span>
                               )}
                             </div>
-                          )}
-                        </div>
 
-                        {/* Scene Summary */}
-                        <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
-                          {scene.summary}
-                        </p>
+                            {/* Name & Detected Relation */}
+                            <div>
+                              <h4 className="text-sm font-extrabold text-slate-900 dark:text-white">
+                                {item.name}
+                              </h4>
+                              {!isNew && item.detectedAliasOf && (
+                                <p className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1 mt-0.5">
+                                  <Link2 className="w-3 h-3" />
+                                  <span>Sebutan lain dari: <strong>{item.detectedAliasOf}</strong></span>
+                                </p>
+                              )}
+                            </div>
 
-                        {/* Characters in Scene */}
-                        {scene.characters && scene.characters.length > 0 && (
-                          <div className="flex items-center gap-1.5 flex-wrap pt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                            <span className="flex items-center gap-1">
-                              <User className="w-3 h-3 text-indigo-500" />
-                              <span>Tokoh:</span>
-                            </span>
-                            {scene.characters.map((char, cIdx) => (
-                              <span
-                                key={cIdx}
-                                className="px-2 py-0.2 rounded-full bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium"
-                              >
-                                {char}
-                              </span>
-                            ))}
+                            {/* Short Description */}
+                            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                              {item.shortDescription}
+                            </p>
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-center py-6 px-4 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-950/20 text-xs text-slate-500 dark:text-slate-400">
-                  Belum ada pembagian adegan. Ketuk tombol di atas atau gunakan Generate All.
-                </div>
-              )}
-            </div>
 
-            {/* 🛡️ 4. DETEKSI ENTITAS GLOSARIUM & ALIAS TOKOH / LATAR / ITEM */}
-            <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-6 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                    <Shield className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
-                      Deteksi Glosarium &amp; Alias (Tokoh, Latar, Item)
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Pindai entitas baru untuk didaftarkan ke Worldbuilding serta julukan/alias dari objek yang sudah ada
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleDetectEntities}
-                  disabled={isDetectingEntities || isGeneratingAll}
-                  className="py-2 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs shadow-md shadow-emerald-500/20 transition flex items-center justify-center gap-1.5 disabled:opacity-50"
-                >
-                  {isDetectingEntities ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Memindai Naskah...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                      <span>
-                        {detectedEntities.length > 0 ? 'Pindai Ulang Glosarium ✨' : 'Pindai Entitas & Alias ✨'}
-                      </span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {detectedEntities.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  {detectedEntities.map((item) => {
-                    const isNew = item.suggestedAction === 'register_new';
-                    const isRegistered = registeredEntityIds[item.id];
-                    const isAliasSaved = registeredAliasIds[item.id];
-
-                    const categoryBadgeMap: Record<WorldCategory, { label: string; color: string; icon: any }> = {
-                      character: { label: 'Karakter', color: 'text-pink-600 dark:text-pink-400 bg-pink-500/10 border-pink-500/30', icon: User },
-                      location: { label: 'Lokasi', color: 'text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 border-cyan-500/30', icon: MapPin },
-                      item: { label: 'Item / Senjata', color: 'text-yellow-600 dark:text-yellow-400 bg-yellow-500/10 border-yellow-500/30', icon: Shield },
-                      lore: { label: 'Lore / Istilah', color: 'text-purple-600 dark:text-purple-400 bg-purple-500/10 border-purple-500/30', icon: Tag },
-                    };
-
-                    const catMeta = categoryBadgeMap[item.category] || categoryBadgeMap.character;
-                    const CatIcon = catMeta.icon;
-
-                    return (
-                      <div
-                        key={item.id}
-                        className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800/80 flex flex-col justify-between gap-3 shadow-sm hover:border-slate-300 dark:hover:border-slate-700 transition"
-                      >
-                        <div className="space-y-1.5">
-                          {/* Category Badge & Action Type */}
-                          <div className="flex items-center justify-between gap-1 flex-wrap">
-                            <span
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${catMeta.color}`}
-                            >
-                              <CatIcon className="w-3 h-3" />
-                              <span>{catMeta.label}</span>
-                            </span>
-
+                          {/* Action CTA Button */}
+                          <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-end">
                             {isNew ? (
-                              <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                                🆕 Entitas Baru
-                              </span>
-                            ) : (
-                              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
-                                🔗 Alias Terdeteksi
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Name & Detected Relation */}
-                          <div>
-                            <h4 className="text-sm font-extrabold text-slate-900 dark:text-white">
-                              {item.name}
-                            </h4>
-                            {!isNew && item.detectedAliasOf && (
-                              <p className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1 mt-0.5">
-                                <Link2 className="w-3 h-3" />
-                                <span>Sebutan lain dari: <strong>{item.detectedAliasOf}</strong></span>
-                              </p>
-                            )}
-                          </div>
-
-                          {/* Short Description */}
-                          <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                            {item.shortDescription}
-                          </p>
-                        </div>
-
-                        {/* Action CTA Button */}
-                        <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-end">
-                          {isNew ? (
-                            isRegistered ? (
+                              isRegistered ? (
+                                <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                  <CheckCheck className="w-4 h-4" />
+                                  <span>Terdaftar di Glosarium</span>
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRegisterNewEntity(item)}
+                                  className="py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 active:scale-95 transition shadow-sm"
+                                >
+                                  <PlusCircle className="w-3.5 h-3.5" />
+                                  <span>Daftarkan ke Glosarium (+)</span>
+                                </button>
+                              )
+                            ) : isAliasSaved ? (
                               <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
                                 <CheckCheck className="w-4 h-4" />
-                                <span>Terdaftar di Glosarium</span>
+                                <span>Alias Tersimpan</span>
                               </span>
                             ) : (
                               <button
                                 type="button"
-                                onClick={() => handleRegisterNewEntity(item)}
-                                className="py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 active:scale-95 transition shadow-sm"
+                                onClick={() => handleAddAliasToExisting(item)}
+                                className="py-1.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center gap-1.5 active:scale-95 transition shadow-sm"
                               >
-                                <PlusCircle className="w-3.5 h-3.5" />
-                                <span>Daftarkan ke Glosarium (+)</span>
+                                <Link2 className="w-3.5 h-3.5" />
+                                <span>Simpan Sebagai Alias Resmi</span>
                               </button>
-                            )
-                          ) : isAliasSaved ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                              <CheckCheck className="w-4 h-4" />
-                              <span>Alias Tersimpan</span>
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => handleAddAliasToExisting(item)}
-                              className="py-1.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center gap-1.5 active:scale-95 transition shadow-sm"
-                            >
-                              <Link2 className="w-3.5 h-3.5" />
-                              <span>Simpan Sebagai Alias Resmi</span>
-                            </button>
-                          )}
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-center py-6 px-4 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-950/20 text-xs text-slate-500 dark:text-slate-400">
-                  Belum ada entitas baru atau alias yang dipindai. Ketuk tombol di atas atau gunakan Generate All.
-                </div>
-              )}
-            </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-10 px-4 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-950/20 text-xs text-slate-500 dark:text-slate-400 space-y-2">
+                    <Shield className="w-8 h-8 mx-auto text-slate-400 dark:text-slate-600" />
+                    <p>Belum ada entitas baru atau alias yang dipindai.</p>
+                    <p className="text-[11px] text-slate-400">
+                      Ketuk tombol <strong>Pindai Entitas &amp; Alias</strong> di atas atau gunakan <strong>Generate All</strong>.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </main>
+
+      {/* ========================================================================= */}
+      {/* MODAL: PENGATURAN DASAR PROMPT GAMBAR GLOBAL                              */}
+      {/* ========================================================================= */}
+      {showImageSettingsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl p-5 sm:p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                  <Sliders className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                    Pengaturan Prompt Gambar Adegan
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Konfigurasi global untuk prompt generator (Midjourney, Flux, Stable Diffusion)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowImageSettingsModal(false)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <div className="space-y-4">
+              {/* 1. Rasio Aspek Layar */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
+                  <span>Rasio Aspek Layar (Aspect Ratio)</span>
+                  <span className="text-[11px] text-purple-600 dark:text-purple-400 font-normal">Default: 9:16 (Layar HP)</span>
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { label: '9:16 (Layar HP)', val: '9:16 (Layar HP)' },
+                    { label: '16:9 (Sinematik)', val: '16:9 (Desktop)' },
+                    { label: '1:1 (Persegi)', val: '1:1 (Square)' },
+                    { label: '3:4 (Portrait)', val: '3:4 (Portrait)' },
+                  ].map((preset) => (
+                    <button
+                      key={preset.val}
+                      type="button"
+                      onClick={() => setTempImageSettings({ ...tempImageSettings, aspectRatio: preset.val })}
+                      className={`p-2 rounded-xl text-xs font-bold border transition ${
+                        tempImageSettings.aspectRatio === preset.val
+                          ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                          : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-purple-300'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  value={tempImageSettings.aspectRatio}
+                  onChange={(e) => setTempImageSettings({ ...tempImageSettings, aspectRatio: e.target.value })}
+                  placeholder="Kustom: misal 9:16 --ar 9:16"
+                  className="w-full mt-1.5 p-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-purple-500 font-mono"
+                />
+              </div>
+
+              {/* 2. Gaya Visual (Style) */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
+                  <span>Gaya Visual (Style &amp; Rendering)</span>
+                  <span className="text-[11px] text-purple-600 dark:text-purple-400 font-normal">Hyper Realistic</span>
+                </label>
+                <textarea
+                  value={tempImageSettings.style}
+                  onChange={(e) => setTempImageSettings({ ...tempImageSettings, style: e.target.value })}
+                  rows={2}
+                  className="w-full p-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-purple-500 leading-relaxed"
+                />
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {[
+                    'Hyper realistic, natural scene, 8k, cinematic lighting',
+                    'Cinematic movie still, 35mm film photography, raw candid',
+                    'Anime / Manga fine art, Makoto Shinkai aesthetic',
+                    'Dark fantasy concept art, volumetric atmosphere',
+                  ].map((preset, pIdx) => (
+                    <button
+                      key={pIdx}
+                      type="button"
+                      onClick={() => setTempImageSettings({ ...tempImageSettings, style: preset })}
+                      className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-[10px] text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition"
+                    >
+                      + {preset.split(',')[0]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 3. Penggambaran Karakter (person1/person2) */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  Penggambaran Karakter (Format Token Tokoh)
+                </label>
+                <input
+                  type="text"
+                  value={tempImageSettings.characterNaming}
+                  onChange={(e) => setTempImageSettings({ ...tempImageSettings, characterNaming: e.target.value })}
+                  className="w-full p-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-purple-500 font-mono"
+                />
+                <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-500/20 text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                  💡 <strong>Tips Karakter:</strong> AI akan menulis tokoh sebagai <code>[person1]</code>, <code>[person2]</code> dst. Hal ini memudahkan Anda mencocokkan wajah tokoh dengan gambar referensi foto karakter yang dilampirkan di generator gambar (seperti fitur <em>Character Reference</em> / IP-Adapter).
+                </div>
+              </div>
+
+              {/* 4. Kata Kunci Tambahan */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  Kata Kunci Tambahan (Kualitas &amp; Suasana Kamera)
+                </label>
+                <input
+                  type="text"
+                  value={tempImageSettings.additionalKeywords}
+                  onChange={(e) => setTempImageSettings({ ...tempImageSettings, additionalKeywords: e.target.value })}
+                  className="w-full p-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                />
+              </div>
+
+              {/* 5. Bahasa Prompt */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  Bahasa Teks Prompt Gambar
+                </label>
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="promptLanguage"
+                      checked={tempImageSettings.language === 'en'}
+                      onChange={() => setTempImageSettings({ ...tempImageSettings, language: 'en' })}
+                      className="text-purple-600 focus:ring-purple-500"
+                    />
+                    <span>English (Direkomendasikan untuk Midjourney, Flux, SD)</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="promptLanguage"
+                      checked={tempImageSettings.language === 'id'}
+                      onChange={() => setTempImageSettings({ ...tempImageSettings, language: 'id' })}
+                      className="text-purple-600 focus:ring-purple-500"
+                    />
+                    <span>Bahasa Indonesia</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={handleResetImageSettings}
+                className="text-xs font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition"
+              >
+                Reset ke Default
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowImageSettingsModal(false)}
+                  className="py-2 px-3.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-200 transition"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSaveImageSettings(tempImageSettings)}
+                  className="py-2 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 active:scale-95 text-white font-bold text-xs shadow-md shadow-purple-500/20 transition"
+                >
+                  Simpan Pengaturan
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -30,6 +30,12 @@ export interface ChapterPlotBreakdown {
   resolution: string;
 }
 
+export interface SceneGlosariumItem {
+  name: string;
+  category: WorldCategory;
+  entityId?: string;
+}
+
 export interface ChapterSceneItem {
   id: string;
   sceneNumber: number;
@@ -41,6 +47,16 @@ export interface ChapterSceneItem {
   timelineType?: 'linear' | 'parallel' | 'flashback' | 'branched';
   timeMarker?: string;
   branchGroup?: string;
+  entitiesPresent?: SceneGlosariumItem[];
+  imagePrompt?: string;
+}
+
+export interface ImagePromptSettings {
+  aspectRatio: string;
+  style: string;
+  characterNaming: string;
+  additionalKeywords: string;
+  language: 'en' | 'id';
 }
 
 export interface DetectedEntityCandidate {

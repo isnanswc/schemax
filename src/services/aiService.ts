@@ -6,6 +6,11 @@ import {
   AIGenerateResult,
   AIGenerationEvent,
 } from '../types/ai';
+import {
+  ChapterSceneItem,
+  SceneGlosariumItem,
+  ImagePromptSettings,
+} from '../types';
 
 // Modern baseline defaults (Gemini 2.5/2.0 series & Groq current lineup)
 export const DEFAULT_GEMINI_MODELS: AIModelOption[] = [
@@ -557,34 +562,54 @@ function extractSection(text: string, title: string): string {
 }
 
 // 3. Chapter Auto-Scene Decomposition Engine with Smart Timeline
+// 3. Chapter Auto-Scene Decomposition Engine with Smart Timeline, Glosarium Mapping, & Image Prompts
 export async function generateChapterAutoScenes(
   chapterTitle: string,
   bookTitle: string,
-  contentText: string
-): Promise<Array<{
-  id: string;
-  sceneNumber: number;
-  title: string;
-  setting: string;
-  characters: string[];
-  summary: string;
-  goalConflict?: string;
-  timelineType?: 'linear' | 'parallel' | 'flashback' | 'branched';
-  timeMarker?: string;
-  branchGroup?: string;
-}>> {
-  const prompt = `Bedah dan uraikan naskah bab berikut menjadi daftar adegan-adegan (scenes breakdown) berurutan beserta analisis alur kronologis waktu (timeline).
+  contentText: string,
+  existingEntities?: Array<{ id: string; name: string; category: string }>,
+  promptSettings?: ImagePromptSettings
+): Promise<ChapterSceneItem[]> {
+  const entityContext =
+    existingEntities && existingEntities.length > 0
+      ? `\nDaftar Entitas Glosarium yang Sudah Ada di Buku:\n` +
+        existingEntities.map((e) => `- [${e.category.toUpperCase()}] ${e.name} (id: ${e.id})`).join('\n')
+      : '';
+
+  const aspectRatio = promptSettings?.aspectRatio || '9:16 (Layar HP)';
+  const style =
+    promptSettings?.style ||
+    'Hyper realistic, natural scene, 8k resolution, cinematic lighting, photorealistic textures';
+  const charNaming =
+    promptSettings?.characterNaming ||
+    'person1, person2 (sesuai foto/referensi karakter yang dilampirkan)';
+  const extraKeywords =
+    promptSettings?.additionalKeywords ||
+    'candid scene photography, authentic emotions, high detail, volumetric lighting';
+  const promptLang =
+    promptSettings?.language === 'id' ? 'Bahasa Indonesia' : 'English (standard image prompt)';
+
+  const prompt = `Bedah dan uraikan naskah bab berikut menjadi daftar adegan-adegan (scenes breakdown) berurutan beserta analisis kronologis alur (timeline), deteksi entitas glosarium di dalam tiap adegan, dan prompt pembuatan gambar AI untuk adegan tersebut.
 
 Judul Buku: "${bookTitle}"
-Judul Bab: "${chapterTitle}"
+Judul Bab: "${chapterTitle}"${entityContext}
 
 Isi Naskah Bab:
 ${contentText.slice(0, 7000)}
 
-Instruksi Timeline:
-- Tentukan apakah alur adegan berjalan lurus ("linear"), terjadi bersamaan/simultan di tempat berbeda ("parallel" atau "branched"), atau kilas balik masa lalu ("flashback").
-- timeMarker: Keterangan waktu (misal: "Pagi hari", "Terjadi bersamaan dengan Adegan 1", "Kilas balik 3 tahun lalu", "Malam hari").
-- branchGroup: Kelompok garis waktu (misal: "Garis Waktu Utama", "Garis Waktu B (Simultan)", "Flashback").
+Instruksi Analisis Tiap Adegan:
+1. Timeline: Tentukan tipe kronologi ("linear", "parallel" / "branched" jika simultan, atau "flashback"), timeMarker (penanda waktu), dan branchGroup.
+2. Informasi Glosarium dalam Adegan (entitiesPresent):
+   Sebutkan semua entitas (tokoh/karakter, latar tempat, benda/senjata pusaka, lore/faksi) yang hadir atau berperan penting di dalam adegan ini.
+   Jika cocok dengan entitas di daftar glosarium yang sudah ada, cantumkan entityId-nya.
+3. Prompt Gambar Adegan (imagePrompt):
+   Buatkan prompt visual text-to-image (untuk Midjourney/Flux/SD) untuk memvisualisasikan momen paling dramatis dari adegan ini dengan aturan:
+   - Rasio Aspek: ${aspectRatio}
+   - Gaya Visual: ${style}
+   - Penggambaran Karakter: Gunakan label [person1], [person2], dst untuk karakter utama di adegan (sesuai urutan tokoh) agar dapat dicocokkan dengan referensi foto karakter yang dilampirkan.
+   - Suasana & Komposisi: Natural scene, pencahayaan alami/sinematik, deskripsi latar yang kaya.
+   - Kata Kunci Tambahan: ${extraKeywords}
+   - Bahasa Prompt Gambar: ${promptLang}.
 
 Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
 [
@@ -593,16 +618,22 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
     "title": "Judul Singkat Adegan",
     "setting": "Latar tempat & waktu adegan",
     "characters": ["Nama Tokoh 1", "Nama Tokoh 2"],
-    "summary": "Rangkuman kejadian dalam adegan ini",
+    "summary": "Rangkuman kejadian dalam adegan ini secara detail",
     "goalConflict": "Tujuan tokoh atau konflik yang terjadi di adegan",
     "timelineType": "linear",
     "timeMarker": "Pagi hari di Dermaga",
-    "branchGroup": "Garis Waktu Utama"
+    "branchGroup": "Garis Waktu Utama",
+    "entitiesPresent": [
+      { "name": "Nama Tokoh 1", "category": "character", "entityId": "" },
+      { "name": "Dermaga", "category": "location", "entityId": "" },
+      { "name": "Pedang Giok", "category": "item", "entityId": "" }
+    ],
+    "imagePrompt": "Hyper-realistic natural scene photo of [person1] standing at the foggy wooden pier in the morning, holding an ancient jade blade, cinematic soft morning sunlight, 8k resolution, authentic textures, phone wallpaper aspect ratio 9:16 --ar 9:16"
   }
 ]`;
 
   const systemPrompt =
-    'Anda adalah script reader dan editor adegan novel. Berikan HANYA format JSON array valid.';
+    'Anda adalah script reader, visual concept artist, dan continuity editor novel. Berikan HANYA format JSON array valid.';
   const res = await generateWithSmartFallback(prompt, systemPrompt);
 
   try {
@@ -620,6 +651,16 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
         timelineType: item.timelineType || 'linear',
         timeMarker: item.timeMarker || '',
         branchGroup: item.branchGroup || 'Garis Waktu Utama',
+        entitiesPresent: Array.isArray(item.entitiesPresent)
+          ? item.entitiesPresent.map((e: any) => ({
+              name: e.name || '',
+              category: ['character', 'location', 'item', 'lore'].includes(e.category)
+                ? e.category
+                : 'character',
+              entityId: e.entityId || undefined,
+            }))
+          : [],
+        imagePrompt: item.imagePrompt || '',
       }));
     }
   } catch (err) {
@@ -639,8 +680,65 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
       timelineType: 'linear',
       timeMarker: 'Awal Bab',
       branchGroup: 'Garis Waktu Utama',
+      entitiesPresent: [],
+      imagePrompt: '',
     },
   ];
+}
+
+// 3b. Dedicated Single Scene Image Prompt Generator / Regenerator
+export async function generateSingleSceneImagePrompt(
+  scene: {
+    title: string;
+    setting: string;
+    characters: string[];
+    summary: string;
+    entitiesPresent?: SceneGlosariumItem[];
+  },
+  bookTitle: string,
+  chapterTitle: string,
+  promptSettings?: ImagePromptSettings
+): Promise<string> {
+  const aspectRatio = promptSettings?.aspectRatio || '9:16 (Layar HP)';
+  const style =
+    promptSettings?.style ||
+    'Hyper realistic, natural scene, 8k resolution, cinematic lighting, photorealistic textures';
+  const charNaming =
+    promptSettings?.characterNaming ||
+    'person1, person2 (sesuai foto/referensi karakter yang dilampirkan)';
+  const extraKeywords =
+    promptSettings?.additionalKeywords ||
+    'candid scene photography, authentic emotions, high detail, volumetric lighting';
+  const promptLang =
+    promptSettings?.language === 'id' ? 'Bahasa Indonesia' : 'English (standard image prompt)';
+
+  const prompt = `Anda adalah AI Prompt Engineer spesialis pembuatan prompt gambar sinematik untuk Midjourney, Flux, Stable Diffusion, dan DALL-E 3.
+
+Tugas Anda: Buat SATU prompt teks-ke-gambar (Text-to-Image Prompt) untuk adegan cerita berikut:
+
+Judul Buku: "${bookTitle}"
+Judul Bab: "${chapterTitle}"
+Adegan: "${scene.title}"
+Latar: ${scene.setting || 'Sesuai konteks adegan'}
+Tokoh Terlibat: ${scene.characters.join(', ') || 'Karakter utama'}
+Ringkasan Kejadian Adegan:
+${scene.summary}
+
+Aturan Pembuatan Prompt:
+1. Rasio Aspek: ${aspectRatio} (tambahkan penanda --ar 9:16 jika relevan)
+2. Gaya Visual: ${style}
+3. Penggambaran Karakter: Wajib gunakan sebutan [person1], [person2] dst untuk merepresentasikan karakter yang hadir sesuai urutan tokoh (${charNaming}), sertakan deskripsi pakaian, postur, dan ekspresi emosional mereka.
+4. Suasana Adegan: Natural scene, pencahayaan alami/sinematik, kedalaman ruang (depth of field), detail lingkungan latar.
+5. Modifiers Tambahan: ${extraKeywords}
+6. Bahasa: ${promptLang}.
+
+Format Keluaran:
+Tulis HANYA teks prompt gambar akhir siap salin tanpa kata pengantar, tanpa tanda kutip pembuka/penutup, dan tanpa format markdown.`;
+
+  const systemPrompt =
+    'Anda adalah world-class AI Image Prompt Engineer untuk novel visual. Keluarkan HANYA teks prompt murni siap pakai.';
+  const res = await generateWithSmartFallback(prompt, systemPrompt);
+  return res.text.replace(/^["']|["']$/g, '').trim();
 }
 
 // 4. Polish Raw Draft to Prose Engine
