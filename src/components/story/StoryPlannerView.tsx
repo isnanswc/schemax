@@ -11,6 +11,7 @@ import {
   Info
 } from 'lucide-react';
 import { db } from '../../db';
+import { navStack } from '../../services/backNavigationService';
 
 interface StoryPlannerViewProps {
   bookId: string;
@@ -28,6 +29,26 @@ export const StoryPlannerView: React.FC<StoryPlannerViewProps> = ({
   const [filter, setFilter] = useState<'all' | ChapterStatus>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [activeSheetChapter, setActiveSheetChapter] = useState<{ chapter: StoryChapter; index: number } | null>(null);
+
+  const handleOpenAddModal = () => {
+    navStack.push('modal-add-chapter', () => setIsAddModalOpen(false));
+    setIsAddModalOpen(true);
+  };
+
+  const handleCloseAddModal = () => {
+    navStack.pop('modal-add-chapter');
+    setIsAddModalOpen(false);
+  };
+
+  const handleOpenActionSheet = (chapter: StoryChapter, index: number) => {
+    navStack.push('sheet-chapter-action', () => setActiveSheetChapter(null));
+    setActiveSheetChapter({ chapter, index });
+  };
+
+  const handleCloseActionSheet = () => {
+    navStack.pop('sheet-chapter-action');
+    setActiveSheetChapter(null);
+  };
 
   const filteredChapters = chapters.filter((c) => {
     if (filter === 'all') return true;
@@ -144,7 +165,7 @@ export const StoryPlannerView: React.FC<StoryPlannerViewProps> = ({
 
         {/* Add Planned Story Button */}
         <button
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={handleOpenAddModal}
           className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 py-2.5 px-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-95 text-slate-950 font-bold rounded-xl text-xs shadow-md shadow-amber-500/15 transition flex-shrink-0"
         >
           <Plus className="w-4 h-4" />
@@ -169,7 +190,7 @@ export const StoryPlannerView: React.FC<StoryPlannerViewProps> = ({
             Rancang plot dan alur adegan ceritamu dengan menekan tombol Tambah Bab Baru.
           </p>
           <button
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={handleOpenAddModal}
             className="inline-flex items-center gap-2 py-2 px-4 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-xl text-xs border border-slate-700 transition"
           >
             <Plus className="w-4 h-4 text-amber-400" />
@@ -184,7 +205,7 @@ export const StoryPlannerView: React.FC<StoryPlannerViewProps> = ({
               chapter={chapter}
               index={idx}
               onOpenEditor={onOpenEditor}
-              onOpenActionSheet={(chap, i) => setActiveSheetChapter({ chapter: chap, index: i })}
+              onOpenActionSheet={handleOpenActionSheet}
               onQuickStatusToggle={handleStatusToggle}
             />
           ))}
@@ -196,7 +217,7 @@ export const StoryPlannerView: React.FC<StoryPlannerViewProps> = ({
         isOpen={isAddModalOpen}
         bookId={bookId}
         nextOrder={chapters.length + 1}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={handleCloseAddModal}
         onSuccess={() => onRefresh()}
       />
 
@@ -205,7 +226,7 @@ export const StoryPlannerView: React.FC<StoryPlannerViewProps> = ({
         chapter={activeSheetChapter?.chapter || null}
         chapterIndex={activeSheetChapter?.index || 0}
         isOpen={!!activeSheetChapter}
-        onClose={() => setActiveSheetChapter(null)}
+        onClose={handleCloseActionSheet}
         onOpenEditor={onOpenEditor}
         onStatusChange={handleStatusChange}
         onDelete={handleDelete}

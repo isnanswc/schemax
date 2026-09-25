@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowLeft, BookOpen, Database, Sparkles, HardDrive } from 'lucide-react';
 import { Book } from '../../types';
+import { ThemeToggle } from './ThemeToggle';
 
 interface MobileHeaderProps {
   currentBook?: Book | null;
@@ -69,8 +70,11 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
           </div>
         </div>
 
-        {/* Right: AI Settings & IndexedDB Sync Buttons */}
-        <div className="flex items-center gap-2">
+        {/* Right: AI Settings, IndexedDB, and Theme Toggle Buttons */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Theme Toggle (Dark/Light/Auto) */}
+          <ThemeToggle />
+
           {/* AI Settings Button */}
           <button
             type="button"
@@ -85,7 +89,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
 
           <button
             onClick={onOpenSyncModal}
-            className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 text-slate-300 text-xs font-medium active:scale-95 transition shadow-sm"
+            className="flex items-center gap-1.5 py-1.5 px-2.5 sm:px-3 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 text-slate-300 text-xs font-medium active:scale-95 transition shadow-sm"
             title="Penyimpanan IndexedDB & Sinkronisasi"
           >
             <HardDrive className="w-3.5 h-3.5 text-amber-400" />

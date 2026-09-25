@@ -17,6 +17,7 @@ import {
   Lightbulb,
   Zap
 } from 'lucide-react';
+import { navStack } from '../../services/backNavigationService';
 
 interface BookListDashboardProps {
   books: Book[];
@@ -46,6 +47,16 @@ export const BookListDashboard: React.FC<BookListDashboardProps> = ({
   const [activeCategory, setActiveCategory] = useState<'all' | BookStatus>('draft');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSparkModalOpen, setIsSparkModalOpen] = useState(false);
+
+  const handleOpenSparkModal = () => {
+    navStack.push('modal-spark', () => setIsSparkModalOpen(false));
+    setIsSparkModalOpen(true);
+  };
+
+  const handleCloseSparkModal = () => {
+    navStack.pop('modal-spark');
+    setIsSparkModalOpen(false);
+  };
 
   const draftBooks = books.filter((b) => b.status === 'draft');
   const releasedBooks = books.filter((b) => b.status === 'released');
@@ -191,7 +202,7 @@ export const BookListDashboard: React.FC<BookListDashboardProps> = ({
 
         <button
           type="button"
-          onClick={() => setIsSparkModalOpen(true)}
+          onClick={handleOpenSparkModal}
           className="inline-flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs border border-slate-700 active:scale-95 transition flex-shrink-0"
         >
           <Sparkles className="w-3.5 h-3.5 text-amber-400" />
@@ -349,7 +360,7 @@ export const BookListDashboard: React.FC<BookListDashboardProps> = ({
       {/* AI Quick Spark Modal */}
       <AISparkModal
         isOpen={isSparkModalOpen}
-        onClose={() => setIsSparkModalOpen(false)}
+        onClose={handleCloseSparkModal}
         books={books}
       />
     </div>

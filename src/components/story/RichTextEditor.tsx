@@ -30,6 +30,8 @@ import { db } from '../../db';
 import { LoreSidebarDrawer } from './LoreSidebarDrawer';
 import { AIAssistantSheet } from './AIAssistantSheet';
 import { AISettingsModal } from '../settings/AISettingsModal';
+import { ThemeToggle } from '../layout/ThemeToggle';
+import { navStack } from '../../services/backNavigationService';
 
 interface RichTextEditorProps {
   chapter: StoryChapter;
@@ -65,7 +67,33 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const handleOpenAIAssistant = () => {
     const sel = window.getSelection()?.toString() || '';
     setSelectedTextForAI(sel);
+    navStack.push('editor-ai-assistant', () => setIsAIAssistantOpen(false));
     setIsAIAssistantOpen(true);
+  };
+
+  const handleCloseAIAssistant = () => {
+    navStack.pop('editor-ai-assistant');
+    setIsAIAssistantOpen(false);
+  };
+
+  const handleOpenLoreDrawer = () => {
+    navStack.push('editor-lore-drawer', () => setIsLoreDrawerOpen(false));
+    setIsLoreDrawerOpen(true);
+  };
+
+  const handleCloseLoreDrawer = () => {
+    navStack.pop('editor-lore-drawer');
+    setIsLoreDrawerOpen(false);
+  };
+
+  const handleOpenAISettings = () => {
+    navStack.push('editor-ai-settings', () => setIsAISettingsOpen(false));
+    setIsAISettingsOpen(true);
+  };
+
+  const handleCloseAISettings = () => {
+    navStack.pop('editor-ai-settings');
+    setIsAISettingsOpen(false);
   };
 
   const handleApplyAIResult = (aiText: string, mode: 'insert' | 'replace') => {
@@ -260,7 +288,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
           {/* Lore Drawer Button */}
           <button
             type="button"
-            onClick={() => setIsLoreDrawerOpen(true)}
+            onClick={handleOpenLoreDrawer}
             className="flex items-center gap-1 py-1 px-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-xs font-bold transition active:scale-95 shadow-sm"
             title="Buka Glosarium Lore"
           >
@@ -272,6 +300,9 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
               </span>
             )}
           </button>
+
+          {/* Theme Toggle (Dark/Light/Auto) */}
+          <ThemeToggle />
 
           {/* Auto-save Status Icon */}
           <button
@@ -488,7 +519,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
         <button
           type="button"
-          onClick={() => setIsLoreDrawerOpen(true)}
+          onClick={handleOpenLoreDrawer}
           className="flex items-center gap-1.5 py-2 px-3 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black text-xs shadow-xl shadow-amber-500/25 border border-amber-400/40 active:scale-95 transition"
           title="Lore Drawer"
         >
@@ -522,7 +553,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
       {/* Slide-Over Lore Drawer */}
       <LoreSidebarDrawer
         isOpen={isLoreDrawerOpen}
-        onClose={() => setIsLoreDrawerOpen(false)}
+        onClose={handleCloseLoreDrawer}
         entities={entities}
         onInsertEntityName={handleInsertEntityName}
       />
@@ -530,19 +561,19 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
       {/* AI Assistant Co-Pilot Sheet */}
       <AIAssistantSheet
         isOpen={isAIAssistantOpen}
-        onClose={() => setIsAIAssistantOpen(false)}
+        onClose={handleCloseAIAssistant}
         selectedText={selectedTextForAI}
         chapterPremise={chapter.premise}
         bookTitle={bookTitle}
         entities={entities}
         onApplyResult={handleApplyAIResult}
-        onOpenAISettings={() => setIsAISettingsOpen(true)}
+        onOpenAISettings={handleOpenAISettings}
       />
 
       {/* Multi-AI Settings Modal */}
       <AISettingsModal
         isOpen={isAISettingsOpen}
-        onClose={() => setIsAISettingsOpen(false)}
+        onClose={handleCloseAISettings}
       />
     </div>
   );

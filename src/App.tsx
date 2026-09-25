@@ -14,6 +14,7 @@ import { CreateBookModal } from './components/books/CreateBookModal';
 import { SyncStatusModal } from './components/sync/SyncStatusModal';
 import { AISettingsModal } from './components/settings/AISettingsModal';
 import { AIStoryArchitectModal } from './components/story/AIStoryArchitectModal';
+import { navStack } from './services/backNavigationService';
 
 export function App() {
   const [currentBook, setCurrentBook] = useState<Book | null>(null);
@@ -24,6 +25,7 @@ export function App() {
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [isAISettingsOpen, setIsAISettingsOpen] = useState(false);
   const [isArchitectModalOpen, setIsArchitectModalOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Initialize seed data if database is empty on first boot
@@ -67,38 +69,81 @@ export function App() {
     ? books.find((b) => b.id === recentChapter.bookId) || null
     : null;
 
-  // Native back gesture & Android hardware back button support
+  // Native back gesture & Android hardware back button support via navStack
   useEffect(() => {
-    const handlePopState = () => {
-      setEditingChapter(null);
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    const cleanup = navStack.init((msg) => {
+      setToastMessage(msg);
+      setTimeout(() => setToastMessage(null), 2200);
+    });
+    return cleanup;
   }, []);
 
   const handleSelectBook = (book: Book) => {
-    window.history.pushState({ screen: 'book' }, '');
+    navStack.push('book', () => {
+      setCurrentBook(null);
+      setEditingChapter(null);
+    });
     setCurrentBook(book);
     setActiveTab('chapters');
   };
 
   const handleBackToHome = () => {
+    navStack.pop('book');
     setCurrentBook(null);
     setEditingChapter(null);
   };
 
   const handleOpenEditor = (chapter: StoryChapter) => {
-    window.history.pushState({ screen: 'editor' }, '');
+    navStack.push('editor', () => {
+      setEditingChapter(null);
+    });
     setEditingChapter(chapter);
   };
 
   const handleBackFromEditor = () => {
+    navStack.pop('editor');
     setEditingChapter(null);
   };
 
   const handleOpenCreateModal = (defaultStatus: BookStatus = 'draft') => {
     setCreateModalInitialStatus(defaultStatus);
+    navStack.push('modal-create', () => setIsCreateModalOpen(false));
     setIsCreateModalOpen(true);
+  };
+
+  const handleCloseCreateModal = () => {
+    navStack.pop('modal-create');
+    setIsCreateModalOpen(false);
+  };
+
+  const handleOpenSyncModal = () => {
+    navStack.push('modal-sync', () => setIsSyncModalOpen(false));
+    setIsSyncModalOpen(true);
+  };
+
+  const handleCloseSyncModal = () => {
+    navStack.pop('modal-sync');
+    setIsSyncModalOpen(false);
+  };
+
+  const handleOpenAISettings = () => {
+    navStack.push('modal-ai-settings', () => setIsAISettingsOpen(false));
+    setIsAISettingsOpen(true);
+  };
+
+  const handleCloseAISettings = () => {
+    navStack.pop('modal-ai-settings');
+    setIsAISettingsOpen(false);
+  };
+
+  const handleOpenArchitect = () => {
+    navStack.push('modal-architect', () => setIsArchitectModalOpen(false));
+    setIsArchitectModalOpen(true);
+  };
+
+  const handleCloseArchitect = () => {
+    navStack.pop('modal-architect');
+    setIsArchitectModalOpen(false);
   };
 
   const triggerRefresh = () => {
@@ -106,7 +151,7 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
       {/* 1. Fullscreen Rich Text Writing Mode */}
       {editingChapter && currentBook ? (
         <RichTextEditor
@@ -125,8 +170,8 @@ export function App() {
           <MobileHeader
             currentBook={currentBook}
             onBack={currentBook ? handleBackToHome : undefined}
-            onOpenSyncModal={() => setIsSyncModalOpen(true)}
-            onOpenAISettings={() => setIsAISettingsOpen(true)}
+            onOpenSyncModal={handleOpenSyncModal}
+            onOpenAISettings={handleOpenAISettings}
           />
 
           {/* 3. Main Body Container - Compact & Edge-to-Edge on Mobile */}
@@ -145,8 +190,8 @@ export function App() {
                   handleOpenEditor(chapter);
                 }}
                 onOpenCreateModal={handleOpenCreateModal}
-                onOpenStoryArchitect={() => setIsArchitectModalOpen(true)}
-                onOpenAISettings={() => setIsAISettingsOpen(true)}
+                onOpenStoryArchitect={handleOpenArchitect}
+                onOpenAISettings={handleOpenAISettings}
               />
             ) : (
               /* Inside Book Workspace */
@@ -208,7 +253,7 @@ export function App() {
           <CreateBookModal
             isOpen={isCreateModalOpen}
             initialStatus={createModalInitialStatus}
-            onClose={() => setIsCreateModalOpen(false)}
+            onClose={handleCloseCreateModal}
             onSuccess={(newBook) => {
               triggerRefresh();
               setCurrentBook(newBook);
@@ -219,26 +264,34 @@ export function App() {
           {/* 6. IndexedDB & Cloud Sync Status Modal */}
           <SyncStatusModal
             isOpen={isSyncModalOpen}
-            onClose={() => setIsSyncModalOpen(false)}
+            onClose={handleCloseSyncModal}
             onDataChanged={triggerRefresh}
           />
 
           {/* 7. Multi-AI Settings Modal (Gemini & Groq Fallback) */}
           <AISettingsModal
             isOpen={isAISettingsOpen}
-            onClose={() => setIsAISettingsOpen(false)}
+            onClose={handleCloseAISettings}
           />
 
           {/* 8. AI Story Architect Modal (Idea to Full Project) */}
           <AIStoryArchitectModal
             isOpen={isArchitectModalOpen}
-            onClose={() => setIsArchitectModalOpen(false)}
+            onClose={handleCloseArchitect}
             onProjectCreated={(newBook) => {
               triggerRefresh();
               handleSelectBook(newBook);
             }}
-            onOpenAISettings={() => setIsAISettingsOpen(true)}
+            onOpenAISettings={handleOpenAISettings}
           />
+
+          {/* Toast Notification for back button exit guard */}
+          {toastMessage && (
+            <div className="fixed bottom-16 sm:bottom-8 left-1/2 -translate-x-1/2 z-[100] px-4 py-2 rounded-full bg-slate-900/95 border border-slate-700/80 text-white text-xs font-semibold shadow-2xl backdrop-blur-md transition flex items-center gap-2 pointer-events-none">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+              <span>{toastMessage}</span>
+            </div>
+          )}
         </>
       )}
     </div>

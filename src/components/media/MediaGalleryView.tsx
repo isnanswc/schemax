@@ -12,6 +12,7 @@ import {
   ZoomIn,
   Sparkles
 } from 'lucide-react';
+import { navStack } from '../../services/backNavigationService';
 
 interface MediaGalleryViewProps {
   bookId: string;
@@ -87,6 +88,16 @@ export const MediaGalleryView: React.FC<MediaGalleryViewProps> = ({
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const { url: previewUrl } = useMediaUrl(selectedMedia?.id);
+
+  const handleOpenPreview = (item: MediaItem) => {
+    navStack.push('modal-media-preview', () => setSelectedMedia(null));
+    setSelectedMedia(item);
+  };
+
+  const handleClosePreview = () => {
+    navStack.pop('modal-media-preview');
+    setSelectedMedia(null);
+  };
 
   const totalBytes = mediaList.reduce((acc, m) => acc + (m.size || 0), 0);
   const totalFormatted =
@@ -180,7 +191,7 @@ export const MediaGalleryView: React.FC<MediaGalleryViewProps> = ({
             <ImageThumbnail
               key={item.id}
               item={item}
-              onSelect={setSelectedMedia}
+              onSelect={handleOpenPreview}
               onDelete={handleDelete}
             />
           ))}
@@ -201,7 +212,7 @@ export const MediaGalleryView: React.FC<MediaGalleryViewProps> = ({
                 </p>
               </div>
               <button
-                onClick={() => setSelectedMedia(null)}
+                onClick={handleClosePreview}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
               >
                 <X className="w-5 h-5" />

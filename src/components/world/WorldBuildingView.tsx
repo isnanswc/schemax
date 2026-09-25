@@ -20,6 +20,7 @@ import {
   Eye
 } from 'lucide-react';
 import { db } from '../../db';
+import { navStack } from '../../services/backNavigationService';
 
 interface WorldBuildingViewProps {
   bookId: string;
@@ -199,6 +200,26 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [hologramEntity, setHologramEntity] = useState<WorldEntity | null>(null);
 
+  const handleOpenAddModal = () => {
+    navStack.push('modal-add-entity', () => setIsAddModalOpen(false));
+    setIsAddModalOpen(true);
+  };
+
+  const handleCloseAddModal = () => {
+    navStack.pop('modal-add-entity');
+    setIsAddModalOpen(false);
+  };
+
+  const handleOpenHologram = (ent: WorldEntity) => {
+    navStack.push('modal-hologram', () => setHologramEntity(null));
+    setHologramEntity(ent);
+  };
+
+  const handleCloseHologram = () => {
+    navStack.pop('modal-hologram');
+    setHologramEntity(null);
+  };
+
   const filteredEntities = entities.filter((ent) => {
     if (selectedCategory === 'all') return true;
     return ent.category === selectedCategory;
@@ -253,7 +274,7 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
 
         {/* Add Entity Button */}
         <button
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={handleOpenAddModal}
           className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 py-2.5 px-3.5 bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 active:scale-95 text-white font-bold rounded-xl text-xs shadow-md shadow-pink-500/20 transition flex-shrink-0"
         >
           <Plus className="w-4 h-4" />
@@ -278,7 +299,7 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
             Mulai bangun ensiklopedia duniamu: karakter utama, kastil tua, senjata legendaris, atau sistem sihir.
           </p>
           <button
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={handleOpenAddModal}
             className="inline-flex items-center gap-2 py-2 px-4 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-xl text-xs border border-slate-700 transition"
           >
             <Plus className="w-4 h-4 text-pink-400" />
@@ -292,7 +313,7 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
               key={entity.id}
               entity={entity}
               onDelete={handleDelete}
-              onOpenHologram={(ent) => setHologramEntity(ent)}
+              onOpenHologram={handleOpenHologram}
             />
           ))}
         </div>
@@ -303,7 +324,7 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
         isOpen={isAddModalOpen}
         bookId={bookId}
         initialCategory={selectedCategory === 'all' ? 'character' : selectedCategory}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={handleCloseAddModal}
         onSuccess={() => onRefresh()}
       />
 
@@ -311,7 +332,7 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
       <WorldEntityHologramModal
         entity={hologramEntity}
         isOpen={!!hologramEntity}
-        onClose={() => setHologramEntity(null)}
+        onClose={handleCloseHologram}
       />
     </div>
   );
