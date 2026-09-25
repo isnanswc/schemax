@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Book, StoryChapter, WorldEntity, MediaItem } from '../../types';
 import { BookCoverImage } from './BookCoverImage';
+import { EditBookModal } from './EditBookModal';
 import { db, saveMediaItem } from '../../db';
 import {
   FileText,
@@ -13,7 +14,8 @@ import {
   Calendar,
   Sparkles,
   TrendingUp,
-  Tag
+  Tag,
+  Edit3
 } from 'lucide-react';
 
 interface BookOverviewTabProps {
@@ -36,6 +38,7 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
   const [synopsis, setSynopsis] = useState(book.synopsis || '');
   const [isEditingSynopsis, setIsEditingSynopsis] = useState(false);
   const [targetWordCount, setTargetWordCount] = useState(book.wordCountTarget || 50000);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const totalWords = chapters.reduce((sum, c) => sum + (c.wordCount || 0), 0);
   const completedChapters = chapters.filter((c) => c.status === 'completed').length;
@@ -110,23 +113,34 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
                 {book.genre || 'Fiksi'}
               </span>
 
-              {/* Status Toggle Switch */}
-              <button
-                onClick={toggleStatus}
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition active:scale-95 ${
-                  book.status === 'released'
-                    ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30'
-                    : 'bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-400 border-amber-200 dark:border-amber-500/30'
-                }`}
-              >
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    book.status === 'released' ? 'bg-emerald-500' : 'bg-amber-500'
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition active:scale-95 shadow-sm"
+                >
+                  <Edit3 className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>Edit Info Buku</span>
+                </button>
+
+                {/* Status Toggle Switch */}
+                <button
+                  onClick={toggleStatus}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition active:scale-95 ${
+                    book.status === 'released'
+                      ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30'
+                      : 'bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-400 border-amber-200 dark:border-amber-500/30'
                   }`}
-                />
-                <span>Status: {book.status === 'released' ? 'Released' : 'Draft'}</span>
-                <span className="text-[10px] text-slate-400 ml-1">(Klik ganti)</span>
-              </button>
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      book.status === 'released' ? 'bg-emerald-500' : 'bg-amber-500'
+                    }`}
+                  />
+                  <span>Status: {book.status === 'released' ? 'Released' : 'Draft'}</span>
+                  <span className="text-[10px] text-slate-400 ml-1">(Klik ganti)</span>
+                </button>
+              </div>
             </div>
 
             <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white leading-tight">
@@ -250,6 +264,18 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
           <span>Cadangkan JSON</span>
         </button>
       </div>
+
+      {/* Edit Book Modal */}
+      <EditBookModal
+        isOpen={isEditModalOpen}
+        book={book}
+        onClose={() => setIsEditModalOpen(false)}
+        onSuccess={(updated) => {
+          onBookUpdated(updated);
+          setSynopsis(updated.synopsis || '');
+          setTargetWordCount(updated.wordCountTarget || 50000);
+        }}
+      />
     </div>
   );
 };
