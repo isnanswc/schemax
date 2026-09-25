@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { WorldEntity, WorldCategory } from '../../types';
 import { AddWorldEntityModal } from './AddWorldEntityModal';
+import { WorldEntityHologramModal } from './WorldEntityHologramModal';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
+import { useLongPress } from '../../hooks/useLongPress';
 import {
   Compass,
   User,
@@ -13,7 +15,9 @@ import {
   Tag,
   ChevronDown,
   ChevronUp,
-  Sparkles
+  Sparkles,
+  Info,
+  Eye
 } from 'lucide-react';
 import { db } from '../../db';
 
@@ -26,9 +30,28 @@ interface WorldBuildingViewProps {
 const EntityCard: React.FC<{
   entity: WorldEntity;
   onDelete: (id: string, name: string) => void;
-}> = ({ entity, onDelete }) => {
+  onOpenHologram: (entity: WorldEntity) => void;
+}> = ({ entity, onDelete, onOpenHologram }) => {
   const { url } = useMediaUrl(entity.avatarMediaId);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isPressing, setIsPressing] = useState(false);
+
+  const longPressEvents = useLongPress(
+    () => {
+      setIsPressing(false);
+      onOpenHologram(entity);
+    },
+    () => {
+      // Single tap toggles expand/collapse
+      setIsExpanded((prev) => !prev);
+    },
+    {
+      threshold: 400,
+      onStart: () => setIsPressing(true),
+      onCancel: () => setIsPressing(false),
+      onFinish: () => setIsPressing(false),
+    }
+  );
 
   const categoryMeta: Record<WorldCategory, { label: string; icon: any; color: string; badge: string }> = {
     character: { label: 'Karakter', icon: User, color: 'text-pink-400', badge: 'bg-pink-500/10 text-pink-400 border-pink-500/30' },
@@ -37,19 +60,30 @@ const EntityCard: React.FC<{
     lore: { label: 'Lore/Faksi', icon: Scroll, color: 'text-purple-400', badge: 'bg-purple-500/10 text-purple-400 border-purple-500/30' },
   };
 
-  const meta = categoryMeta[entity.category];
+  const meta = categoryMeta[entity.category] || categoryMeta.character;
   const Icon = meta.icon;
 
   return (
-    <div className="bg-slate-900/80 hover:bg-slate-900 border border-slate-800 rounded-2xl p-4 transition shadow-sm space-y-3">
+    <div
+      {...longPressEvents}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onOpenHologram(entity);
+      }}
+      className={`relative bg-slate-900/90 border rounded-2xl p-3.5 transition-all duration-200 select-none shadow-sm space-y-2.5 cursor-pointer ${
+        isPressing
+          ? 'scale-[0.98] border-pink-500/80 bg-slate-900 ring-2 ring-pink-500/30'
+          : 'border-slate-800/80 hover:border-slate-700/80 active:scale-[0.99]'
+      }`}
+    >
       {/* Top Header */}
       <div className="flex items-start gap-3">
         {/* Avatar / Visual preview */}
-        <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-slate-950 border border-slate-800 flex-shrink-0 flex items-center justify-center">
+        <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden bg-slate-950 border border-slate-800 flex-shrink-0 flex items-center justify-center">
           {url ? (
             <img src={url} alt={entity.name} className="w-full h-full object-cover" />
           ) : (
-            <Icon className={`w-6 h-6 ${meta.color}`} />
+            <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${meta.color}`} />
           )}
         </div>
 
@@ -61,16 +95,33 @@ const EntityCard: React.FC<{
               <span>{meta.label}</span>
             </span>
 
-            <button
-              onClick={() => onDelete(entity.id, entity.name)}
-              className="p-1 rounded-lg text-slate-500 hover:text-red-400 transition"
-              title="Hapus Entitas"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenHologram(entity);
+                }}
+                className="p-1 rounded-lg text-slate-500 hover:text-amber-300 transition"
+                title="Intip Hologram"
+              >
+                <Eye className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(entity.id, entity.name);
+                }}
+                className="p-1 rounded-lg text-slate-500 hover:text-red-400 transition"
+                title="Hapus Entitas"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
 
-          <h4 className="font-bold text-base text-white truncate">{entity.name}</h4>
+          <h4 className="font-bold text-sm sm:text-base text-white truncate">{entity.name}</h4>
           {entity.shortDescription && (
             <p className="text-xs text-slate-400 line-clamp-2 mt-0.5 leading-snug">
               {entity.shortDescription}
@@ -81,14 +132,14 @@ const EntityCard: React.FC<{
 
       {/* Attributes Badges / Key Values */}
       {entity.attributes && entity.attributes.length > 0 && (
-        <div className="grid grid-cols-2 gap-1.5 pt-1">
+        <div className="grid grid-cols-2 gap-1.5 pt-0.5">
           {entity.attributes.slice(0, isExpanded ? undefined : 2).map((attr) => (
             <div
               key={attr.id}
-              className="bg-slate-950/70 border border-slate-800/80 rounded-lg px-2.5 py-1 text-[11px] flex items-center justify-between"
+              className="bg-slate-950/70 border border-slate-800/80 rounded-lg px-2 py-1 text-[11px] flex items-center justify-between"
             >
-              <span className="text-slate-400">{attr.label}</span>
-              <span className="font-medium text-white truncate max-w-[100px]">{attr.value}</span>
+              <span className="text-slate-400 truncate mr-1">{attr.label}</span>
+              <span className="font-medium text-white truncate max-w-[85px]">{attr.value}</span>
             </div>
           ))}
         </div>
@@ -99,8 +150,8 @@ const EntityCard: React.FC<{
         <div className="pt-2 border-t border-slate-800/80 space-y-2 text-xs animate-in fade-in">
           {entity.detailedNotes && (
             <div>
-              <span className="font-semibold text-slate-300 block mb-1">Catatan Lore & Latar:</span>
-              <p className="text-slate-400 leading-relaxed whitespace-pre-wrap bg-slate-950/40 p-2.5 rounded-xl border border-slate-800/60">
+              <span className="font-semibold text-slate-300 block mb-1 text-[11px]">Catatan Lore & Latar:</span>
+              <p className="text-slate-300 leading-relaxed whitespace-pre-wrap bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/60 text-xs">
                 {entity.detailedNotes}
               </p>
             </div>
@@ -124,8 +175,12 @@ const EntityCard: React.FC<{
       {/* Expand/Collapse Button */}
       {(entity.detailedNotes || (entity.attributes && entity.attributes.length > 2)) && (
         <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full pt-1 flex items-center justify-center gap-1 text-[11px] font-medium text-amber-400/90 hover:text-amber-300 transition"
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsExpanded(!isExpanded);
+          }}
+          className="w-full pt-1 flex items-center justify-center gap-1 text-[11px] font-medium text-pink-400/90 hover:text-pink-300 transition"
         >
           <span>{isExpanded ? 'Tutup Rincian' : 'Lihat Rincian Lore & Atribut'}</span>
           {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -142,6 +197,7 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<'all' | WorldCategory>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [hologramEntity, setHologramEntity] = useState<WorldEntity | null>(null);
 
   const filteredEntities = entities.filter((ent) => {
     if (selectedCategory === 'all') return true;
@@ -164,11 +220,11 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
   ];
 
   return (
-    <div className="space-y-4 pb-20">
+    <div className="space-y-3 pb-24">
       {/* Category Pills & Add Button */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
         {/* Horizontal Category Filter */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
           {categories.map((cat) => {
             const Icon = cat.icon;
             const isSelected = selectedCategory === cat.id;
@@ -176,10 +232,10 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition active:scale-95 ${
                   isSelected
-                    ? 'bg-amber-500 text-slate-950 shadow-sm'
-                    : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
+                    ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
+                    : 'bg-slate-900/90 border border-slate-800 text-slate-400 hover:text-white'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -198,17 +254,25 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
         {/* Add Entity Button */}
         <button
           onClick={() => setIsAddModalOpen(true)}
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 py-2.5 px-4 bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 active:scale-95 text-white font-bold rounded-xl text-xs shadow-md shadow-pink-500/20 transition flex-shrink-0"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 py-2.5 px-3.5 bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 active:scale-95 text-white font-bold rounded-xl text-xs shadow-md shadow-pink-500/20 transition flex-shrink-0"
         >
           <Plus className="w-4 h-4" />
           <span>Tambah Worldbuilding</span>
         </button>
       </div>
 
+      {/* Helpful Mobile Micro-Hint */}
+      {filteredEntities.length > 0 && (
+        <div className="flex items-center gap-1.5 px-1 text-[11px] text-slate-500">
+          <Info className="w-3.5 h-3.5 text-pink-400/80 flex-shrink-0" />
+          <span>Tip: <strong>Tekan & tahan</strong> kartu untuk intip profil hologram instan.</span>
+        </div>
+      )}
+
       {/* Entities Grid */}
       {filteredEntities.length === 0 ? (
-        <div className="text-center py-12 px-4 border border-dashed border-slate-800 rounded-2xl bg-slate-900/40">
-          <Compass className="w-10 h-10 mx-auto text-slate-600 mb-3" />
+        <div className="text-center py-12 px-4 border border-dashed border-slate-800 rounded-2xl bg-slate-900/30">
+          <Compass className="w-9 h-9 mx-auto text-slate-600 mb-2" />
           <h3 className="text-sm font-bold text-white mb-1">Belum Ada Entitas di Kategori Ini</h3>
           <p className="text-xs text-slate-400 max-w-sm mx-auto mb-4">
             Mulai bangun ensiklopedia duniamu: karakter utama, kastil tua, senjata legendaris, atau sistem sihir.
@@ -222,20 +286,32 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
           {filteredEntities.map((entity) => (
-            <EntityCard key={entity.id} entity={entity} onDelete={handleDelete} />
+            <EntityCard
+              key={entity.id}
+              entity={entity}
+              onDelete={handleDelete}
+              onOpenHologram={(ent) => setHologramEntity(ent)}
+            />
           ))}
         </div>
       )}
 
-      {/* Modal */}
+      {/* Modal Tambah Entitas */}
       <AddWorldEntityModal
         isOpen={isAddModalOpen}
         bookId={bookId}
         initialCategory={selectedCategory === 'all' ? 'character' : selectedCategory}
         onClose={() => setIsAddModalOpen(false)}
         onSuccess={() => onRefresh()}
+      />
+
+      {/* Hologram Quick Card Modal */}
+      <WorldEntityHologramModal
+        entity={hologramEntity}
+        isOpen={!!hologramEntity}
+        onClose={() => setHologramEntity(null)}
       />
     </div>
   );

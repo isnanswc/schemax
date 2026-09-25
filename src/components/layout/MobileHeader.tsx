@@ -6,12 +6,14 @@ interface MobileHeaderProps {
   currentBook?: Book | null;
   onBack?: () => void;
   onOpenSyncModal: () => void;
+  onOpenAISettings: () => void;
 }
 
 export const MobileHeader: React.FC<MobileHeaderProps> = ({
   currentBook,
   onBack,
   onOpenSyncModal,
+  onOpenAISettings,
 }) => {
   return (
     <header className="sticky top-0 z-40 w-full backdrop-blur-xl bg-slate-950/85 border-b border-slate-800/80 px-4 py-3 safe-top transition-all">
@@ -67,8 +69,20 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
           </div>
         </div>
 
-        {/* Right: IndexedDB & Sync Status Indicator Button */}
+        {/* Right: AI Settings & IndexedDB Sync Buttons */}
         <div className="flex items-center gap-2">
+          {/* AI Settings Button */}
+          <button
+            type="button"
+            onClick={onOpenAISettings}
+            className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-xl bg-gradient-to-r from-amber-500/10 to-indigo-500/10 border border-amber-500/30 hover:border-amber-400 text-amber-300 text-xs font-bold active:scale-95 transition shadow-sm"
+            title="Pengaturan Multi-AI (Gemini & Groq Fallback)"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden sm:inline">AI Config</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+          </button>
+
           <button
             onClick={onOpenSyncModal}
             className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 text-slate-300 text-xs font-medium active:scale-95 transition shadow-sm"

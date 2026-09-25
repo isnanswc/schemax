@@ -12,6 +12,8 @@ import { WorldBuildingView } from './components/world/WorldBuildingView';
 import { MediaGalleryView } from './components/media/MediaGalleryView';
 import { CreateBookModal } from './components/books/CreateBookModal';
 import { SyncStatusModal } from './components/sync/SyncStatusModal';
+import { AISettingsModal } from './components/settings/AISettingsModal';
+import { AIStoryArchitectModal } from './components/story/AIStoryArchitectModal';
 
 export function App() {
   const [currentBook, setCurrentBook] = useState<Book | null>(null);
@@ -20,6 +22,8 @@ export function App() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createModalInitialStatus, setCreateModalInitialStatus] = useState<BookStatus>('draft');
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+  const [isAISettingsOpen, setIsAISettingsOpen] = useState(false);
+  const [isArchitectModalOpen, setIsArchitectModalOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Initialize seed data if database is empty on first boot
@@ -54,13 +58,41 @@ export function App() {
     chapterCounts[ch.bookId] = (chapterCounts[ch.bookId] || 0) + 1;
   });
 
+  // Find the most recently active chapter across all books for 1-Tap Quick Resume
+  const recentChapter = allChapters.length > 0
+    ? [...allChapters].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0]
+    : null;
+
+  const recentBook = recentChapter
+    ? books.find((b) => b.id === recentChapter.bookId) || null
+    : null;
+
+  // Native back gesture & Android hardware back button support
+  useEffect(() => {
+    const handlePopState = () => {
+      setEditingChapter(null);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const handleSelectBook = (book: Book) => {
+    window.history.pushState({ screen: 'book' }, '');
     setCurrentBook(book);
     setActiveTab('chapters');
   };
 
   const handleBackToHome = () => {
     setCurrentBook(null);
+    setEditingChapter(null);
+  };
+
+  const handleOpenEditor = (chapter: StoryChapter) => {
+    window.history.pushState({ screen: 'editor' }, '');
+    setEditingChapter(chapter);
+  };
+
+  const handleBackFromEditor = () => {
     setEditingChapter(null);
   };
 
@@ -80,9 +112,10 @@ export function App() {
         <RichTextEditor
           chapter={editingChapter}
           bookTitle={currentBook.title}
-          onBack={() => setEditingChapter(null)}
+          entities={bookEntities}
+          onBack={handleBackFromEditor}
           onChapterUpdated={(updated) => {
-            setEditingChapter(updated);
+            setEditingChapter((prev) => (prev ? updated : null));
             triggerRefresh();
           }}
         />
@@ -93,17 +126,27 @@ export function App() {
             currentBook={currentBook}
             onBack={currentBook ? handleBackToHome : undefined}
             onOpenSyncModal={() => setIsSyncModalOpen(true)}
+            onOpenAISettings={() => setIsAISettingsOpen(true)}
           />
 
-          {/* 3. Main Body Container */}
-          <main className="flex-1 w-full max-w-4xl mx-auto px-4 py-4 sm:py-6">
+          {/* 3. Main Body Container - Compact & Edge-to-Edge on Mobile */}
+          <main className="flex-1 w-full max-w-4xl mx-auto px-2.5 sm:px-4 py-3 sm:py-6">
             {!currentBook ? (
-              /* Home Screen / Book Dashboard (Draft & Released Sheets) */
+              /* Home Screen / Studio Dashboard (Quick Resume, AI Spark, Draft & Released) */
               <BookListDashboard
                 books={books}
+                allChapters={allChapters}
+                recentChapter={recentChapter}
+                recentBook={recentBook}
                 chapterCounts={chapterCounts}
                 onSelectBook={handleSelectBook}
+                onResumeChapter={(book, chapter) => {
+                  setCurrentBook(book);
+                  handleOpenEditor(chapter);
+                }}
                 onOpenCreateModal={handleOpenCreateModal}
+                onOpenStoryArchitect={() => setIsArchitectModalOpen(true)}
+                onOpenAISettings={() => setIsAISettingsOpen(true)}
               />
             ) : (
               /* Inside Book Workspace */
@@ -126,7 +169,7 @@ export function App() {
                   <StoryPlannerView
                     bookId={currentBook.id}
                     chapters={bookChapters}
-                    onOpenEditor={(chapter) => setEditingChapter(chapter)}
+                    onOpenEditor={handleOpenEditor}
                     onRefresh={triggerRefresh}
                   />
                 )}
@@ -178,6 +221,23 @@ export function App() {
             isOpen={isSyncModalOpen}
             onClose={() => setIsSyncModalOpen(false)}
             onDataChanged={triggerRefresh}
+          />
+
+          {/* 7. Multi-AI Settings Modal (Gemini & Groq Fallback) */}
+          <AISettingsModal
+            isOpen={isAISettingsOpen}
+            onClose={() => setIsAISettingsOpen(false)}
+          />
+
+          {/* 8. AI Story Architect Modal (Idea to Full Project) */}
+          <AIStoryArchitectModal
+            isOpen={isArchitectModalOpen}
+            onClose={() => setIsArchitectModalOpen(false)}
+            onProjectCreated={(newBook) => {
+              triggerRefresh();
+              handleSelectBook(newBook);
+            }}
+            onOpenAISettings={() => setIsAISettingsOpen(true)}
           />
         </>
       )}

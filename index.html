@@ -137,20 +137,7 @@
     </style>
   </head>
   <body class="bg-slate-950 text-slate-100 min-h-screen antialiased selection:bg-amber-500/30 selection:text-amber-200">
-    <div id="app-root" class="min-h-screen flex flex-col">
-      <!-- Loading State -->
-      <div class="flex-1 flex flex-col items-center justify-center min-h-screen">
-        <div class="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-3 animate-pulse">
-          <svg class="w-6 h-6 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
-        </div>
-        <p class="text-xs font-semibold text-slate-400 tracking-wider">Memuat Schemax Studio...</p>
-      </div>
-    </div>
-
-    <!-- Modal Container -->
-    <div id="modal-container"></div>
-
-    <!-- Application Script -->
-    <script src="app.js"></script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
