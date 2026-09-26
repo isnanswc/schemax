@@ -975,8 +975,13 @@ export interface ChapterBranchOption {
   title: string;
   premise: string;
   hook: string;
-  intensity: 'Tinggi (Aksi/Konflik)' | 'Misteri (Plot Twist)' | 'Emosional (Drama)' | 'Eksplorasi (Lore)';
+  intensity: 'Tinggi (Aksi/Konflik)' | 'Misteri (Plot Twist)' | 'Emosional (Drama)' | 'Eksplorasi (Lore)' | string;
   rationale: string;
+  storyPlan?: string;
+  involvedCharacters?: string[];
+  characterConditions?: string;
+  climax?: string;
+  potentialTwist?: string;
 }
 
 export async function generateNextChapterBranches(
@@ -985,28 +990,47 @@ export async function generateNextChapterBranches(
   contentText: string,
   premise?: string
 ): Promise<ChapterBranchOption[]> {
-  const prompt = `Analisis bab ini dan hasilkan 3 rekomendasi cabang alur cerita (branching plot options) untuk bab berikutnya:
+  const prompt = `Anda adalah story architect dan continuity supervisor novel profesional.
+Analisis naskah bab saat ini secara mendalam untuk merancang 3 rekomendasi cabang kelanjutan alur cerita (branching plot options) yang SANGAT MASUK AKAL, BERKELANJUTAN (koheren dengan apa yang baru saja terjadi), dan penuh tensi dramatis untuk bab selanjutnya:
+
 Judul Buku: "${bookTitle}"
 Bab Saat Ini: "${chapterTitle}"
 Premis Bab Ini: ${premise || 'Belum ada premis tertulis'}
 
-Naskah Bab Ini:
+Naskah Bab Saat Ini:
 ${contentText ? contentText.slice(0, 60000) : (premise || 'Bab ini sedang ditulis')}
 
-Tugas:
-Rancang 3 arah alur bab selanjutnya yang sangat menarik dan berbeda:
-1. Cabang Intensitas Tinggi (Aksi langsung, eskalasi konflik, konfrontasi berbahaya)
-2. Cabang Plot Twist / Misteri (Pengungkapan rahasia mengejutkan, penemuan artefak, atau pengkhianatan)
-3. Cabang Emosional / Karakter (Perkembangan hubungan tokoh, dilema moral batin, atau penyelaman lore mendalam)
+Tugas Khusus:
+Rancang 3 arah cabang cerita bab selanjutnya dengan logika sebab-akibat yang kuat dari bab sebelumnya:
+1. Cabang A (Intensitas Tinggi): Konfrontasi langsung, pelarian berisiko tinggi, atau eskalasi krisis yang mendesak.
+2. Cabang B (Plot Twist & Misteri): Terungkapnya kebohongan, aliansi tak terduga, atau penemuan petunjuk rahasia masa lalu.
+3. Cabang C (Dilema Emosional & Karakter): Pengorbanan moral, ujian kesetiaan antar tokoh, atau pergeseran motivasi batin.
+
+Setiap cabang WAJIB memuat:
+- title: Judul bab berikutnya yang kuat dan puitis/dramatis.
+- premise: Premis sinopsis bab 2-3 kalimat yang mengikat.
+- hook: Kalimat/adegan pembuka yang menggigit di paragraf awal bab baru.
+- storyPlan: Rencana alur cerita runut (langkah kejadian dari awal, eskalasi konflik, hingga penyelesaian bab yang masuk akal berdasar bab sebelumnya).
+- involvedCharacters: Daftar nama tokoh penting yang terlibat.
+- characterConditions: Kondisi fisik/emosional/status para tokoh saat cabang ini dimulai.
+- climax: Titik puncak klimaks yang meledak di bab tersebut.
+- potentialTwist: Konsekuensi atau kejutan tersembunyi di bab ini.
+- intensity: Kategori intensitas ("Tinggi (Aksi/Konflik)" / "Misteri (Plot Twist)" / "Emosional (Drama)").
+- rationale: Alasan mengapa cabang ini logis dan memuaskan bagi pembaca setelah membaca bab sebelumnya.
 
 Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
 [
   {
-    "title": "Judul Bab Berikutnya yang Menarik",
-    "premise": "Sinopsis/premis 2-3 kalimat mengenai apa yang akan terjadi di bab baru ini...",
-    "hook": "Adegan pembuka yang memikat pembaca di paragraf pertama bab baru...",
+    "title": "Judul Bab Berikutnya",
+    "premise": "Rangkuman premis bab baru...",
+    "hook": "Adegan atau kalimat pembuka pertama bab baru...",
+    "storyPlan": "Langkah 1: ..., Langkah 2: ..., Langkah 3: ...",
+    "involvedCharacters": ["Nama Tokoh 1", "Nama Tokoh 2"],
+    "characterConditions": "Kondisi fisik dan emosi tokoh yang terlibat...",
+    "climax": "Momen klimaks di mana puncak konflik meledak...",
+    "potentialTwist": "Kejutan tak terduga yang terjadi...",
     "intensity": "Tinggi (Aksi/Konflik)",
-    "rationale": "Mengapa cabang ini seru untuk kelanjutan cerita..."
+    "rationale": "Mengapa cabang ini sangat masuk akal..."
   }
 ]`;
 
@@ -1023,6 +1047,15 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
         hook: item.hook || '',
         intensity: item.intensity || 'Tinggi (Aksi/Konflik)',
         rationale: item.rationale || '',
+        storyPlan: item.storyPlan || '',
+        involvedCharacters: Array.isArray(item.involvedCharacters)
+          ? item.involvedCharacters
+          : typeof item.involvedCharacters === 'string'
+          ? item.involvedCharacters.split(',').map((s: string) => s.trim())
+          : [],
+        characterConditions: item.characterConditions || '',
+        climax: item.climax || '',
+        potentialTwist: item.potentialTwist || '',
       }));
     }
   } catch (err) {
@@ -1037,7 +1070,12 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
       premise: 'Dampak dari keputusan di bab sebelumnya mulai terasa nyata ketika ancaman baru tiba tanpa peringatan.',
       hook: 'Langkah kaki tergesa di lorong memecah keheningan dini hari sebelum kabar buruk itu tiba.',
       intensity: 'Tinggi (Aksi/Konflik)',
-      rationale: 'Menjaga tempo ketegangan agar pembaca tidak kehilangan antusiasme.',
+      rationale: 'Menjaga tempo ketegangan agar pembaca tidak kehilangan antusiasme berdasar aksi di bab sebelumnya.',
+      storyPlan: '1. Tokoh menyadari jejak musuh mendekat. 2. Upaya evakuasi barang penting di tengah kepanikan. 3. Konfrontasi tak terelakkan di gerbang perbatasan.',
+      involvedCharacters: ['Tokoh Utama', 'Rekan Seperjalanan'],
+      characterConditions: 'Tokoh utama kelelahan fisik namun adrenalin memuncak; rekan mengalami cedera ringan.',
+      climax: 'Pertarungan sengit di jembatan sebelum jembatan diledakkan untuk memutus pengejaran.',
+      potentialTwist: 'Salah satu pengejar ternyata mengenali tanda pusaka di tangan tokoh utama.',
     },
     {
       id: 'branch_fallback_2',
@@ -1045,7 +1083,12 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
       premise: 'Petunjuk tersembunyi yang tertinggal membongkar kebohongan salah satu pihak terdekat.',
       hook: 'Sebuah dokumen usang dengan cap segel merah tergeletak di tempat yang tak semestinya.',
       intensity: 'Misteri (Plot Twist)',
-      rationale: 'Memicu rasa ingin tahu pembaca dengan teka-teki baru.',
+      rationale: 'Memicu rasa ingin tahu pembaca dengan teka-teki baru yang logis dari peristiwa kemarin.',
+      storyPlan: '1. Penyelidikan diam-diam terhadap barang peninggalan. 2. Menemukan kode terenkripsi yang merujuk pada pembelotan. 3. Konfrontasi verbal yang menegangkan tanpa senjata.',
+      involvedCharacters: ['Tokoh Utama', 'Sosok Mentor / Sekutu'],
+      characterConditions: 'Keduanya tampak tenang di luar, namun ketegangan psikologis membuncah.',
+      climax: 'Terkuaknya surat perjanjian rahasia yang melibatkan nama keluarga besar tokoh utama.',
+      potentialTwist: 'Mentor tidak berniat jahat, melainkan melindungi tokoh utama dari konspirasi yang lebih besar.',
     },
     {
       id: 'branch_fallback_3',
@@ -1054,6 +1097,11 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
       hook: 'Bayangan masa lalu kembali menghantui saat tatapan mata itu menuntut kepastian.',
       intensity: 'Emosional (Drama)',
       rationale: 'Memberi ruang bernapas untuk memperdalam kedalaman emosional karakter.',
+      storyPlan: '1. Percakapan intim di dekat api unggun mengenang masa lalu. 2. Perdebatan mengenai harga yang harus dibayar demi kemenangan. 3. Keputusan tegas yang merubah arah perjalanan.',
+      involvedCharacters: ['Tokoh Utama', 'Tokoh Pendamping'],
+      characterConditions: 'Kelelahan batin, keraguan terhadap takdir, namun ikatan emosional semakin erat.',
+      climax: 'Pengakuan rahasia yang selama ini disembunyikan demi melindungi perasaan satu sama lain.',
+      potentialTwist: 'Keputusan yang diambil tanpa sengaja memicu ramalan kuno yang telah tertidur berabad-abad.',
     },
   ];
 }

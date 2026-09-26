@@ -71,8 +71,8 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
   onUpdateChapter,
   onInsertTextToManuscript,
 }) => {
-  // Navigation Subtabs: 6 primary tabs (including chapter auto-map)
-  const [activeSubTab, setActiveSubTab] = useState<'entities' | 'map' | 'detected' | 'images' | 'scenes' | 'visuals'>('entities');
+  // Navigation Subtabs: Unified tabs (candidates merged into entities)
+  const [activeSubTab, setActiveSubTab] = useState<'entities' | 'map' | 'images' | 'scenes' | 'visuals'>('entities');
   
   // 📚 Unified Entities State (Filter, Sort, Search)
   const [searchQuery, setSearchQuery] = useState('');
@@ -687,7 +687,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
               onClick={handleDetectEntities}
               disabled={isDetectingEntities || !getEffectiveText()}
               className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-gradient-to-r from-amber-500/15 to-indigo-500/15 hover:from-amber-500/25 hover:to-indigo-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-xs font-bold transition active:scale-95 disabled:opacity-50 flex-shrink-0"
-              title="Scan naskah untuk mendeteksi tokoh atau istilah baru"
+              title="Pindai naskah untuk mendeteksi tokoh, latar, relik, atau sebutan alias baru"
             >
               {isDetectingEntities ? (
                 <>
@@ -697,16 +697,16 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
               ) : (
                 <>
                   <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Pindai Naskah</span>
+                  <span>Pindai Entitas</span>
                 </>
               )}
             </button>
           </div>
         </div>
 
-        {/* 📑 Clean 5-Tab Navigation Bar: Merged Menu */}
+        {/* 📑 Clean 4-Tab Navigation Bar: Candidates merged inside Entitas */}
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1">
-          {/* TAB 1: GABUNGAN ENTITAS (Karakter, Item, Lokasi, Lore) */}
+          {/* TAB 1: GABUNGAN ENTITAS (Karakter, Item, Lokasi, Lore + Kandidat) */}
           <button
             type="button"
             onClick={() => setActiveSubTab('entities')}
@@ -718,6 +718,11 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
           >
             <Compass className="w-3.5 h-3.5" />
             <span>Entitas ({entities.length})</span>
+            {detectedEntities.length > 0 && (
+              <span className="px-1.5 py-0.2 text-[9px] rounded-full font-black bg-emerald-500 text-white shadow-xs">
+                +{detectedEntities.length} baru
+              </span>
+            )}
           </button>
 
           {/* TAB 2: PETA RELASI BAB (AUTO-MAP) */}
@@ -732,29 +737,6 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
           >
             <GitFork className="w-3.5 h-3.5" />
             <span>Peta Relasi Bab (Auto-Map)</span>
-          </button>
-
-          {/* TAB 3: KANDIDAT AI */}
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('detected')}
-            className={`py-1.5 px-3 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 flex items-center gap-1.5 relative ${
-              activeSubTab === 'detected'
-                ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-500/30'
-                : detectedEntities.length > 0
-                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 border border-emerald-500/30'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <Sparkles className={`w-3.5 h-3.5 ${activeSubTab === 'detected' ? 'text-white' : 'text-emerald-500'}`} />
-            <span>Kandidat AI</span>
-            {detectedEntities.length > 0 && (
-              <span className={`px-1.5 py-0.2 text-[10px] rounded-full font-black ${
-                activeSubTab === 'detected' ? 'bg-white text-emerald-700' : 'bg-emerald-500 text-white'
-              }`}>
-                {detectedEntities.length}
-              </span>
-            )}
           </button>
 
           {/* TAB 3: IMAGE GALLERY */}
@@ -802,42 +784,15 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
       </div>
 
       {/* ========================================================================= */}
-      {/* 1. 📚 UNIFIED ENTITAS WORKSPACE (Search, Filter, Sort)                    */}
+      {/* 1. 📚 UNIFIED ENTITAS WORKSPACE (Search, Filter, Sort & AI Candidates)     */}
       {/* ========================================================================= */}
       {activeSubTab === 'entities' && (
-        <div className="space-y-3 animate-in fade-in">
-          {/* Detected Candidates Notification Banner */}
-          {detectedEntities.length > 0 && (
-            <div className="bg-gradient-to-r from-emerald-500/15 via-teal-500/10 to-emerald-500/15 border border-emerald-500/30 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-sm">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
-                    {detectedEntities.length} Entitas / Alias Terdeteksi dari Naskah
-                  </h4>
-                  <p className="text-[11px] text-emerald-700 dark:text-emerald-300/80">
-                    Ada karakter atau sebutan baru yang siap Anda tambahkan ke glosarium.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveSubTab('detected')}
-                className="py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1 flex-shrink-0 shadow-sm active:scale-95"
-              >
-                <span>Tinjau ({detectedEntities.length})</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
-
-          {/* Unified Controls Card: Search, Filter, Sort & Add */}
+        <div className="space-y-3.5 animate-in fade-in">
+          {/* Unified Controls Card: Search, Pindai Entitas, Filter, Sort & Add */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
-            {/* Top row: Search Bar & Add Button */}
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
+            {/* Top row: Search Bar, Pindai Entitas & Add Button */}
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+              <div className="relative flex-1 min-w-[200px]">
                 <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
@@ -857,14 +812,36 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
                 )}
               </div>
 
-              <button
-                type="button"
-                onClick={() => setIsAddEntityModalOpen(true)}
-                className="py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 text-xs font-bold transition flex items-center gap-1.5 shadow-sm flex-shrink-0"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>+ Entitas</span>
-              </button>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={handleDetectEntities}
+                  disabled={isDetectingEntities || !getEffectiveText()}
+                  className="py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500/15 via-emerald-500/15 to-indigo-500/15 hover:from-amber-500/25 hover:to-indigo-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-xs font-bold transition active:scale-95 disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
+                  title="Pindai naskah untuk menemukan entitas baru atau sebutan alias"
+                >
+                  {isDetectingEntities ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />
+                      <span>Memindai...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Pindai Entitas</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsAddEntityModalOpen(true)}
+                  className="py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Entitas</span>
+                </button>
+              </div>
             </div>
 
             {/* Filter Pills */}
@@ -922,6 +899,176 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
             </div>
           </div>
 
+          {/* AI CANDIDATES SECTION (Embedded directly inside Entitas) */}
+          {detectedEntities.length > 0 && (
+            <div className="bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-emerald-500/10 border border-emerald-500/30 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-emerald-500/20">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <span>Kandidat Entitas &amp; Alias Baru</span>
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500 text-white shadow-sm">
+                        {detectedEntities.length} ditemukan
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Entitas yang terdeteksi dari naskah bab ini. Daftarkan langsung ke ensiklopedia glosarium.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                  <button
+                    type="button"
+                    onClick={handleRegisterAllNew}
+                    disabled={isBatchRegistering || pendingNewCount === 0}
+                    className="py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm active:scale-95 flex-shrink-0"
+                  >
+                    {isBatchRegistering ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Mendaftarkan...</span>
+                      </>
+                    ) : (
+                      <>
+                        <PlusCircle className="w-3.5 h-3.5" />
+                        <span>Daftarkan Semua ({pendingNewCount})</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleClearAllCandidates}
+                    className="py-1.5 px-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-rose-500 hover:bg-rose-500/10 text-xs font-semibold transition active:scale-95 flex items-center gap-1 flex-shrink-0"
+                    title="Hapus daftar hasil pemindaian"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Bersihkan</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Grid of Candidate Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {detectedEntities.map((item) => {
+                  const isNew = item.suggestedAction === 'register_new';
+                  const isRegistered = registeredEntityIds[item.id];
+                  const isAliasSaved = registeredAliasIds[item.id];
+                  const meta = getCategoryMeta(item.category);
+                  const CatIcon = meta.icon;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 shadow-sm hover:border-slate-300 dark:hover:border-slate-700 transition flex flex-col justify-between gap-2.5"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-1 flex-wrap">
+                          <span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${meta.badge} flex items-center gap-1`}>
+                            <CatIcon className="w-2.5 h-2.5" />
+                            <span>{meta.label}</span>
+                          </span>
+
+                          <div className="flex items-center gap-1">
+                            {isNew ? (
+                              <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.2 rounded-full">
+                                🆕 Entitas Baru
+                              </span>
+                            ) : (
+                              <span className="text-[9px] font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.2 rounded-full flex items-center gap-1">
+                                <Link2 className="w-2.5 h-2.5" />
+                                <span>Alias</span>
+                              </span>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => handleDismissCandidate(item.id)}
+                              className="p-1 text-slate-400 hover:text-rose-500 rounded-lg transition"
+                              title="Abaikan entitas ini"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                            {item.name}
+                          </h4>
+                          {!isNew && item.detectedAliasOf && (
+                            <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1 mt-0.5">
+                              <Link2 className="w-3 h-3" />
+                              <span>Sebutan lain dari: <strong>{item.detectedAliasOf}</strong></span>
+                            </p>
+                          )}
+                        </div>
+
+                        <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-2">
+                          {item.shortDescription || 'Tidak ada deskripsi singkat.'}
+                        </p>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleInsert(item.name)}
+                          className="py-1 px-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-[10px] font-semibold transition active:scale-95"
+                          title="Sisipkan nama ke naskah"
+                        >
+                          {insertedName === item.name ? 'Tersisip!' : '+ Sisip'}
+                        </button>
+
+                        <div>
+                          {isNew ? (
+                            isRegistered ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-xl border border-emerald-500/20">
+                                <CheckCheck className="w-3.5 h-3.5" />
+                                <span>Terdaftar</span>
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleRegisterEntity(item)}
+                                disabled={registeringCandidateId === item.id}
+                                className="py-1 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-[11px] flex items-center gap-1 active:scale-95 transition shadow-sm"
+                              >
+                                {registeringCandidateId === item.id ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <PlusCircle className="w-3 h-3" />
+                                )}
+                                <span>+ Daftarkan</span>
+                              </button>
+                            )
+                          ) : isAliasSaved ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-xl border border-emerald-500/20">
+                              <CheckCheck className="w-3.5 h-3.5" />
+                              <span>Alias Tersimpan</span>
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleSaveAlias(item)}
+                              className="py-1 px-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-[11px] flex items-center gap-1 active:scale-95 transition shadow-sm"
+                            >
+                              <Link2 className="w-3 h-3" />
+                              <span>+ Simpan Alias</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Entities Grid */}
           {displayEntities.length === 0 ? (
             <div className="text-center py-10 px-4 bg-white dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800 rounded-3xl space-y-2">
@@ -932,7 +1079,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
               <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
                 {searchQuery
                   ? `Tidak ada entitas dengan kata kunci "${searchQuery}". Coba bersihkan pencarian.`
-                  : 'Belum ada entitas dalam kategori ini. Buat entitas baru atau gunakan tombol Pindai Naskah.'}
+                  : 'Belum ada entitas dalam kategori ini. Buat entitas baru atau gunakan tombol Pindai Entitas.'}
               </p>
               <button
                 type="button"
@@ -966,14 +1113,14 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
                         {/* Avatar / Main picture with quick camera changer */}
                         <div
                           onClick={() => setImagePickerEntity(ent)}
-                          className="relative group w-11 h-11 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex-shrink-0 flex items-center justify-center cursor-pointer shadow-inner"
+                          className="relative group w-12 h-12 min-w-[3rem] min-h-[3rem] max-w-[3rem] max-h-[3rem] aspect-square rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex-shrink-0 flex items-center justify-center cursor-pointer shadow-inner"
                           title="Pasang / ubah gambar utama"
                         >
                           {ent.avatarMediaId && entityAvatarUrls[ent.avatarMediaId] ? (
                             <img
                               src={entityAvatarUrls[ent.avatarMediaId]}
                               alt={ent.name}
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-cover aspect-square block pointer-events-none"
                             />
                           ) : (
                             <Icon className={`w-5 h-5 ${meta.color}`} />
@@ -1360,203 +1507,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* 3. CANDIDATES / DETECTED ENTITIES VIEW                                    */}
-      {/* ========================================================================= */}
-      {activeSubTab === 'detected' && (
-        <div className="space-y-3">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                  <Sparkles className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <span>Entitas &amp; Alias Hasil Pindai Naskah</span>
-                    {detectedEntities.length > 0 && (
-                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                        {detectedEntities.length} item
-                      </span>
-                    )}
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Tinjau karakter, tempat, item, atau sebutan alias yang ditemukan dari naskah bab ini.
-                  </p>
-                </div>
-              </div>
 
-              {detectedEntities.length > 0 && (
-                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                  <button
-                    type="button"
-                    onClick={handleRegisterAllNew}
-                    disabled={isBatchRegistering || pendingNewCount === 0}
-                    className="py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm active:scale-95 flex-shrink-0"
-                  >
-                    {isBatchRegistering ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Mendaftarkan...</span>
-                      </>
-                    ) : (
-                      <>
-                        <PlusCircle className="w-3.5 h-3.5" />
-                        <span>Daftarkan Semua Baru ({pendingNewCount})</span>
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleClearAllCandidates}
-                    className="py-1.5 px-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-rose-500 hover:bg-rose-500/10 text-xs font-semibold transition active:scale-95 flex items-center gap-1 flex-shrink-0"
-                    title="Hapus daftar hasil pemindaian"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Bersihkan</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {detectedEntities.length === 0 ? (
-            <div className="text-center py-10 px-4 bg-white dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800 rounded-3xl space-y-2">
-              <Sparkles className="w-8 h-8 text-slate-400 mx-auto mb-1" />
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                Belum Ada Kandidat Entitas
-              </h4>
-              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-3">
-                Klik tombol "Pindai Naskah" di pojok kanan atas untuk membiarkan AI menganalisis nama tokoh, latar, dan relik yang baru muncul.
-              </p>
-              <button
-                type="button"
-                onClick={handleDetectEntities}
-                disabled={isDetectingEntities || !getEffectiveText()}
-                className="py-2 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs inline-flex items-center gap-1.5 shadow-sm active:scale-95"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Pindai Naskah Bab Sekarang ✨</span>
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {detectedEntities.map((item) => {
-                const isNew = item.suggestedAction === 'register_new';
-                const isRegistered = registeredEntityIds[item.id];
-                const isAliasSaved = registeredAliasIds[item.id];
-                const meta = getCategoryMeta(item.category);
-                const CatIcon = meta.icon;
-
-                return (
-                  <div
-                    key={item.id}
-                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm hover:border-slate-300 dark:hover:border-slate-700 transition flex flex-col justify-between gap-3"
-                  >
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between gap-1 flex-wrap">
-                        <span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${meta.badge} flex items-center gap-1`}>
-                          <CatIcon className="w-2.5 h-2.5" />
-                          <span>{meta.label}</span>
-                        </span>
-
-                        <div className="flex items-center gap-1">
-                          {isNew ? (
-                            <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                              🆕 Entitas Baru
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full flex items-center gap-1">
-                              <Link2 className="w-2.5 h-2.5" />
-                              <span>Alias</span>
-                            </span>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => handleDismissCandidate(item.id)}
-                            className="p-1 text-slate-400 hover:text-rose-500 rounded-lg transition"
-                            title="Abaikan entitas ini"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                          {item.name}
-                        </h4>
-                        {!isNew && item.detectedAliasOf && (
-                          <p className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1 mt-0.5">
-                            <Link2 className="w-3 h-3" />
-                            <span>Sebutan lain dari: <strong>{item.detectedAliasOf}</strong></span>
-                          </p>
-                        )}
-                      </div>
-
-                      <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                        {item.shortDescription || 'Tidak ada deskripsi singkat.'}
-                      </p>
-                    </div>
-
-                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleInsert(item.name)}
-                        className="py-1 px-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-[10px] font-semibold transition active:scale-95"
-                        title="Sisipkan nama ke naskah"
-                      >
-                        {insertedName === item.name ? 'Tersisip!' : '+ Sisip'}
-                      </button>
-
-                      <div>
-                        {isNew ? (
-                          isRegistered ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-xl border border-emerald-500/20">
-                              <CheckCheck className="w-3.5 h-3.5" />
-                              <span>Terdaftar di Glosarium</span>
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => handleRegisterEntity(item)}
-                              disabled={registeringCandidateId === item.id}
-                              className="py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 active:scale-95 transition shadow-sm"
-                            >
-                              {registeringCandidateId === item.id ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <PlusCircle className="w-3.5 h-3.5" />
-                              )}
-                              <span>Daftarkan ke Glosarium (+)</span>
-                            </button>
-                          )
-                        ) : isAliasSaved ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-xl border border-emerald-500/20">
-                            <CheckCheck className="w-3.5 h-3.5" />
-                            <span>Alias Tersimpan</span>
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleSaveAlias(item)}
-                            className="py-1.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center gap-1.5 active:scale-95 transition shadow-sm"
-                          >
-                            <Link2 className="w-3.5 h-3.5" />
-                            <span>Simpan Sebagai Alias Resmi</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* 4. AUTO SCENE VIEW                                                        */}

@@ -35,13 +35,20 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
   onUpdateChapter,
   onNavigateToManuscript,
 }) => {
-  const [premise, setPremise] = useState(chapter.premise || '');
+  const [premise, setPremise] = useState(chapter.premise || chapter.aiSummary || '');
   const [notes, setNotes] = useState(chapter.notes || '');
   const [targetWordCount, setTargetWordCount] = useState(chapter.targetWordCount || 1500);
   const [targetInput, setTargetInput] = useState(String(chapter.targetWordCount || 1500));
   const [status, setStatus] = useState<ChapterStatus>(chapter.status);
   const [isGeneratingPremise, setIsGeneratingPremise] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+
+  // Synchronize premise if chapter.premise or chapter.aiSummary updates externally
+  useEffect(() => {
+    if (chapter.premise || chapter.aiSummary) {
+      setPremise(chapter.premise || chapter.aiSummary || '');
+    }
+  }, [chapter.premise, chapter.aiSummary]);
 
   // Chapter Cover States
   const [coverUrl, setCoverUrl] = useState<string | null>(chapter.coverImageUrl || null);
@@ -87,7 +94,8 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
 
   const handlePremiseChange = (newPremise: string) => {
     setPremise(newPremise);
-    onUpdateChapter({ premise: newPremise });
+    // Two-way synchronization: Premis & Cerita Singkat = Ringkasan Isi Bab
+    onUpdateChapter({ premise: newPremise, aiSummary: newPremise });
     showSavedIndicator();
   };
 
@@ -146,7 +154,7 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
       );
       if (generated) {
         setPremise(generated);
-        onUpdateChapter({ premise: generated });
+        onUpdateChapter({ premise: generated, aiSummary: generated });
         showSavedIndicator();
       }
     } catch (err: any) {

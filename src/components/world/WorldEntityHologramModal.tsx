@@ -96,11 +96,11 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
             {/* Avatar Preview with Camera Quick Picker */}
             <div
               onClick={() => setIsImagePickerOpen(true)}
-              className="relative group w-16 h-16 rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex-shrink-0 flex items-center justify-center shadow-sm cursor-pointer"
+              className="relative group w-16 h-16 min-w-[4rem] min-h-[4rem] max-w-[4rem] max-h-[4rem] aspect-square rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex-shrink-0 flex items-center justify-center shadow-sm cursor-pointer"
               title="Klik untuk pasang / ubah gambar utama"
             >
               {url ? (
-                <img src={url} alt={activeEntity.name} className="w-full h-full object-cover" />
+                <img src={url} alt={activeEntity.name} className="w-full h-full object-cover aspect-square block pointer-events-none" />
               ) : (
                 <Icon className={`w-8 h-8 ${meta.color}`} />
               )}

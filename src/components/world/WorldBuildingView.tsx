@@ -96,11 +96,11 @@ const EntityCard: React.FC<{
             e.stopPropagation();
             onOpenImagePicker(entity);
           }}
-          className="relative group w-13 h-13 sm:w-14 sm:h-14 rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex-shrink-0 flex items-center justify-center cursor-pointer shadow-inner"
+          className="relative group w-14 h-14 min-w-[3.5rem] min-h-[3.5rem] max-w-[3.5rem] max-h-[3.5rem] aspect-square rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex-shrink-0 flex items-center justify-center cursor-pointer shadow-inner"
           title="Klik untuk pasang / ubah gambar utama"
         >
           {url ? (
-            <img src={url} alt={entity.name} className="w-full h-full object-cover" />
+            <img src={url} alt={entity.name} className="w-full h-full object-cover aspect-square block pointer-events-none" />
           ) : (
             <Icon className={`w-6 h-6 ${meta.color}`} />
           )}

@@ -229,10 +229,12 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
     await updateChapterField('status', newStatus);
   };
 
-  // Save Premise & Brief
+  // Save Premise & Brief (Synchronized with aiSummary)
   const handleSavePremise = async () => {
+    const trimmedPremise = premiseText.trim();
     await db.chapters.update(chapter.id, {
-      premise: premiseText.trim(),
+      premise: trimmedPremise,
+      aiSummary: trimmedPremise,
       notes: chapterNotes.trim(),
       targetWordCount: parseInt(targetWords) || 1500,
       updatedAt: Date.now(),
@@ -429,7 +431,17 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
     setAiStudioError(null);
     try {
       const summary = await generateChapterSummary(chapter.title, book.title, text);
-      await updateChapterField('aiSummary', summary);
+      await db.chapters.update(chapter.id, {
+        aiSummary: summary,
+        premise: summary,
+        updatedAt: Date.now(),
+      });
+      setPremiseText(summary);
+      const fresh = await db.chapters.get(chapter.id);
+      if (fresh) {
+        setChapter(fresh);
+        onChapterUpdated?.(fresh);
+      }
     } catch (err: any) {
       setAiStudioError(err.message || 'Gagal generate ringkasan AI.');
     } finally {

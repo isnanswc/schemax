@@ -12,7 +12,13 @@ import {
   Plus,
   Loader2,
   HelpCircle,
-  Compass
+  Compass,
+  Copy,
+  Check,
+  Users,
+  ShieldAlert,
+  SlidersHorizontal,
+  Bookmark
 } from 'lucide-react';
 import { StoryChapter, ChapterPlotBreakdown } from '../../../types';
 import {
@@ -38,7 +44,8 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
   onUpdateChapter,
   onSwitchChapter,
 }) => {
-  const [summary, setSummary] = useState(chapter.aiSummary || '');
+  // Sync summary with chapter.aiSummary or chapter.premise
+  const [summary, setSummary] = useState(chapter.aiSummary || chapter.premise || '');
   const [plot, setPlot] = useState<ChapterPlotBreakdown | undefined>(chapter.aiPlot);
   const [branches, setBranches] = useState<ChapterBranchOption[]>([]);
   const [nextChapter, setNextChapter] = useState<StoryChapter | null>(null);
@@ -47,6 +54,23 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
   const [isGeneratingPlot, setIsGeneratingPlot] = useState(false);
   const [isGeneratingBranches, setIsGeneratingBranches] = useState(false);
   const [creatingBranchId, setCreatingBranchId] = useState<string | null>(null);
+
+  // Generate Semua with sequential delay state
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const [generateAllStep, setGenerateAllStep] = useState<string>('');
+
+  // Copy toast state
+  const [copiedSummary, setCopiedSummary] = useState(false);
+
+  // Keep summary synchronized if prop updates
+  useEffect(() => {
+    if (chapter.aiSummary || chapter.premise) {
+      setSummary(chapter.aiSummary || chapter.premise || '');
+    }
+    if (chapter.aiPlot) {
+      setPlot(chapter.aiPlot);
+    }
+  }, [chapter.aiSummary, chapter.premise, chapter.aiPlot]);
 
   // Check if next chapter already exists in database
   useEffect(() => {
@@ -72,6 +96,15 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
     return (chapter.premise || chapter.notes || '').trim();
   };
 
+  const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const handleCopySummary = () => {
+    if (!summary) return;
+    navigator.clipboard.writeText(summary);
+    setCopiedSummary(true);
+    setTimeout(() => setCopiedSummary(false), 2200);
+  };
+
   const handleGenerateSummary = async () => {
     const textToSummarize = getEffectiveText();
     if (!textToSummarize) {
@@ -84,7 +117,8 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
       const generated = await generateChapterSummary(chapter.title, bookTitle, textToSummarize);
       if (generated) {
         setSummary(generated);
-        onUpdateChapter({ aiSummary: generated });
+        // Synchronize: Ringkasan Isi Bab = Premis & Cerita Singkat
+        onUpdateChapter({ aiSummary: generated, premise: generated });
       }
     } catch (err: any) {
       alert('Gagal membuat ringkasan: ' + (err.message || 'Periksa API Key di AI Config'));
@@ -106,7 +140,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
         chapter.title,
         bookTitle,
         textToPlot,
-        chapter.premise
+        summary || chapter.premise
       );
       if (generatedPlot) {
         setPlot(generatedPlot);
@@ -127,7 +161,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
         chapter.title,
         bookTitle,
         textToBranch,
-        chapter.premise
+        summary || chapter.premise
       );
       if (generatedBranches && generatedBranches.length > 0) {
         setBranches(generatedBranches);
@@ -139,11 +173,87 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
     }
   };
 
+  // 🚀 Generate Semua Analisis secara berurutan dengan jeda 2.5 detik untuk menghindari rate limit API
+  const handleGenerateAll = async () => {
+    const text = getEffectiveText();
+    if (!text) {
+      alert('Tuliskan naskah bab atau premis terlebih dahulu agar AI dapat menganalisis.');
+      return;
+    }
+
+    setIsGeneratingAll(true);
+    try {
+      // 1. Ringkasan Isi Bab
+      setGenerateAllStep('1/3 Merangkum isi bab...');
+      const genSummary = await generateChapterSummary(chapter.title, bookTitle, text);
+      let effectiveSummary = summary;
+      if (genSummary) {
+        effectiveSummary = genSummary;
+        setSummary(genSummary);
+        onUpdateChapter({ aiSummary: genSummary, premise: genSummary });
+      }
+
+      // Jeda 2.5 detik agar kuota TPM/RPM tidak terkena limit
+      setGenerateAllStep('Jeda aman kuota AI (2.5 detik)...');
+      await delay(2500);
+
+      // 2. Auto Plot 4-Babak
+      setGenerateAllStep('2/3 Memetakan struktur plot 4-babak...');
+      const genPlot = await generateChapterAutoPlot(
+        chapter.title,
+        bookTitle,
+        text,
+        effectiveSummary || chapter.premise
+      );
+      if (genPlot) {
+        setPlot(genPlot);
+        onUpdateChapter({ aiPlot: genPlot });
+      }
+
+      // Jeda 2.5 detik lagi
+      setGenerateAllStep('Jeda aman kuota AI (2.5 detik)...');
+      await delay(2500);
+
+      // 3. Rekomendasi Cabang Cerita Berkelanjutan
+      setGenerateAllStep('3/3 Merancang 3 cabang alur cerita...');
+      const genBranches = await generateNextChapterBranches(
+        chapter.title,
+        bookTitle,
+        text,
+        effectiveSummary || chapter.premise
+      );
+      if (genBranches && genBranches.length > 0) {
+        setBranches(genBranches);
+      }
+    } catch (err: any) {
+      alert('Terjadi kendala saat Generate Semua: ' + (err.message || 'Periksa koneksi atau API Key'));
+    } finally {
+      setIsGeneratingAll(false);
+      setGenerateAllStep('');
+    }
+  };
+
   const handleCreateChapterFromBranch = async (branch: ChapterBranchOption) => {
     setCreatingBranchId(branch.id);
     try {
       const nextOrder = chapter.order + 1;
       const newId = 'chap_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+      
+      const detailedNotes = [
+        `Rekomendasi Cabang: ${branch.intensity}`,
+        `Alasan Alur: ${branch.rationale}`,
+        branch.storyPlan ? `\nRencana Alur Cerita:\n${branch.storyPlan}` : '',
+        branch.involvedCharacters && branch.involvedCharacters.length > 0
+          ? `\nKarakter Terlibat: ${branch.involvedCharacters.join(', ')}`
+          : '',
+        branch.characterConditions ? `\nKondisi Tokoh: ${branch.characterConditions}` : '',
+        branch.climax ? `\nTitik Puncak Klimaks: ${branch.climax}` : '',
+        branch.potentialTwist ? `\nPotensi Twist/Kejutan: ${branch.potentialTwist}` : '',
+        `\nHook Awal: ${branch.hook}`,
+      ]
+        .filter(Boolean)
+        .join('\n');
+
       const newChapter: StoryChapter = {
         id: newId,
         bookId: chapter.bookId,
@@ -151,7 +261,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
         order: nextOrder,
         status: 'planned',
         premise: branch.premise,
-        notes: `Rekomendasi Cabang: ${branch.intensity}\nAlasan: ${branch.rationale}\n\nHook Awal: ${branch.hook}`,
+        notes: detailedNotes,
         contentHtml: `<p><em>${branch.hook}</em></p><p><br></p>`,
         wordCount: 0,
         targetWordCount: 1500,
@@ -176,65 +286,126 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
 
   return (
     <div className="space-y-4 pb-28 max-w-3xl mx-auto animate-fade-in-up px-1 sm:px-2">
-      {/* 1. Header Card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-2">
-        <div className="flex items-center gap-1.5">
-          <span className="p-1.5 rounded-xl bg-amber-500/15 text-amber-500 font-bold">
-            <GitBranch className="w-4 h-4" />
-          </span>
-          <div>
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-              Ringkasan, Auto Plot & Cabang Cerita
-            </h2>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Analisis struktur bab dan rekomendasi arah alur untuk bab berikutnya
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. RINGKASAN BAB (AI SUMMARY) */}
+      {/* 1. Header Card with Generate Semua */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-              <FileText className="w-4 h-4 text-amber-500" />
-              <span>Ringkasan Isi Bab (AI Summary)</span>
-            </h3>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Rangkuman padat kronologis peristiwa di bab ini
-            </p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="p-2 rounded-2xl bg-gradient-to-r from-amber-500/20 to-purple-500/20 text-amber-500 font-bold flex-shrink-0">
+              <GitBranch className="w-5 h-5" />
+            </span>
+            <div>
+              <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
+                Ringkasan, Auto Plot &amp; Cabang Cerita
+              </h2>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Analisis kontinuitas bab &amp; pemetaan arah bab berikutnya
+              </p>
+            </div>
           </div>
 
           <button
             type="button"
-            onClick={handleGenerateSummary}
-            disabled={isSummarizing || !contentText.trim()}
-            className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-gradient-to-r from-amber-500/15 to-indigo-500/15 hover:from-amber-500/25 hover:to-indigo-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-xs font-bold transition active:scale-95 disabled:opacity-50 flex-shrink-0"
-            title="Buat rangkuman otomatis dari teks naskah"
+            onClick={handleGenerateAll}
+            disabled={isGeneratingAll || !getEffectiveText()}
+            className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-2xl bg-gradient-to-r from-amber-500 via-pink-500 to-purple-600 hover:opacity-95 text-white font-black text-xs shadow-md shadow-pink-500/20 active:scale-95 transition flex-shrink-0 disabled:opacity-50"
+            title="Jalankan otomatis Ringkasan Bab, Auto Plot 4-Babak, dan Rekomendasi 3 Cabang Alur dengan jeda kuota aman"
           >
-            {isSummarizing ? (
+            {isGeneratingAll ? (
               <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />
-                <span>Merangkum...</span>
+                <Loader2 className="w-4 h-4 animate-spin text-amber-300" />
+                <span className="text-xs truncate max-w-[220px]">{generateAllStep || 'Menganalisis...'}</span>
               </>
             ) : (
               <>
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                <span>{summary ? 'Regenerate Ringkasan' : 'Buat Ringkasan'}</span>
+                <Sparkles className="w-4 h-4 text-amber-300" />
+                <span>Generate Semua Analisis ✨</span>
               </>
             )}
           </button>
         </div>
+      </div>
+
+      {/* 2. RINGKASAN BAB (AI SUMMARY = PREMIS & CERITA SINGKAT) */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-amber-500" />
+                <span>Ringkasan Isi Bab</span>
+              </h3>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                = Premis &amp; Cerita Singkat
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+              Rangkuman padat isi bab yang terhubung langsung dengan Premis di Menu Chapter Info
+            </p>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            {summary && (
+              <button
+                type="button"
+                onClick={handleCopySummary}
+                className="flex items-center gap-1 py-1.5 px-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition active:scale-95 border border-slate-200 dark:border-slate-700"
+                title="Salin ringkasan ke clipboard"
+              >
+                {copiedSummary ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-500" />
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">Tersalin!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Salin</span>
+                  </>
+                )}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleGenerateSummary}
+              disabled={isSummarizing || isGeneratingAll || !getEffectiveText()}
+              className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-gradient-to-r from-amber-500/15 to-indigo-500/15 hover:from-amber-500/25 hover:to-indigo-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-xs font-bold transition active:scale-95 disabled:opacity-50 flex-shrink-0"
+              title="Buat rangkuman otomatis dari teks naskah"
+            >
+              {isSummarizing ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />
+                  <span>Merangkum...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <span>{summary ? 'Regenerate Ringkasan' : 'Buat Ringkasan'}</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
 
         {summary ? (
-          <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed">
-            {summary}
+          <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed space-y-2">
+            <p className="whitespace-pre-line">{summary}</p>
+            <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-800/60 text-[10px] text-slate-400">
+              <span>Sinkron otomatis dengan Chapter Info</span>
+              <button
+                type="button"
+                onClick={handleCopySummary}
+                className="hover:text-amber-500 inline-flex items-center gap-1 font-semibold"
+              >
+                <Copy className="w-3 h-3" />
+                <span>Salin Teks Ringkasan</span>
+              </button>
+            </div>
           </div>
         ) : (
           <div className="text-center py-6 px-4 bg-slate-50 dark:bg-slate-950/60 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
             <p className="text-xs text-slate-400">
-              Belum ada ringkasan bab. Klik tombol di atas untuk membuat rangkuman otomatis dari naskah bab ini.
+              Belum ada ringkasan bab. Klik tombol di atas atau gunakan "Generate Semua Analisis" untuk merangkum naskah.
             </p>
           </div>
         )}
@@ -256,7 +427,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
           <button
             type="button"
             onClick={handleGeneratePlot}
-            disabled={isGeneratingPlot}
+            disabled={isGeneratingPlot || isGeneratingAll}
             className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-gradient-to-r from-indigo-500/15 to-purple-500/15 hover:from-indigo-500/25 hover:to-purple-500/25 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 text-xs font-bold transition active:scale-95 disabled:opacity-50 flex-shrink-0"
             title="Analisis dan petakan struktur plot dramatis"
           >
@@ -345,16 +516,14 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
               )}
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-              {nextChapter
-                ? `Bab ${nextChapter.order} ("${nextChapter.title}") sudah ada di buku. Anda tetap bisa meminta rekomendasi ide cabang alternatif di bawah ini.`
-                : `Bab ${chapter.order + 1} belum dibuat. Minta AI memberikan 3 ide cabang plot menarik dan buat bab baru dengan 1 ketukan!`}
+              Rekomendasi alur terstruktur yang sangat masuk akal berdasar peristiwa di bab ini
             </p>
           </div>
 
           <button
             type="button"
             onClick={handleGenerateBranches}
-            disabled={isGeneratingBranches}
+            disabled={isGeneratingBranches || isGeneratingAll}
             className="flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 text-white text-xs font-bold shadow-md shadow-purple-500/20 active:scale-95 transition flex-shrink-0 disabled:opacity-50"
           >
             {isGeneratingBranches ? (
@@ -396,17 +565,18 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
           </div>
         )}
 
-        {/* Branches Options */}
+        {/* Branches Options with Detailed Narrative Architecture */}
         {branches.length > 0 ? (
-          <div className="space-y-3 pt-1">
+          <div className="space-y-3.5 pt-1">
             {branches.map((b, idx) => (
               <div
                 key={b.id || idx}
-                className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-purple-400 rounded-3xl p-4 sm:p-5 shadow-sm space-y-2.5 transition"
+                className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-purple-400 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3 transition"
               >
+                {/* Header: Title and Intensity */}
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-purple-600 text-white text-xs font-black flex items-center justify-center">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-6 h-6 rounded-full bg-purple-600 text-white text-xs font-black flex items-center justify-center flex-shrink-0">
                       {String.fromCharCode(65 + idx)}
                     </span>
                     <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
@@ -414,23 +584,95 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
                     </h4>
                   </div>
 
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 flex-shrink-0">
                     {b.intensity}
                   </span>
                 </div>
 
-                <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
-                  <strong>Premis:</strong> {b.premise}
-                </p>
+                {/* Premise */}
+                <div className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed bg-white/70 dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800/80">
+                  <span className="font-bold text-slate-900 dark:text-white block mb-0.5">Premis Cabang:</span>
+                  <p>{b.premise}</p>
+                </div>
 
+                {/* Detailed Story Plan (Rencana Alur Cerita yang Masuk Akal) */}
+                {b.storyPlan && (
+                  <div className="text-xs space-y-1 bg-amber-50/60 dark:bg-amber-950/20 p-3 rounded-2xl border border-amber-200/70 dark:border-amber-500/30">
+                    <span className="font-bold text-amber-800 dark:text-amber-400 flex items-center gap-1.5 text-[11px]">
+                      <Bookmark className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Rencana Cerita Berkelanjutan:</span>
+                    </span>
+                    <p className="text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line text-xs">
+                      {b.storyPlan}
+                    </p>
+                  </div>
+                )}
+
+                {/* Characters Involved & Their Conditions */}
+                {((b.involvedCharacters && b.involvedCharacters.length > 0) || b.characterConditions) && (
+                  <div className="text-xs space-y-1.5 bg-blue-50/50 dark:bg-blue-950/20 p-3 rounded-2xl border border-blue-200/60 dark:border-blue-500/20">
+                    {b.involvedCharacters && b.involvedCharacters.length > 0 && (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold text-blue-900 dark:text-blue-300 text-[11px] flex items-center gap-1">
+                          <Users className="w-3.5 h-3.5 text-blue-500" />
+                          <span>Tokoh Terlibat:</span>
+                        </span>
+                        {b.involvedCharacters.map((cName, cIdx) => (
+                          <span
+                            key={cIdx}
+                            className="px-2 py-0.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 font-semibold text-[10px]"
+                          >
+                            {cName}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {b.characterConditions && (
+                      <p className="text-slate-700 dark:text-slate-300 text-[11px] leading-relaxed pt-0.5">
+                        <strong className="text-slate-900 dark:text-white">Kondisi &amp; Peran:</strong> {b.characterConditions}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Climax & Twist Badges */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  {b.climax && (
+                    <div className="p-2.5 rounded-2xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200/70 dark:border-rose-500/30 space-y-0.5">
+                      <span className="font-extrabold text-rose-700 dark:text-rose-400 text-[10px] flex items-center gap-1 uppercase tracking-wide">
+                        <Flame className="w-3 h-3 text-rose-500" />
+                        <span>Puncak Klimaks:</span>
+                      </span>
+                      <p className="text-slate-700 dark:text-slate-300 text-[11px] leading-snug">
+                        {b.climax}
+                      </p>
+                    </div>
+                  )}
+
+                  {b.potentialTwist && (
+                    <div className="p-2.5 rounded-2xl bg-purple-50/60 dark:bg-purple-950/20 border border-purple-200/70 dark:border-purple-500/30 space-y-0.5">
+                      <span className="font-extrabold text-purple-700 dark:text-purple-400 text-[10px] flex items-center gap-1 uppercase tracking-wide">
+                        <Zap className="w-3 h-3 text-purple-500" />
+                        <span>Potensi Twist:</span>
+                      </span>
+                      <p className="text-slate-700 dark:text-slate-300 text-[11px] leading-snug">
+                        {b.potentialTwist}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Opening Hook Quote */}
                 {b.hook && (
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 italic bg-white dark:bg-slate-900/80 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800">
                     <strong>Hook Awal:</strong> "{b.hook}"
                   </p>
                 )}
 
-                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200 dark:border-slate-800/80">
-                  <span className="text-[10px] text-slate-400 truncate max-w-[200px]">
+                {/* Footer Action */}
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200 dark:border-slate-800/80">
+                  <span className="text-[10px] text-slate-400 truncate max-w-[200px]" title={b.rationale}>
                     {b.rationale}
                   </span>
 

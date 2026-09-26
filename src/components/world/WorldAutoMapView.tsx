@@ -119,6 +119,12 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
   const [draggedNodeId, setDraggedNodeId] = useState<string | null>(null);
   const [nodeDragOffset, setNodeDragOffset] = useState({ x: 0, y: 0 });
 
+  // 2-Finger Touch Pinch Zoom & Pan Refs
+  const pinchStartDistRef = useRef<number | null>(null);
+  const pinchStartZoomRef = useRef<number>(1);
+  const pinchStartPanRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const pinchMidpointRef = useRef<{ x: number; y: number } | null>(null);
+
   // Node Positions Map { [entityId]: { x, y } }
   const [nodePositions, setNodePositions] = useState<Record<string, NodePosition>>({});
 
@@ -527,6 +533,53 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
     setDraggedNodeId(null);
   };
 
+  // 2-Finger Touch Pinch Zoom with focal midpoint tracking
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 2) {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      pinchStartDistRef.current = dist;
+      pinchStartZoomRef.current = zoom;
+      pinchStartPanRef.current = { ...pan };
+
+      const container = containerRef.current;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        pinchMidpointRef.current = {
+          x: (t1.clientX + t2.clientX) / 2 - rect.left,
+          y: (t1.clientY + t2.clientY) / 2 - rect.top,
+        };
+      }
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 2 && pinchStartDistRef.current && pinchStartDistRef.current > 0) {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      const ratio = currentDist / pinchStartDistRef.current;
+      const newZoom = Math.min(3.5, Math.max(0.25, pinchStartZoomRef.current * ratio));
+      setZoom(newZoom);
+
+      if (pinchMidpointRef.current) {
+        const factor = newZoom / pinchStartZoomRef.current;
+        const mid = pinchMidpointRef.current;
+        const newPanX = mid.x - (mid.x - pinchStartPanRef.current.x) * factor;
+        const newPanY = mid.y - (mid.y - pinchStartPanRef.current.y) * factor;
+        setPan({ x: newPanX, y: newPanY });
+      }
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length < 2) {
+      pinchStartDistRef.current = null;
+      pinchMidpointRef.current = null;
+    }
+  };
+
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     e.preventDefault();
     const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
@@ -597,31 +650,56 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
             </div>
           </div>
 
-          {/* Mode Switcher Tabs */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-950 rounded-xl text-xs font-semibold self-start sm:self-auto flex-shrink-0">
+          {/* Controls: Mode Switcher Tabs + Fullscreen Button */}
+          <div className="flex items-center gap-1.5 flex-wrap self-start sm:self-auto flex-shrink-0">
+            <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-950 rounded-xl text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setViewMode('network')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition active:scale-95 ${
+                  viewMode === 'network'
+                    ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <GitFork className="w-3.5 h-3.5" />
+                <span>Garis Relasi</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('clusters')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition active:scale-95 ${
+                  viewMode === 'clusters'
+                    ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Boxes className="w-3.5 h-3.5" />
+                <span>Himpunan Faksi</span>
+              </button>
+            </div>
+
             <button
               type="button"
-              onClick={() => setViewMode('network')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition active:scale-95 ${
-                viewMode === 'network'
-                  ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition active:scale-95 border shadow-sm ${
+                isFullscreen
+                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-pink-500/50'
               }`}
+              title={isFullscreen ? 'Keluar Layar Penuh' : 'Mode Layar Penuh (Mobile Imersif)'}
             >
-              <GitFork className="w-3.5 h-3.5" />
-              <span>Garis Relasi</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('clusters')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition active:scale-95 ${
-                viewMode === 'clusters'
-                  ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Boxes className="w-3.5 h-3.5" />
-              <span>Himpunan Faksi</span>
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Keluar Layar Penuh</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="w-3.5 h-3.5 text-pink-500" />
+                  <span>Layar Penuh</span>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -717,6 +795,10 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
           onWheel={handleWheel}
           style={{ touchAction: 'none' }}
           className={`relative w-full bg-slate-950 rounded-3xl border border-slate-800 overflow-hidden shadow-2xl select-none cursor-grab active:cursor-grabbing ${
