@@ -101,27 +101,26 @@ export function App() {
   };
 
   const handleOpenChapterStudio = (chapter: StoryChapter) => {
-    navStack.push('chapter-studio', () => {
-      setStudioChapter(null);
-    });
-    setStudioChapter(chapter);
+    handleOpenEditor(chapter);
   };
 
   const handleBackFromChapterStudio = () => {
-    navStack.pop('chapter-studio');
-    setStudioChapter(null);
+    handleBackFromEditor();
   };
 
   const handleOpenEditor = (chapter: StoryChapter) => {
     navStack.push('editor', () => {
       setEditingChapter(null);
+      setStudioChapter(null);
     });
     setEditingChapter(chapter);
+    setStudioChapter(chapter);
   };
 
   const handleBackFromEditor = () => {
     navStack.pop('editor');
     setEditingChapter(null);
+    setStudioChapter(null);
   };
 
   const handleOpenCreateModal = (defaultStatus: BookStatus = 'draft') => {
@@ -171,28 +170,21 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
-      {/* 1. Fullscreen Rich Text Writing Mode */}
-      {editingChapter && currentBook ? (
+      {/* 1. Fullscreen Chapter Workspace (5 Bottom Tabs with Central Pen) */}
+      {(editingChapter || studioChapter) && currentBook ? (
         <RichTextEditor
-          chapter={editingChapter}
+          chapter={editingChapter || studioChapter!}
           bookTitle={currentBook.title}
           entities={bookEntities}
           onBack={handleBackFromEditor}
           onChapterUpdated={(updated) => {
-            setEditingChapter((prev) => (prev ? updated : null));
-            setStudioChapter((prev) => (prev?.id === updated.id ? updated : prev));
+            setEditingChapter(updated);
+            setStudioChapter(updated);
             triggerRefresh();
           }}
-        />
-      ) : studioChapter && currentBook ? (
-        /* 2. Chapter Studio Workspace Hub */
-        <ChapterStudioView
-          chapter={studioChapter}
-          book={currentBook}
-          onBack={handleBackFromChapterStudio}
-          onOpenEditor={handleOpenEditor}
-          onChapterUpdated={(updated) => {
-            setStudioChapter(updated);
+          onSwitchChapter={(newChapter) => {
+            setEditingChapter(newChapter);
+            setStudioChapter(newChapter);
             triggerRefresh();
           }}
         />

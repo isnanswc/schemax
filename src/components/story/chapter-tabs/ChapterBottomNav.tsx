@@ -46,7 +46,7 @@ export const ChapterBottomNav: React.FC<ChapterBottomNavProps> = ({
             )}
           </div>
           <span className="text-[9px] mt-1 tracking-tight truncate max-w-full">
-            Info Bab
+            Chapter Info
           </span>
         </button>
 
@@ -73,7 +73,7 @@ export const ChapterBottomNav: React.FC<ChapterBottomNavProps> = ({
             )}
           </div>
           <span className="text-[9px] mt-1 tracking-tight truncate max-w-full">
-            Draf Kasar
+            Tulisan Kasar
           </span>
         </button>
 
