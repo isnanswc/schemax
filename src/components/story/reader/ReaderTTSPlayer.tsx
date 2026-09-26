@@ -98,7 +98,7 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
   const isContinuousRef = useRef(true);
 
   // Gapless audio prefetch cache & in-flight tracker
-  const prefetchedAudiosRef = useRef<Map<number, HTMLAudioElement>>(new Map());
+  const prefetchedAudiosRef = useRef<Map<number, string[]>>(new Map());
   const isPrefetchingRef = useRef<Set<number>>(new Set());
 
   isPlayingRef.current = isPlaying;
@@ -159,10 +159,6 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
-      prefetchedAudiosRef.current.forEach((audio) => {
-        audio.pause();
-        audio.src = '';
-      });
       prefetchedAudiosRef.current.clear();
       isPrefetchingRef.current.clear();
     };
@@ -170,10 +166,6 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
 
   // Invalidate prefetched audio cache when voice/model/engine changes
   useEffect(() => {
-    prefetchedAudiosRef.current.forEach((audio) => {
-      audio.pause();
-      audio.src = '';
-    });
     prefetchedAudiosRef.current.clear();
     isPrefetchingRef.current.clear();
   }, [ttsEngine, selectedModel, selectedVoice]);
@@ -280,12 +272,12 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
         tag
       );
 
-      if (res.audioUrl) {
-        const audio = new Audio(res.audioUrl);
+      const urls = res.audioUrls && res.audioUrls.length > 0 ? res.audioUrls : [res.audioUrl];
+      if (urls.length > 0) {
+        prefetchedAudiosRef.current.set(index, urls);
+        const audio = new Audio(urls[0]);
         audio.preload = 'auto';
-        audio.playbackRate = baseRate;
         audio.load();
-        prefetchedAudiosRef.current.set(index, audio);
       }
     } catch (e) {
       console.warn(`[TTS Prefetch] Background prefetch paragraf ${index}:`, e);
@@ -383,45 +375,75 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
 
     setEngineNotice(null);
 
-    // 1. Instant Play if Audio is Already Prefetched in Background
-    if (prefetchedAudiosRef.current.has(index)) {
-      const audio = prefetchedAudiosRef.current.get(index)!;
-      prefetchedAudiosRef.current.delete(index);
-      audio.playbackRate = baseRate;
-      htmlAudioRef.current = audio;
+    const playChunksSequence = async (audioUrls: string[]) => {
+      const playChunk = async (chunkIdx: number) => {
+        if (!isPlayingRef.current) return;
+        const chunkUrl = audioUrls[chunkIdx];
+        if (!chunkUrl) return;
 
-      audio.onended = () => {
-        if (isPlayingRef.current) {
-          if (index + 1 < paragraphs.length && isContinuousRef.current) {
-            onParagraphChange(index + 1);
-            speakParagraph(index + 1);
+        const audio = new Audio(chunkUrl);
+        audio.playbackRate = baseRate;
+        htmlAudioRef.current = audio;
+
+        audio.onended = () => {
+          if (isPlayingRef.current) {
+            if (chunkIdx + 1 < audioUrls.length) {
+              // Play next chunk within current paragraph
+              playChunk(chunkIdx + 1);
+            } else if (index + 1 < paragraphs.length && isContinuousRef.current) {
+              // Paragraph finished, advance to next paragraph
+              onParagraphChange(index + 1);
+              speakParagraph(index + 1);
+            } else {
+              setIsPlaying(false);
+              setIsPaused(false);
+            }
+          }
+        };
+
+        audio.onerror = (e) => {
+          console.warn('Audio stream error on chunk:', chunkIdx, e);
+          if (chunkIdx + 1 < audioUrls.length) {
+            playChunk(chunkIdx + 1);
           } else {
+            setEngineNotice('Gagal memutar stream audio. Pastikan koneksi stabil.');
             setIsPlaying(false);
             setIsPaused(false);
+          }
+        };
+
+        try {
+          await audio.play();
+          setIsPlaying(true);
+          setIsPaused(false);
+          setIsLoadingAudio(false);
+
+          // Preload next paragraph while last chunk is playing
+          if (chunkIdx === audioUrls.length - 1 && index + 1 < paragraphs.length) {
+            prefetchParagraph(index + 1);
+          }
+        } catch (err: any) {
+          console.warn('Audio play() failed:', err);
+          if (chunkIdx + 1 < audioUrls.length) {
+            playChunk(chunkIdx + 1);
+          } else {
+            setEngineNotice(`Gagal memutar audio: ${err.message || 'Browser memblokir pemutaran otomatis'}`);
+            setIsPlaying(false);
+            setIsPaused(false);
+            setIsLoadingAudio(false);
           }
         }
       };
 
-      audio.onerror = (e) => {
-        console.warn('Audio playback error:', e);
-        setEngineNotice('Gagal memutar stream audio.');
-        setIsPlaying(false);
-      };
+      await playChunk(0);
+    };
 
-      try {
-        await audio.play();
-        setIsPlaying(true);
-        setIsPaused(false);
-        setIsLoadingAudio(false);
-
-        // Preload next paragraph while this one plays
-        if (index + 1 < paragraphs.length) {
-          prefetchParagraph(index + 1);
-        }
-        return;
-      } catch (e) {
-        console.warn('Prefetched audio play failed, falling back to fresh fetch:', e);
-      }
+    // 1. Instant Play if Audio is Already Prefetched in Background
+    if (prefetchedAudiosRef.current.has(index)) {
+      const urls = prefetchedAudiosRef.current.get(index)!;
+      prefetchedAudiosRef.current.delete(index);
+      await playChunksSequence(urls);
+      return;
     }
 
     // 2. Fresh Network Fetch (with loading indicator)
@@ -437,42 +459,13 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
         tag
       );
 
-      const audio = new Audio(res.audioUrl);
-      audio.playbackRate = baseRate;
-      htmlAudioRef.current = audio;
-
-      audio.onended = () => {
-        if (isPlayingRef.current) {
-          if (index + 1 < paragraphs.length && isContinuousRef.current) {
-            onParagraphChange(index + 1);
-            speakParagraph(index + 1);
-          } else {
-            setIsPlaying(false);
-            setIsPaused(false);
-          }
-        }
-      };
-
-      audio.onerror = (e) => {
-        console.warn('Audio stream error:', e);
-        setEngineNotice('Gagal memutar stream audio.');
-        setIsPlaying(false);
-      };
-
-      await audio.play();
-      setIsPlaying(true);
-      setIsPaused(false);
-
-      // Preload next paragraph immediately in background!
-      if (index + 1 < paragraphs.length) {
-        prefetchParagraph(index + 1);
-      }
+      const urls = res.audioUrls && res.audioUrls.length > 0 ? res.audioUrls : [res.audioUrl];
+      await playChunksSequence(urls);
     } catch (err: any) {
       console.warn('Gagal memutar audio AI:', err);
       setEngineNotice(`Gagal Suara AI: ${err.message || 'Layanan TTS belum merespon'}`);
       setIsPlaying(false);
       setIsPaused(false);
-    } finally {
       setIsLoadingAudio(false);
     }
   };

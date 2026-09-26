@@ -23,17 +23,27 @@ export interface TTSExtraConfig {
   azureApiKey: string;
   azureRegion: string;
   googleCloudApiKey: string;
+  dedicatedGeminiApiKey: string;
 }
 
 export function loadTTSExtraConfig(): TTSExtraConfig {
   try {
     const raw = localStorage.getItem('schemax_tts_extra_config');
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      return {
+        azureApiKey: '',
+        azureRegion: 'southeastasia',
+        googleCloudApiKey: '',
+        dedicatedGeminiApiKey: '',
+        ...JSON.parse(raw),
+      };
+    }
   } catch (e) {}
   return {
     azureApiKey: '',
     azureRegion: 'southeastasia',
     googleCloudApiKey: '',
+    dedicatedGeminiApiKey: '',
   };
 }
 
@@ -458,14 +468,30 @@ export async function generateGeminiSpeechAudio(
   }
 
   // Load configured Gemini API key slots
+  const extraConfig = loadTTSExtraConfig();
+  const dedicatedKey = (extraConfig.dedicatedGeminiApiKey || '').trim();
+
   const aiConfig = loadAISettings();
-  const geminiSlots = aiConfig.slots.filter(
-    (s) => s.provider === 'gemini' && s.isActive && s.apiKey && s.apiKey.trim().length > 0
-  );
+  const geminiSlots = [
+    ...aiConfig.slots.filter(
+      (s) => s.provider === 'gemini' && s.isActive && s.apiKey && s.apiKey.trim().length > 0
+    ),
+  ];
+
+  if (dedicatedKey) {
+    geminiSlots.unshift({
+      id: 'dedicated-tts',
+      provider: 'gemini',
+      label: 'Kunci Khusus TTS',
+      apiKey: dedicatedKey,
+      isActive: true,
+      model: modelName,
+    });
+  }
 
   if (geminiSlots.length === 0) {
     throw new Error(
-      'API Key Google AI Studio (Gemini) belum ditemukan. Buka Pengaturan AI (ikon ✨ di header) untuk memasukkan API Key Gemini gratis Anda.'
+      'API Key Google AI Studio (Gemini) belum ditemukan. Buka Pengaturan Kunci TTS (ikon ⚙️/kunci di player) untuk memasukkan API Key Gemini gratis Anda.'
     );
   }
 
@@ -662,18 +688,60 @@ export async function generateGoogleCloudSpeechAudio(
 }
 
 /**
+ * Break text down into small, natural phrase chunks (max 100-110 chars)
+ * to prevent Google Translate TTS from returning HTTP 400 Bad Request on mobile.
+ */
+export function getWasmSpeechChunks(text: string): string[] {
+  const cleanText = text.trim();
+  if (!cleanText) return [];
+
+  const chunks: string[] = [];
+  const sentences = cleanText.split(/([.!?,;\n]+)/);
+  let current = '';
+
+  for (const part of sentences) {
+    if (!part) continue;
+    if ((current + part).length <= 110) {
+      current += part;
+    } else {
+      if (current.trim()) chunks.push(current.trim());
+      if (part.length > 110) {
+        const words = part.split(' ');
+        let sub = '';
+        for (const w of words) {
+          if ((sub + ' ' + w).length <= 110) {
+            sub = sub ? sub + ' ' + w : w;
+          } else {
+            if (sub.trim()) chunks.push(sub.trim());
+            sub = w;
+          }
+        }
+        current = sub;
+      } else {
+        current = part;
+      }
+    }
+  }
+  if (current.trim()) chunks.push(current.trim());
+  return chunks.length > 0 ? chunks : [cleanText.slice(0, 110)];
+}
+
+/**
  * Generate speech audio using WASM / Mobile Free Direct Natural Stream (100% Free, 0 Limits)
  */
 export async function generateWasmSpeechAudio(
   text: string
-): Promise<{ audioUrl: string; mimeType: string }> {
+): Promise<{ audioUrl: string; audioUrls: string[]; mimeType: string }> {
   const cleanText = text.trim();
   if (!cleanText) throw new Error('Teks naskah kosong.');
 
-  const encoded = encodeURIComponent(cleanText.slice(0, 300));
-  const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=id&client=tw-ob&q=${encoded}`;
+  const chunks = getWasmSpeechChunks(cleanText);
+  const audioUrls = chunks.map((chunk) => {
+    const encoded = encodeURIComponent(chunk);
+    return `https://translate.google.com/translate_tts?ie=UTF-8&tl=id&client=tw-ob&q=${encoded}`;
+  });
 
-  return { audioUrl, mimeType: 'audio/mpeg' };
+  return { audioUrl: audioUrls[0] || '', audioUrls, mimeType: 'audio/mpeg' };
 }
 
 /**
@@ -766,7 +834,7 @@ export async function generateUnifiedSpeechAudio(
     isDialogue?: boolean;
     actingNotes?: string;
   }
-): Promise<{ audioUrl: string; mimeType: string; usedEngine: TTSEngineMode }> {
+): Promise<{ audioUrl: string; audioUrls?: string[]; mimeType: string; usedEngine: TTSEngineMode }> {
   // If a specific engine is chosen by the user:
   if (engine === 'azure') {
     const res = await generateAzureSpeechAudio(text, voiceName || 'id-ID-GadisNeural');
@@ -793,7 +861,7 @@ export async function generateUnifiedSpeechAudio(
     return { ...res, usedEngine: 'wasm' };
   }
 
-  // --- AUTO-FALLBACK PIPELINE (Azure ➔ Google Cloud ➔ Gemini ➔ WASM Mobile Free) ---
+  // --- AUTO-FALLBACK PIPELINE (Azure ➔ Google Cloud ➔ Dedicated Gemini ➔ WASM Mobile Free) ---
   const extraConfig = loadTTSExtraConfig();
 
   // 1. Try Azure Speech if configured
@@ -822,13 +890,8 @@ export async function generateUnifiedSpeechAudio(
     }
   }
 
-  // 3. Try Gemini Studio (if configured and quota allows)
-  const aiConfig = loadAISettings();
-  const hasGeminiKey = aiConfig.slots.some(
-    (s) => s.provider === 'gemini' && s.isActive && s.apiKey && s.apiKey.trim().length > 0
-  );
-
-  if (hasGeminiKey) {
+  // 3. Try Gemini Studio (ONLY if a dedicated Gemini TTS key is configured, protecting main writing slots)
+  if (extraConfig.dedicatedGeminiApiKey && extraConfig.dedicatedGeminiApiKey.trim().length > 0) {
     try {
       const res = await generateGeminiSpeechAudio(
         text,
@@ -838,7 +901,7 @@ export async function generateUnifiedSpeechAudio(
       );
       return { ...res, usedEngine: 'gemini' };
     } catch (e: any) {
-      console.warn('[Auto-Fallback] Gemini gagal atau limit, beralih ke WASM Mobile Free:', e.message);
+      console.warn('[Auto-Fallback] Dedicated Gemini gagal atau limit, beralih ke WASM Mobile Free:', e.message);
     }
   }
 

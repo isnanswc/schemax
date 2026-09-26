@@ -80,7 +80,37 @@ export const TTSConfigModal: React.FC<TTSConfigModalProps> = ({
             </div>
           </div>
 
-          {/* Section 1: Microsoft Azure Speech */}
+          {/* Section 1: Dedicated Gemini Key (100% Gratis Tanpa Billing/Kartu Kredit) */}
+          <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-100">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>Google AI Studio (Gemini Khusus TTS)</span>
+              </div>
+              <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold">
+                100% Free • No Credit Card
+              </span>
+            </div>
+
+            <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-tight">
+              Dapatkan di <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-amber-600 dark:text-amber-400 font-bold underline">aistudio.google.com</a> secara gratis tanpa kartu kredit. Gunakan akun Gmail lain atau API Key terpisah agar <strong>kuota naskah cerita utama Anda 100% aman dan tidak tersedot TTS</strong>.
+            </p>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                Gemini Dedicated API Key:
+              </label>
+              <input
+                type="password"
+                value={config.dedicatedGeminiApiKey}
+                onChange={(e) => setConfig({ ...config, dedicatedGeminiApiKey: e.target.value })}
+                placeholder="Contoh: AIzaSy... (Khusus TTS)"
+                className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-mono focus:outline-hidden focus:border-amber-500"
+              />
+            </div>
+          </div>
+
+          {/* Section 2: Microsoft Azure Speech (F0 Tier) */}
           <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
@@ -88,12 +118,12 @@ export const TTSConfigModal: React.FC<TTSConfigModalProps> = ({
                 <span>Microsoft Azure Speech (F0 Free Tier)</span>
               </div>
               <span className="text-[9px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 font-bold">
-                500k Karakter/Bln Gratis
+                Butuh Akun Azure
               </span>
             </div>
 
             <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-              Memberikan suara AI manusia paling alami di dunia untuk Bahasa Indonesia: <strong>Gadis (Neural)</strong> &amp; <strong>Ardi (Neural)</strong>.
+              Suara paling alami di dunia: <strong>Gadis &amp; Ardi (Neural)</strong>. <em>Catatan: Azure membutuhkan akun portal.azure.com (memerlukan billing/kartu saat mendaftar).</em>
             </p>
 
             <div className="space-y-2">
@@ -128,25 +158,25 @@ export const TTSConfigModal: React.FC<TTSConfigModalProps> = ({
             </div>
           </div>
 
-          {/* Section 2: Google Cloud Text-to-Speech */}
+          {/* Section 3: Google Cloud Text-to-Speech */}
           <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
                 <Cpu className="w-3.5 h-3.5 text-rose-500" />
-                <span>Google Cloud TTS (Bukan Gemini)</span>
+                <span>Google Cloud TTS (Neural2 / WaveNet)</span>
               </div>
               <span className="text-[9px] px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold">
-                1 Juta Karakter/Bln Gratis
+                Butuh Cloud Billing
               </span>
             </div>
 
             <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-              Layanan TTS resmi Google Cloud terpisah dari Gemini Studio. Suara <strong>Neural2</strong> dan <strong>WaveNet</strong> Indonesia.
+              Layanan TTS resmi Google Cloud (console.cloud.google.com). <em>Catatan: Memerlukan penautan billing Google Cloud untuk aktivasi.</em>
             </p>
 
             <div>
               <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                Google Cloud API Key (Text-to-Speech):
+                Google Cloud API Key:
               </label>
               <input
                 type="password"
@@ -158,12 +188,12 @@ export const TTSConfigModal: React.FC<TTSConfigModalProps> = ({
             </div>
           </div>
 
-          {/* Section 3: WASM Mobile Free */}
+          {/* Section 4: WASM Mobile Free */}
           <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-start gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
             <div className="text-[10px] leading-tight text-emerald-800 dark:text-emerald-200">
-              <span className="font-bold block text-[11px]">WASM / Mobile Free Selalu Siap:</span>
-              Jika Anda tidak mengisi API Key di atas, Schemax akan otomatis menggunakan gateway suara bebas kuota. 100% gratis, aman, dan tanpa limit di HP maupun PC.
+              <span className="font-bold block text-[11px]">WASM / Mobile Free (Bebas Kuota &amp; Tanpa Kunci):</span>
+              Jika kunci di atas dikosongkan, Schemax menggunakan audio gateway bebas kuota dengan pemecah kalimat cerdas. 100% gratis, aman, dan tanpa limit di HP.
             </div>
           </div>
 
