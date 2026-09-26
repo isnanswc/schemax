@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Bold,
   Italic,
@@ -45,8 +45,36 @@ export const AdvancedEditorToolbar: React.FC<AdvancedEditorToolbarProps> = ({
   onOpenAIAssistant,
   onExitToTabs,
 }) => {
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+
+  // Auto-lift toolbar to stick directly above mobile virtual keyboard
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+
+    const handleViewportChange = () => {
+      if (!window.visualViewport) return;
+      // Calculate how much the virtual keyboard pushed the viewport
+      const offset = window.innerHeight - window.visualViewport.height;
+      setKeyboardOffset(Math.max(0, Math.round(offset)));
+    };
+
+    window.visualViewport.addEventListener('resize', handleViewportChange);
+    window.visualViewport.addEventListener('scroll', handleViewportChange);
+
+    return () => {
+      window.visualViewport?.removeEventListener('resize', handleViewportChange);
+      window.visualViewport?.removeEventListener('scroll', handleViewportChange);
+    };
+  }, []);
+
   return (
-    <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 shadow-xl transition-all duration-200 safe-bottom">
+    <div
+      style={{
+        transform: keyboardOffset > 0 ? `translateY(-${keyboardOffset}px)` : undefined,
+        transition: 'transform 0.1s ease-out',
+      }}
+      className="fixed bottom-0 inset-x-0 z-40 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 shadow-xl safe-bottom"
+    >
       {/* Floating Info & Quick Action Bar (Top of toolbar) */}
       <div className="max-w-4xl mx-auto px-3 py-1 flex items-center justify-between border-b border-slate-100 dark:border-slate-800/60 text-xs">
         {/* Exit back to tabs */}

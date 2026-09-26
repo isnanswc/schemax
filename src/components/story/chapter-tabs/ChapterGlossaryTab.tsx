@@ -20,6 +20,7 @@ import {
 import { StoryChapter, WorldEntity, WorldCategory, ChapterSceneItem } from '../../../types';
 import { generateChapterAutoScenes, detectWorldEntitiesInChapter } from '../../../services/aiService';
 import { WorldEntityHologramModal } from '../../world/WorldEntityHologramModal';
+import { VerticalSceneTimeline } from './VerticalSceneTimeline';
 
 interface ChapterGlossaryTabProps {
   chapter: StoryChapter;
@@ -78,9 +79,21 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
     setTimeout(() => setCopiedPromptId(null), 2000);
   };
 
+  const getEffectiveText = (): string => {
+    if (contentText && contentText.trim()) return contentText.trim();
+    if (chapter.contentHtml && chapter.contentHtml.trim()) {
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = chapter.contentHtml;
+      const stripped = (tempDiv.textContent || tempDiv.innerText || '').trim();
+      if (stripped) return stripped;
+    }
+    return (chapter.premise || chapter.notes || '').trim();
+  };
+
   const handleAnalyzeScenes = async () => {
-    if (!contentText.trim()) {
-      alert('Tuliskan naskah bab terlebih dahulu agar AI dapat memetakan adegan.');
+    const textToAnalyze = getEffectiveText();
+    if (!textToAnalyze) {
+      alert('Tuliskan naskah bab atau premis terlebih dahulu agar AI dapat memetakan adegan.');
       return;
     }
 
@@ -89,7 +102,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
       const generatedScenes = await generateChapterAutoScenes(
         chapter.title,
         bookTitle,
-        contentText,
+        textToAnalyze,
         entities.map((e) => ({ id: e.id, name: e.name, category: e.category }))
       );
 
@@ -104,15 +117,16 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
   };
 
   const handleDetectEntities = async () => {
-    if (!contentText.trim()) {
-      alert('Tuliskan naskah bab terlebih dahulu.');
+    const textToAnalyze = getEffectiveText();
+    if (!textToAnalyze) {
+      alert('Tuliskan naskah bab atau premis terlebih dahulu.');
       return;
     }
 
     setIsDetectingEntities(true);
     try {
       const detected = await detectWorldEntitiesInChapter(
-        contentText,
+        textToAnalyze,
         bookTitle,
         entities.map((e) => ({ id: e.id, name: e.name, category: e.category }))
       );
@@ -281,7 +295,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
             <button
               type="button"
               onClick={handleAnalyzeScenes}
-              disabled={isAnalyzingScenes || !contentText.trim()}
+              disabled={isAnalyzingScenes || !getEffectiveText()}
               className="flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 text-white text-xs font-bold shadow-md shadow-indigo-500/20 active:scale-95 transition flex-shrink-0 disabled:opacity-50"
             >
               {isAnalyzingScenes ? (
@@ -305,54 +319,15 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
                 Belum Ada Pembagian Adegan
               </h4>
               <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-3">
-                Klik tombol "Pecah Adegan dari Naskah" agar AI otomatis membedah alur bab ini menjadi babak adegan berurutan.
+                Klik tombol "Pecah Adegan dari Naskah" agar AI otomatis membedah alur bab ini menjadi timeline visual berurutan.
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {scenes.map((sc, idx) => (
-                <div
-                  key={sc.id || idx}
-                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-2.5 transition hover:border-indigo-400"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-black flex items-center justify-center">
-                        {sc.sceneNumber || idx + 1}
-                      </span>
-                      <h4 className="text-sm font-extrabold text-slate-900 dark:text-white truncate">
-                        {sc.title || `Adegan ${idx + 1}`}
-                      </h4>
-                    </div>
-
-                    {sc.setting && (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30 flex items-center gap-1">
-                        <MapPin className="w-3 h-3" />
-                        <span className="truncate max-w-[120px]">{sc.setting}</span>
-                      </span>
-                    )}
-                  </div>
-
-                  <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-200 dark:border-slate-800">
-                    {sc.summary}
-                  </p>
-
-                  {sc.characters && sc.characters.length > 0 && (
-                    <div className="flex items-center gap-1.5 flex-wrap pt-1 text-[11px]">
-                      <span className="text-slate-400 font-medium">Tokoh Hadir:</span>
-                      {sc.characters.map((ch, i) => (
-                        <span
-                          key={i}
-                          className="px-2 py-0.5 rounded-lg bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-500/20 font-bold text-[10px]"
-                        >
-                          {ch}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+            <VerticalSceneTimeline
+              scenes={scenes}
+              entities={entities}
+              onOpenEntityHologram={(ent) => setHologramEntity(ent)}
+            />
           )}
         </div>
       )}

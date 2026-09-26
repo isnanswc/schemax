@@ -321,7 +321,25 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     onBack();
   };
 
-  const contentText = editorRef.current ? editorRef.current.innerText || '' : '';
+  const getEffectivePlainText = (): string => {
+    // 1. Try textContent (textContent is NOT affected by display: none / hidden)
+    if (editorRef.current) {
+      const text = (editorRef.current.textContent || '').trim();
+      if (text) return text;
+    }
+    // 2. Try parsing from currentChapter.contentHtml
+    const html = currentChapter.contentHtml || '';
+    if (html.trim()) {
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = html;
+      const stripped = (tempDiv.textContent || tempDiv.innerText || '').trim();
+      if (stripped) return stripped;
+    }
+    // 3. Fallback to premise or notes so AI can still work even without full manuscript
+    return (currentChapter.premise || currentChapter.notes || '').trim();
+  };
+
+  const contentText = getEffectivePlainText();
 
   return (
     <div

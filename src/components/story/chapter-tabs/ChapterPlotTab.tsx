@@ -61,15 +61,27 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
       .catch((err) => console.error('Error fetching next chapter:', err));
   }, [chapter.id, chapter.order, chapter.bookId]);
 
+  const getEffectiveText = (): string => {
+    if (contentText && contentText.trim()) return contentText.trim();
+    if (chapter.contentHtml && chapter.contentHtml.trim()) {
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = chapter.contentHtml;
+      const stripped = (tempDiv.textContent || tempDiv.innerText || '').trim();
+      if (stripped) return stripped;
+    }
+    return (chapter.premise || chapter.notes || '').trim();
+  };
+
   const handleGenerateSummary = async () => {
-    if (!contentText.trim()) {
-      alert('Tuliskan naskah bab terlebih dahulu agar AI dapat merangkum isinya.');
+    const textToSummarize = getEffectiveText();
+    if (!textToSummarize) {
+      alert('Tuliskan naskah bab atau premis terlebih dahulu agar AI dapat merangkum isinya.');
       return;
     }
 
     setIsSummarizing(true);
     try {
-      const generated = await generateChapterSummary(chapter.title, bookTitle, contentText);
+      const generated = await generateChapterSummary(chapter.title, bookTitle, textToSummarize);
       if (generated) {
         setSummary(generated);
         onUpdateChapter({ aiSummary: generated });
@@ -82,7 +94,8 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
   };
 
   const handleGeneratePlot = async () => {
-    if (!contentText.trim() && !chapter.premise) {
+    const textToPlot = getEffectiveText();
+    if (!textToPlot) {
       alert('Tuliskan naskah bab atau premis terlebih dahulu.');
       return;
     }
@@ -92,7 +105,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
       const generatedPlot = await generateChapterAutoPlot(
         chapter.title,
         bookTitle,
-        contentText,
+        textToPlot,
         chapter.premise
       );
       if (generatedPlot) {
@@ -107,12 +120,13 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
   };
 
   const handleGenerateBranches = async () => {
+    const textToBranch = getEffectiveText();
     setIsGeneratingBranches(true);
     try {
       const generatedBranches = await generateNextChapterBranches(
         chapter.title,
         bookTitle,
-        contentText,
+        textToBranch,
         chapter.premise
       );
       if (generatedBranches && generatedBranches.length > 0) {
