@@ -16,22 +16,36 @@ import {
   Bot,
   Zap,
   Sliders,
-  Repeat
+  Repeat,
+  Cloud,
+  Key,
+  Cpu,
+  ShieldCheck
 } from 'lucide-react';
 import { ParagraphTensionItem, ParagraphEmotionTag } from '../../../types';
 import { getEmotionAcoustics } from '../../../services/dramaDirectorService';
 import {
-  GEMINI_TTS_MODELS,
-  GROQ_TTS_MODELS,
-  GEMINI_VOICES,
-  GROQ_VOICES,
+  TTSEngineMode,
   AIVoiceOption,
   AITTSModelOption,
-  generateGeminiSpeechAudio,
-  generateGroqSpeechAudio
+  getModelsForEngine,
+  getVoicesForEngine,
+  generateUnifiedSpeechAudio,
+  AZURE_VOICES,
+  AZURE_TTS_MODELS,
+  GOOGLE_CLOUD_VOICES,
+  GOOGLE_CLOUD_TTS_MODELS,
+  WASM_VOICES,
+  WASM_TTS_MODELS,
+  GEMINI_VOICES,
+  GEMINI_TTS_MODELS,
+  GROQ_VOICES,
+  GROQ_TTS_MODELS,
+  AUTO_TTS_MODELS,
 } from '../../../services/geminiTtsService';
+import { TTSConfigModal } from './TTSConfigModal';
 
-export type TTSEngineMode = 'gemini' | 'groq' | 'browser';
+export type FullTTSEngine = TTSEngineMode | 'browser';
 
 interface ReaderTTSPlayerProps {
   paragraphs: string[];
@@ -59,19 +73,16 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
   const [baseRate, setBaseRate] = useState<number>(1.0);
   const [isContinuous, setIsContinuous] = useState(true);
 
-  // Engine selection: 'gemini' | 'groq' | 'browser'
-  const [ttsEngine, setTtsEngine] = useState<TTSEngineMode>('gemini');
+  // Engine selection: 'auto' | 'azure' | 'google-cloud' | 'wasm' | 'gemini' | 'groq' | 'browser'
+  const [ttsEngine, setTtsEngine] = useState<FullTTSEngine>('auto');
 
-  // Gemini state
-  const [selectedGeminiModel, setSelectedGeminiModel] = useState<string>('gemini-3.8-flash-tts');
-  const [selectedGeminiVoice, setSelectedGeminiVoice] = useState<string>('Aoede');
-
-  // Groq state
-  const [selectedGroqModel, setSelectedGroqModel] = useState<string>('canopylabs/orpheus-v1-english');
-  const [selectedGroqVoice, setSelectedGroqVoice] = useState<string>('autumn');
+  // Unified engine model & voice state
+  const [selectedModel, setSelectedModel] = useState<string>('auto-pipeline');
+  const [selectedVoice, setSelectedVoice] = useState<string>('id-ID-GadisNeural');
 
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [engineNotice, setEngineNotice] = useState<string | null>(null);
+  const [isTTSConfigOpen, setIsTTSConfigOpen] = useState(false);
 
   // Pickers modal toggles
   const [isModelPickerOpen, setIsModelPickerOpen] = useState(false);
@@ -79,7 +90,7 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
 
   // Browser voices state
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [selectedVoice, setSelectedVoice] = useState<SpeechSynthesisVoice | null>(null);
+  const [selectedBrowserVoice, setSelectedBrowserVoice] = useState<SpeechSynthesisVoice | null>(null);
 
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const htmlAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -128,10 +139,10 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
           v.name.toLowerCase().includes('andika')
       );
       if (idVoice) {
-        setSelectedVoice(idVoice);
+        setSelectedBrowserVoice(idVoice);
       } else {
         const defaultVoice = voices.find((v) => v.default) || voices[0];
-        setSelectedVoice(defaultVoice || null);
+        setSelectedBrowserVoice(defaultVoice || null);
       }
     };
 
@@ -165,7 +176,18 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
     });
     prefetchedAudiosRef.current.clear();
     isPrefetchingRef.current.clear();
-  }, [ttsEngine, selectedGeminiModel, selectedGeminiVoice, selectedGroqModel, selectedGroqVoice]);
+  }, [ttsEngine, selectedModel, selectedVoice]);
+
+  const handleEngineChange = (newEngine: FullTTSEngine) => {
+    handleStop();
+    setTtsEngine(newEngine);
+    if (newEngine !== 'browser') {
+      const models = getModelsForEngine(newEngine);
+      const voices = getVoicesForEngine(newEngine);
+      setSelectedModel(models[0]?.id || '');
+      setSelectedVoice(voices[0]?.id || '');
+    }
+  };
 
   // Compute emotion modulation parameters based on current paragraph's tension score
   const currentTensionItem = tensionItems.find(
@@ -250,28 +272,16 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
     isPrefetchingRef.current.add(index);
     try {
       const tag = emotionTags.find((t) => t.paragraphIndex === index);
-      let audioUrl = '';
+      const res = await generateUnifiedSpeechAudio(
+        rawText,
+        ttsEngine as TTSEngineMode,
+        selectedModel,
+        selectedVoice,
+        tag
+      );
 
-      if (ttsEngine === 'gemini') {
-        const res = await generateGeminiSpeechAudio(
-          rawText,
-          selectedGeminiModel,
-          selectedGeminiVoice,
-          tag
-        );
-        audioUrl = res.audioUrl;
-      } else if (ttsEngine === 'groq') {
-        const res = await generateGroqSpeechAudio(
-          rawText,
-          selectedGroqModel,
-          selectedGroqVoice,
-          tag
-        );
-        audioUrl = res.audioUrl;
-      }
-
-      if (audioUrl) {
-        const audio = new Audio(audioUrl);
+      if (res.audioUrl) {
+        const audio = new Audio(res.audioUrl);
         audio.preload = 'auto';
         audio.playbackRate = baseRate;
         audio.load();
@@ -314,8 +324,8 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
     const tensionMod = getTensionModulation(item?.tensionScore);
 
     const utterance = new SpeechSynthesisUtterance(rawText);
-    if (selectedVoice) {
-      utterance.voice = selectedVoice;
+    if (selectedBrowserVoice) {
+      utterance.voice = selectedBrowserVoice;
     }
 
     // Dynamic rate & pitch with base rate
@@ -350,8 +360,8 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
     setIsPaused(false);
   };
 
-  // Speak with Gemini AI Studio Audio (with 0.0s gapless prefetching)
-  const speakWithGemini = async (index: number) => {
+  // Speak with Unified AI TTS Engine (Auto-Fallback, Azure, Google Cloud, WASM, Gemini, Groq)
+  const speakWithUnifiedEngine = async (index: number) => {
     const rawText = paragraphs[index]?.trim();
     if (!rawText) {
       if (index + 1 < paragraphs.length && isContinuousRef.current) {
@@ -393,8 +403,8 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
       };
 
       audio.onerror = (e) => {
-        console.warn('Gemini audio error:', e);
-        setEngineNotice('Gagal memutar stream audio Gemini.');
+        console.warn('Audio playback error:', e);
+        setEngineNotice('Gagal memutar stream audio.');
         setIsPlaying(false);
       };
 
@@ -419,14 +429,15 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
 
     try {
       const tag = emotionTags.find((t) => t.paragraphIndex === index);
-      const { audioUrl } = await generateGeminiSpeechAudio(
+      const res = await generateUnifiedSpeechAudio(
         rawText,
-        selectedGeminiModel,
-        selectedGeminiVoice,
+        ttsEngine as TTSEngineMode,
+        selectedModel,
+        selectedVoice,
         tag
       );
 
-      const audio = new Audio(audioUrl);
+      const audio = new Audio(res.audioUrl);
       audio.playbackRate = baseRate;
       htmlAudioRef.current = audio;
 
@@ -443,8 +454,8 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
       };
 
       audio.onerror = (e) => {
-        console.warn('Gemini audio error:', e);
-        setEngineNotice('Gagal memutar stream audio Gemini.');
+        console.warn('Audio stream error:', e);
+        setEngineNotice('Gagal memutar stream audio.');
         setIsPlaying(false);
       };
 
@@ -457,124 +468,8 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
         prefetchParagraph(index + 1);
       }
     } catch (err: any) {
-      console.warn('Gagal memutar audio Gemini AI:', err);
-      setEngineNotice(`Gagal Suara AI (Gemini): ${err.message || 'Model AI Studio belum merespon'}`);
-      setIsPlaying(false);
-      setIsPaused(false);
-    } finally {
-      setIsLoadingAudio(false);
-    }
-  };
-
-  // Speak with Groq Cloud Audio (with 0.0s gapless prefetching)
-  const speakWithGroq = async (index: number) => {
-    const rawText = paragraphs[index]?.trim();
-    if (!rawText) {
-      if (index + 1 < paragraphs.length && isContinuousRef.current) {
-        onParagraphChange(index + 1);
-        speakParagraph(index + 1);
-      } else {
-        setIsPlaying(false);
-      }
-      return;
-    }
-
-    if (htmlAudioRef.current) {
-      htmlAudioRef.current.pause();
-      htmlAudioRef.current.src = '';
-    }
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-
-    setEngineNotice(null);
-
-    // 1. Instant Play if Audio is Already Prefetched in Background
-    if (prefetchedAudiosRef.current.has(index)) {
-      const audio = prefetchedAudiosRef.current.get(index)!;
-      prefetchedAudiosRef.current.delete(index);
-      audio.playbackRate = baseRate;
-      htmlAudioRef.current = audio;
-
-      audio.onended = () => {
-        if (isPlayingRef.current) {
-          if (index + 1 < paragraphs.length && isContinuousRef.current) {
-            onParagraphChange(index + 1);
-            speakParagraph(index + 1);
-          } else {
-            setIsPlaying(false);
-            setIsPaused(false);
-          }
-        }
-      };
-
-      audio.onerror = (e) => {
-        console.warn('Groq audio error:', e);
-        setEngineNotice('Gagal memutar stream audio Groq.');
-        setIsPlaying(false);
-      };
-
-      try {
-        await audio.play();
-        setIsPlaying(true);
-        setIsPaused(false);
-        setIsLoadingAudio(false);
-
-        // Preload next paragraph while this one plays
-        if (index + 1 < paragraphs.length) {
-          prefetchParagraph(index + 1);
-        }
-        return;
-      } catch (e) {
-        console.warn('Prefetched Groq audio play failed, falling back to fresh fetch:', e);
-      }
-    }
-
-    // 2. Fresh Network Fetch
-    setIsLoadingAudio(true);
-
-    try {
-      const tag = emotionTags.find((t) => t.paragraphIndex === index);
-      const { audioUrl } = await generateGroqSpeechAudio(
-        rawText,
-        selectedGroqModel,
-        selectedGroqVoice,
-        tag
-      );
-
-      const audio = new Audio(audioUrl);
-      audio.playbackRate = baseRate;
-      htmlAudioRef.current = audio;
-
-      audio.onended = () => {
-        if (isPlayingRef.current) {
-          if (index + 1 < paragraphs.length && isContinuousRef.current) {
-            onParagraphChange(index + 1);
-            speakParagraph(index + 1);
-          } else {
-            setIsPlaying(false);
-            setIsPaused(false);
-          }
-        }
-      };
-
-      audio.onerror = (e) => {
-        console.warn('Groq audio error:', e);
-        setEngineNotice('Gagal memutar stream audio Groq.');
-        setIsPlaying(false);
-      };
-
-      await audio.play();
-      setIsPlaying(true);
-      setIsPaused(false);
-
-      // Preload next paragraph immediately in background!
-      if (index + 1 < paragraphs.length) {
-        prefetchParagraph(index + 1);
-      }
-    } catch (err: any) {
-      console.warn('Gagal memutar audio Groq AI:', err);
-      setEngineNotice(`Gagal Suara AI (Groq): ${err.message || 'Model Groq TTS belum merespon'}`);
+      console.warn('Gagal memutar audio AI:', err);
+      setEngineNotice(`Gagal Suara AI: ${err.message || 'Layanan TTS belum merespon'}`);
       setIsPlaying(false);
       setIsPaused(false);
     } finally {
@@ -584,12 +479,10 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
 
   // Main dispatch speak function
   const speakParagraph = (index: number) => {
-    if (ttsEngine === 'gemini') {
-      speakWithGemini(index);
-    } else if (ttsEngine === 'groq') {
-      speakWithGroq(index);
-    } else {
+    if (ttsEngine === 'browser') {
       speakWithBrowser(index);
+    } else {
+      speakWithUnifiedEngine(index);
     }
   };
 
@@ -665,275 +558,339 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
     }
   };
 
-  const currentGeminiVoice = GEMINI_VOICES.find((v) => v.id === selectedGeminiVoice) || GEMINI_VOICES[0];
-  const currentGroqVoice = GROQ_VOICES.find((v) => v.id === selectedGroqVoice) || GROQ_VOICES[0];
-  const isIndonesianBrowserVoice = selectedVoice?.lang.toLowerCase().startsWith('id');
+  const currentModels = ttsEngine !== 'browser' ? getModelsForEngine(ttsEngine as TTSEngineMode) : [];
+  const currentVoices = ttsEngine !== 'browser' ? getVoicesForEngine(ttsEngine as TTSEngineMode) : [];
+  const selectedModelObj = currentModels.find((m) => m.id === selectedModel) || currentModels[0];
+  const selectedVoiceObj = currentVoices.find((v) => v.id === selectedVoice) || currentVoices[0];
+  const isIndonesianBrowserVoice = selectedBrowserVoice?.lang.toLowerCase().startsWith('id');
 
-  const currentGeminiModelObj = GEMINI_TTS_MODELS.find((m) => m.id === selectedGeminiModel) || GEMINI_TTS_MODELS[0];
-  const currentGroqModelObj = GROQ_TTS_MODELS.find((m) => m.id === selectedGroqModel) || GROQ_TTS_MODELS[0];
+  const getEngineDisplayLabel = () => {
+    switch (ttsEngine) {
+      case 'auto':
+        return '✨ Auto-Fallback (Pintar)';
+      case 'azure':
+        return '🔷 Azure Neural AI';
+      case 'google-cloud':
+        return '🔴 Google Cloud TTS';
+      case 'wasm':
+        return '🛡️ WASM / Mobile Free';
+      case 'gemini':
+        return '🎙️ Gemini AI TTS';
+      case 'groq':
+        return '⚡ Groq Cloud TTS';
+      default:
+        return '🤖 Browser Offline';
+    }
+  };
 
   return (
-    <div className="fixed bottom-3 inset-x-2 sm:inset-x-auto sm:right-6 sm:w-[460px] max-w-full z-40 animate-in slide-in-from-bottom-4 duration-250 select-none">
-      <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-amber-500/30 dark:border-amber-500/25 rounded-3xl shadow-2xl p-3 sm:p-4 space-y-2.5">
-        {/* Top Info Bar */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="p-1.5 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400">
-              {isLoadingAudio ? (
-                <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
-              ) : (
-                <Volume2 className="w-4 h-4 animate-pulse" />
-              )}
-            </span>
-            <div className="min-w-0">
-              <span className="text-[11px] font-black text-slate-800 dark:text-slate-100 flex items-center gap-1.5 truncate">
-                <span>
-                  {ttsEngine === 'gemini'
-                    ? '🎙️ Gemini AI TTS'
-                    : ttsEngine === 'groq'
-                    ? '⚡ Groq Cloud TTS'
-                    : '🤖 Browser Offline'}
+    <>
+      <div className="fixed bottom-3 inset-x-2 sm:inset-x-auto sm:right-6 sm:w-[480px] max-w-full z-40 animate-in slide-in-from-bottom-4 duration-250 select-none">
+        <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-amber-500/30 dark:border-amber-500/25 rounded-3xl shadow-2xl p-3 sm:p-4 space-y-2.5">
+          {/* Top Info Bar */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="p-1.5 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                {isLoadingAudio ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
+                ) : (
+                  <Volume2 className="w-4 h-4 animate-pulse" />
+                )}
+              </span>
+              <div className="min-w-0">
+                <span className="text-[11px] font-black text-slate-800 dark:text-slate-100 flex items-center gap-1.5 truncate">
+                  <span>{getEngineDisplayLabel()}</span>
                 </span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                  Paragraf {activeParagraphIndex + 1} dari {paragraphs.length}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {/* Button to open TTS Key Config */}
+              <button
+                type="button"
+                onClick={() => setIsTTSConfigOpen(true)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-amber-500 hover:bg-amber-500/10 transition"
+                title="Pengaturan Kunci API Azure & Google Cloud (Opsional)"
+              >
+                <Key className="w-3.5 h-3.5" />
+              </button>
+
+              {/* AI Director Emotion Tagging Trigger */}
+              {onRunEmotionTagging &&
+                (emotionTags.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={onRunEmotionTagging}
+                    disabled={isTaggingEmotion}
+                    className="py-0.5 px-2 rounded-full border text-[10px] font-bold flex items-center gap-1 text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20 transition active:scale-95 disabled:opacity-50"
+                    title="Naskah bab ini telah dibedah sutradara AI. Klik untuk membedah ulang."
+                  >
+                    <RefreshCw className={`w-2.5 h-2.5 ${isTaggingEmotion ? 'animate-spin' : ''}`} />
+                    <span className="hidden xs:inline">Emosi AI</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onRunEmotionTagging}
+                    disabled={isTaggingEmotion}
+                    className="py-1 px-2.5 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-[10px] flex items-center gap-1 shadow-xs transition active:scale-95 disabled:opacity-50"
+                    title="Bedah emosi dialog & narasi dengan AI Sutradara Suara untuk intonasi vokal dramatis"
+                  >
+                    {isTaggingEmotion ? (
+                      <>
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        <span>Membedah...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3 h-3" />
+                        <span>Bedah Emosi</span>
+                      </>
+                    )}
+                  </button>
+                ))}
+
+              {/* Active Emotion / Tension Badge */}
+              <span
+                className={`py-0.5 px-2 rounded-full border text-[10px] font-bold flex items-center gap-1 max-w-[120px] sm:max-w-[140px] truncate ${activeModulation.color}`}
+                title={`Modulasi Suara Aktif (${activeModulation.label})`}
+              >
+                <span>{activeModulation.icon}</span>
+                <span className="truncate">{activeModulation.label}</span>
               </span>
-              <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                Paragraf {activeParagraphIndex + 1} dari {paragraphs.length}
-              </span>
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleStop();
+                  onClose();
+                }}
+                className="p-1 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition"
+                title="Tutup Player"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            {/* AI Director Emotion Tagging Trigger */}
-            {onRunEmotionTagging && (
-              emotionTags.length > 0 ? (
-                <button
-                  type="button"
-                  onClick={onRunEmotionTagging}
-                  disabled={isTaggingEmotion}
-                  className="py-0.5 px-2 rounded-full border text-[10px] font-bold flex items-center gap-1 text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20 transition active:scale-95 disabled:opacity-50"
-                  title="Naskah bab ini telah dibedah sutradara AI. Klik untuk membedah ulang."
-                >
-                  <RefreshCw className={`w-2.5 h-2.5 ${isTaggingEmotion ? 'animate-spin' : ''}`} />
-                  <span className="hidden xs:inline">Emosi AI</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={onRunEmotionTagging}
-                  disabled={isTaggingEmotion}
-                  className="py-1 px-2.5 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-[10px] flex items-center gap-1 shadow-xs transition active:scale-95 disabled:opacity-50"
-                  title="Bedah emosi dialog & narasi dengan AI Sutradara Suara untuk intonasi vokal dramatis"
-                >
-                  {isTaggingEmotion ? (
-                    <>
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      <span>Membedah...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-3 h-3" />
-                      <span>Bedah Emosi (AI)</span>
-                    </>
-                  )}
-                </button>
-              )
-            )}
-
-            {/* Active Emotion / Tension Badge */}
-            <span
-              className={`py-0.5 px-2 rounded-full border text-[10px] font-bold flex items-center gap-1 max-w-[120px] sm:max-w-[140px] truncate ${activeModulation.color}`}
-              title={`Modulasi Suara Aktif (${activeModulation.label})`}
-            >
-              <span>{activeModulation.icon}</span>
-              <span className="truncate">{activeModulation.label}</span>
+          {/* Engine Switcher Bar: [ Auto ] [ Azure ] [ Google ] [ WASM ] [ Gemini ] [ Groq ] [ Browser ] */}
+          <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 text-[10px] overflow-x-auto no-scrollbar">
+            <span className="font-bold text-slate-500 dark:text-slate-400 pl-1.5 flex-shrink-0 hidden xs:inline">
+              Mesin:
             </span>
-
-            <button
-              type="button"
-              onClick={() => {
-                handleStop();
-                onClose();
-              }}
-              className="p-1 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition"
-              title="Tutup Player"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Engine Switcher Bar: [ Gemini ] [ Groq ] [ Browser ] */}
-        <div className="flex items-center justify-between gap-1 p-1 bg-slate-100 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 text-[10px]">
-          <span className="font-bold text-slate-500 dark:text-slate-400 pl-1.5 hidden xs:inline">
-            Mesin:
-          </span>
-          <div className="flex items-center gap-1 w-full xs:w-auto justify-end">
-            <button
-              type="button"
-              onClick={() => {
-                handleStop();
-                setTtsEngine('gemini');
-              }}
-              className={`flex-1 xs:flex-none py-1 px-2.5 rounded-xl font-bold transition flex items-center justify-center gap-1 ${
-                ttsEngine === 'gemini'
-                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-              title="Suara AI Google Gemini (Ekspresif & Fasih Bahasa Indonesia)"
-            >
-              <Sparkles className="w-3 h-3" />
-              <span>Gemini AI</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                handleStop();
-                setTtsEngine('groq');
-              }}
-              className={`flex-1 xs:flex-none py-1 px-2.5 rounded-xl font-bold transition flex items-center justify-center gap-1 ${
-                ttsEngine === 'groq'
-                  ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-              title="Suara AI Groq Cloud (Orpheus Model Kecepatan Tinggi)"
-            >
-              <Zap className="w-3 h-3" />
-              <span>Groq Cloud</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                handleStop();
-                setTtsEngine('browser');
-              }}
-              className={`flex-1 xs:flex-none py-1 px-2.5 rounded-xl font-bold transition flex items-center justify-center gap-1 ${
-                ttsEngine === 'browser'
-                  ? 'bg-slate-300 dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-              title="Suara bawaan OS/perangkat (Offline)"
-            >
-              <Bot className="w-3 h-3" />
-              <span>Browser</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Model & Voice Config Row (Only when AI engine is active) */}
-        {ttsEngine !== 'browser' && (
-          <div className="flex items-center justify-between gap-2 px-1 text-[11px]">
-            {/* Model Selector Pill */}
-            <div className="relative min-w-0 flex-1">
+            <div className="flex items-center gap-1 w-full justify-start sm:justify-end flex-nowrap">
               <button
                 type="button"
-                onClick={() => {
-                  setIsModelPickerOpen(!isModelPickerOpen);
-                  setIsVoicePickerOpen(false);
-                }}
-                className="w-full py-1 px-2 rounded-xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-1 text-[10px] font-bold text-slate-700 dark:text-slate-300 truncate"
-                title="Pilih Model AI untuk Menjalankan TTS"
+                onClick={() => handleEngineChange('auto')}
+                className={`flex-shrink-0 py-1 px-2.5 rounded-xl font-bold transition flex items-center justify-center gap-1 ${
+                  ttsEngine === 'auto'
+                    ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+                title="Auto-Fallback Pintar: Azure ➔ Google Cloud ➔ Gemini ➔ WASM Mobile Free"
               >
-                <div className="flex items-center gap-1 truncate">
-                  <Sliders className="w-3 h-3 text-amber-500 flex-shrink-0" />
-                  <span className="truncate">
-                    {ttsEngine === 'gemini' ? currentGeminiModelObj.name.split(' ')[0] + ' ' + currentGeminiModelObj.name.split(' ')[1] : currentGroqModelObj.name.split(' ')[0]}
-                  </span>
-                </div>
-                <ChevronDown className="w-2.5 h-2.5 opacity-50 flex-shrink-0" />
+                <Sparkles className="w-3 h-3" />
+                <span>Auto</span>
               </button>
 
-              {/* Model Dropdown */}
-              {isModelPickerOpen && (
-                <div className="absolute left-0 bottom-full mb-2 w-64 max-h-56 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-1.5 z-50 animate-in fade-in zoom-in-95 text-xs">
-                  <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    Model TTS {ttsEngine === 'gemini' ? 'Gemini' : 'Groq'}
-                  </div>
-                  {(ttsEngine === 'gemini' ? GEMINI_TTS_MODELS : GROQ_TTS_MODELS).map((m) => {
-                    const isSel = ttsEngine === 'gemini' ? selectedGeminiModel === m.id : selectedGroqModel === m.id;
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => {
-                          if (ttsEngine === 'gemini') setSelectedGeminiModel(m.id);
-                          else setSelectedGroqModel(m.id);
-                          setIsModelPickerOpen(false);
-                        }}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-xl transition flex flex-col text-xs mb-0.5 ${
-                          isSel
-                            ? 'bg-amber-500 text-slate-950 font-bold'
-                            : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-                        }`}
-                      >
-                        <span className="truncate font-semibold">{m.name}</span>
-                        <span className={`text-[10px] truncate ${isSel ? 'text-slate-900/80' : 'text-slate-400'}`}>
-                          {m.description}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={() => handleEngineChange('azure')}
+                className={`flex-shrink-0 py-1 px-2 rounded-xl font-bold transition flex items-center justify-center gap-1 ${
+                  ttsEngine === 'azure'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+                title="Microsoft Azure Speech (Gadis & Ardi Neural)"
+              >
+                <Cloud className="w-3 h-3" />
+                <span>Azure</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleEngineChange('google-cloud')}
+                className={`flex-shrink-0 py-1 px-2 rounded-xl font-bold transition flex items-center justify-center gap-1 ${
+                  ttsEngine === 'google-cloud'
+                    ? 'bg-rose-500 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+                title="Google Cloud TTS (Neural2 / WaveNet)"
+              >
+                <Cpu className="w-3 h-3" />
+                <span>Google</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleEngineChange('wasm')}
+                className={`flex-shrink-0 py-1 px-2 rounded-xl font-bold transition flex items-center justify-center gap-1 ${
+                  ttsEngine === 'wasm'
+                    ? 'bg-emerald-500 text-slate-950 shadow-xs font-black'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+                title="WASM / Mobile Free: 100% Gratis Selamanya & Bebas Kuota"
+              >
+                <ShieldCheck className="w-3 h-3" />
+                <span>WASM Free</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleEngineChange('gemini')}
+                className={`flex-shrink-0 py-1 px-2 rounded-xl font-bold transition flex items-center justify-center gap-1 ${
+                  ttsEngine === 'gemini'
+                    ? 'bg-amber-500 text-slate-950 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+                title="Google AI Studio Gemini Flash TTS"
+              >
+                <span>Gemini</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleEngineChange('groq')}
+                className={`flex-shrink-0 py-1 px-2 rounded-xl font-bold transition flex items-center justify-center gap-1 ${
+                  ttsEngine === 'groq'
+                    ? 'bg-indigo-500 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+                title="Groq Cloud Orpheus TTS"
+              >
+                <Zap className="w-3 h-3" />
+                <span>Groq</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleEngineChange('browser')}
+                className={`flex-shrink-0 py-1 px-2 rounded-xl font-bold transition flex items-center justify-center gap-1 ${
+                  ttsEngine === 'browser'
+                    ? 'bg-slate-300 dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+                title="Suara Bawaan Sistem HP / OS Offline"
+              >
+                <Bot className="w-3 h-3" />
+                <span>Browser</span>
+              </button>
             </div>
+          </div>
 
-            {/* Voice Persona Pill */}
-            <div className="relative min-w-0 flex-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsVoicePickerOpen(!isVoicePickerOpen);
-                  setIsModelPickerOpen(false);
-                }}
-                className="w-full py-1 px-2 rounded-xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-1 text-[10px] font-bold text-slate-700 dark:text-slate-300 truncate"
-                title="Pilih Karakter Suara AI"
-              >
-                <div className="flex items-center gap-1 truncate">
-                  <span>{ttsEngine === 'gemini' ? currentGeminiVoice.avatar : currentGroqVoice.avatar}</span>
-                  <span className="truncate">
-                    {ttsEngine === 'gemini' ? currentGeminiVoice.name : currentGroqVoice.name}
-                  </span>
-                </div>
-                <ChevronDown className="w-2.5 h-2.5 opacity-50 flex-shrink-0" />
-              </button>
-
-              {/* Voice Dropdown */}
-              {isVoicePickerOpen && (
-                <div className="absolute right-0 bottom-full mb-2 w-64 max-h-56 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-1.5 z-50 animate-in fade-in zoom-in-95 text-xs">
-                  <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    Karakter Suara {ttsEngine === 'gemini' ? 'Gemini' : 'Groq'}
+          {/* Model & Voice Config Row (When non-browser engine is active) */}
+          {ttsEngine !== 'browser' && (
+            <div className="flex items-center justify-between gap-2 px-1 text-[11px]">
+              {/* Model Selector Pill */}
+              <div className="relative min-w-0 flex-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsModelPickerOpen(!isModelPickerOpen);
+                    setIsVoicePickerOpen(false);
+                  }}
+                  className="w-full py-1 px-2 rounded-xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-1 text-[10px] font-bold text-slate-700 dark:text-slate-300 truncate"
+                  title="Pilih Model AI TTS"
+                >
+                  <div className="flex items-center gap-1 truncate">
+                    <Sliders className="w-3 h-3 text-amber-500 flex-shrink-0" />
+                    <span className="truncate">{selectedModelObj?.name || 'Pilih Model'}</span>
                   </div>
-                  {(ttsEngine === 'gemini' ? GEMINI_VOICES : GROQ_VOICES).map((v) => {
-                    const isSel = ttsEngine === 'gemini' ? selectedGeminiVoice === v.id : selectedGroqVoice === v.id;
-                    return (
-                      <button
-                        key={v.id}
-                        type="button"
-                        onClick={() => {
-                          if (ttsEngine === 'gemini') setSelectedGeminiVoice(v.id);
-                          else setSelectedGroqVoice(v.id);
-                          setIsVoicePickerOpen(false);
-                          if (isPlaying) speakParagraph(activeParagraphIndex);
-                        }}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-xl transition flex items-center gap-2 text-xs mb-0.5 ${
-                          isSel
-                            ? 'bg-amber-500 text-slate-950 font-bold'
-                            : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-                        }`}
-                      >
-                        <span className="text-sm">{v.avatar}</span>
-                        <div className="min-w-0 flex-1">
-                          <span className="block font-bold">{v.name}</span>
-                          <span className={`text-[10px] block truncate ${isSel ? 'text-slate-900/80' : 'text-slate-400'}`}>
-                            {v.description}
+                  <ChevronDown className="w-2.5 h-2.5 opacity-50 flex-shrink-0" />
+                </button>
+
+                {/* Model Dropdown */}
+                {isModelPickerOpen && (
+                  <div className="absolute left-0 bottom-full mb-2 w-64 max-h-56 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-1.5 z-50 animate-in fade-in zoom-in-95 text-xs">
+                    <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Model TTS Tersedia
+                    </div>
+                    {currentModels.map((m) => {
+                      const isSel = selectedModel === m.id;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedModel(m.id);
+                            setIsModelPickerOpen(false);
+                          }}
+                          className={`w-full text-left px-2.5 py-1.5 rounded-xl transition flex flex-col text-xs mb-0.5 ${
+                            isSel
+                              ? 'bg-amber-500 text-slate-950 font-bold'
+                              : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          <span className="truncate font-semibold">{m.name}</span>
+                          <span className={`text-[10px] truncate ${isSel ? 'text-slate-900/80' : 'text-slate-400'}`}>
+                            {m.description}
                           </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Voice Persona Pill */}
+              <div className="relative min-w-0 flex-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsVoicePickerOpen(!isVoicePickerOpen);
+                    setIsModelPickerOpen(false);
+                  }}
+                  className="w-full py-1 px-2 rounded-xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-1 text-[10px] font-bold text-slate-700 dark:text-slate-300 truncate"
+                  title="Pilih Karakter Suara"
+                >
+                  <div className="flex items-center gap-1 truncate">
+                    <span>{selectedVoiceObj?.avatar || '🎙️'}</span>
+                    <span className="truncate">{selectedVoiceObj?.name || 'Pilih Suara'}</span>
+                  </div>
+                  <ChevronDown className="w-2.5 h-2.5 opacity-50 flex-shrink-0" />
+                </button>
+
+                {/* Voice Dropdown */}
+                {isVoicePickerOpen && (
+                  <div className="absolute right-0 bottom-full mb-2 w-64 max-h-56 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-1.5 z-50 animate-in fade-in zoom-in-95 text-xs">
+                    <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Karakter Suara ({currentVoices.length})
+                    </div>
+                    {currentVoices.map((v) => {
+                      const isSel = selectedVoice === v.id;
+                      return (
+                        <button
+                          key={v.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedVoice(v.id);
+                            setIsVoicePickerOpen(false);
+                            if (isPlaying) speakParagraph(activeParagraphIndex);
+                          }}
+                          className={`w-full text-left px-2.5 py-1.5 rounded-xl transition flex items-center gap-2 text-xs mb-0.5 ${
+                            isSel
+                              ? 'bg-amber-500 text-slate-950 font-bold'
+                              : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          <span className="text-sm">{v.avatar}</span>
+                          <div className="min-w-0 flex-1">
+                            <span className="block font-bold">{v.name}</span>
+                            <span className={`text-[10px] block truncate ${isSel ? 'text-slate-900/80' : 'text-slate-400'}`}>
+                              {v.description}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
         {/* Notice Banner (If API key needed or error happened) */}
         {engineNotice && (
@@ -1071,7 +1028,7 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
                 title="Pilih Suara Browser Sistem"
               >
                 <Radio className="w-3 h-3 text-amber-500 flex-shrink-0" />
-                <span className="truncate">{selectedVoice ? selectedVoice.name.split(' ')[0] : 'Suara'}</span>
+                <span className="truncate">{selectedBrowserVoice ? selectedBrowserVoice.name.split(' ')[0] : 'Suara'}</span>
                 <ChevronDown className="w-2.5 h-2.5 opacity-50 flex-shrink-0" />
               </button>
 
@@ -1082,14 +1039,14 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
                     Suara Bawaan Sistem ({availableVoices.length})
                   </div>
                   {availableVoices.map((v) => {
-                    const isSel = selectedVoice?.name === v.name;
+                    const isSel = selectedBrowserVoice?.name === v.name;
                     const isId = v.lang.toLowerCase().startsWith('id');
                     return (
                       <button
                         key={v.name}
                         type="button"
                         onClick={() => {
-                          setSelectedVoice(v);
+                          setSelectedBrowserVoice(v);
                           setIsVoicePickerOpen(false);
                           if (isPlaying) speakParagraph(activeParagraphIndex);
                         }}
@@ -1113,7 +1070,7 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
             </div>
           ) : (
             <div className="text-[10px] text-slate-400 font-bold hidden sm:inline px-1">
-              {ttsEngine === 'gemini' ? 'Google AI' : 'Groq AI'}
+              {getEngineDisplayLabel()}
             </div>
           )}
         </div>
@@ -1124,5 +1081,11 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
         </p>
       </div>
     </div>
+
+    <TTSConfigModal
+      isOpen={isTTSConfigOpen}
+      onClose={() => setIsTTSConfigOpen(false)}
+    />
+  </>
   );
 };
