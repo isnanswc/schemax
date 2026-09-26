@@ -360,7 +360,7 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
         onParagraphChange(index + 1);
         speakParagraph(index + 1);
       } else {
-        setIsPlaying(false);
+        handleStop();
       }
       return;
     }
@@ -374,12 +374,24 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
     }
 
     setEngineNotice(null);
+    setIsPlaying(true);
+    isPlayingRef.current = true;
+    setIsPaused(false);
+    setIsLoadingAudio(true);
 
     const playChunksSequence = async (audioUrls: string[]) => {
       const playChunk = async (chunkIdx: number) => {
-        if (!isPlayingRef.current) return;
+        // If user stopped or paused, abort
+        if (!isPlayingRef.current) {
+          setIsLoadingAudio(false);
+          return;
+        }
+
         const chunkUrl = audioUrls[chunkIdx];
-        if (!chunkUrl) return;
+        if (!chunkUrl) {
+          setIsLoadingAudio(false);
+          return;
+        }
 
         const audio = new Audio(chunkUrl);
         audio.playbackRate = baseRate;
@@ -396,25 +408,25 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
               speakParagraph(index + 1);
             } else {
               setIsPlaying(false);
+              isPlayingRef.current = false;
               setIsPaused(false);
+              setIsLoadingAudio(false);
             }
           }
         };
 
         audio.onerror = (e) => {
           console.warn('Audio stream error on chunk:', chunkIdx, e);
-          if (chunkIdx + 1 < audioUrls.length) {
-            playChunk(chunkIdx + 1);
-          } else {
-            setEngineNotice('Gagal memutar stream audio. Pastikan koneksi stabil.');
-            setIsPlaying(false);
-            setIsPaused(false);
-          }
+          setIsLoadingAudio(false);
+          setEngineNotice('Audio AI dialihkan ke Suara Bawaan HP...');
+          setTtsEngine('browser');
+          speakWithBrowser(index);
         };
 
         try {
           await audio.play();
           setIsPlaying(true);
+          isPlayingRef.current = true;
           setIsPaused(false);
           setIsLoadingAudio(false);
 
@@ -424,13 +436,16 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
           }
         } catch (err: any) {
           console.warn('Audio play() failed:', err);
-          if (chunkIdx + 1 < audioUrls.length) {
-            playChunk(chunkIdx + 1);
-          } else {
-            setEngineNotice(`Gagal memutar audio: ${err.message || 'Browser memblokir pemutaran otomatis'}`);
+          setIsLoadingAudio(false);
+          if (err.name === 'NotAllowedError') {
+            setEngineNotice('Izin audio diperlukan: Ketuk tombol Putar sekali lagi.');
             setIsPlaying(false);
+            isPlayingRef.current = false;
             setIsPaused(false);
-            setIsLoadingAudio(false);
+          } else {
+            setEngineNotice('Gagal memutar audio AI. Dialihkan ke Suara Bawaan HP...');
+            setTtsEngine('browser');
+            speakWithBrowser(index);
           }
         }
       };
@@ -447,8 +462,6 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
     }
 
     // 2. Fresh Network Fetch (with loading indicator)
-    setIsLoadingAudio(true);
-
     try {
       const tag = emotionTags.find((t) => t.paragraphIndex === index);
       const res = await generateUnifiedSpeechAudio(
@@ -459,13 +472,21 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
         tag
       );
 
+      // If user stopped while fetch was underway, abort
+      if (!isPlayingRef.current) {
+        setIsLoadingAudio(false);
+        return;
+      }
+
       const urls = res.audioUrls && res.audioUrls.length > 0 ? res.audioUrls : [res.audioUrl];
       await playChunksSequence(urls);
     } catch (err: any) {
       console.warn('Gagal memutar audio AI:', err);
-      setEngineNotice(`Gagal Suara AI: ${err.message || 'Layanan TTS belum merespon'}`);
-      setIsPlaying(false);
-      setIsPaused(false);
+      setIsLoadingAudio(false);
+      setEngineNotice(`Gagal Suara AI (${err.message || 'Error'}). Dialihkan ke Suara Bawaan HP...`);
+      setTtsEngine('browser');
+      speakWithBrowser(index);
+    } finally {
       setIsLoadingAudio(false);
     }
   };
@@ -488,13 +509,20 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
         window.speechSynthesis.cancel();
       }
       setIsPlaying(false);
+      isPlayingRef.current = false;
       setIsPaused(true);
+      setIsLoadingAudio(false);
     } else {
+      setIsPlaying(true);
+      isPlayingRef.current = true;
+      setIsPaused(false);
+
       if (isPaused && htmlAudioRef.current && htmlAudioRef.current.src) {
         htmlAudioRef.current
           .play()
           .then(() => {
             setIsPlaying(true);
+            isPlayingRef.current = true;
             setIsPaused(false);
             if (activeParagraphIndex + 1 < paragraphs.length) {
               prefetchParagraph(activeParagraphIndex + 1);
@@ -518,6 +546,7 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
       window.speechSynthesis.cancel();
     }
     setIsPlaying(false);
+    isPlayingRef.current = false;
     setIsPaused(false);
     setIsLoadingAudio(false);
   };

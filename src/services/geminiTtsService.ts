@@ -173,16 +173,16 @@ export const WASM_VOICES: AIVoiceOption[] = [
 // 5. Available TTS Models for Google Gemini
 export const GEMINI_TTS_MODELS: AITTSModelOption[] = [
   {
-    id: 'gemini-3.8-flash-tts',
-    name: 'Gemini 3.8 Flash TTS (AI Studio)',
+    id: 'gemini-2.0-flash',
+    name: 'Gemini 2.0 Flash Audio (Resmi Google)',
     provider: 'gemini',
     description: 'Model Text-To-Speech resmi Google AI Studio berkualitas studio',
   },
   {
-    id: 'gemini-3.8-flash-lite-tts',
-    name: 'Gemini 3.8 Flash-Lite TTS',
+    id: 'gemini-2.0-flash-exp',
+    name: 'Gemini 2.0 Flash Exp Audio',
     provider: 'gemini',
-    description: 'Model TTS cepat, hemat latensi dan efisiensi kuota',
+    description: 'Model audio eksperimental multimodal Google AI',
   },
 ];
 
@@ -497,9 +497,9 @@ export async function generateGeminiSpeechAudio(
 
   const modelsToTry = [
     modelName,
-    'gemini-3.8-flash-tts',
-    'gemini-3.8-flash-lite-tts',
-  ].filter((v, idx, arr) => arr.indexOf(v) === idx && Boolean(v));
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-exp',
+  ].filter((v, idx, arr) => arr.indexOf(v) === idx && Boolean(v) && !v.includes('3.8'));
 
   let lastError: Error | null = null;
 
@@ -895,7 +895,7 @@ export async function generateUnifiedSpeechAudio(
     try {
       const res = await generateGeminiSpeechAudio(
         text,
-        'gemini-3.8-flash-tts',
+        'gemini-2.0-flash',
         voiceName || 'Aoede',
         emotionTag
       );
