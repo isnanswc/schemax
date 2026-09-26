@@ -21,8 +21,7 @@ import {
   BarChart3,
   ArrowLeft,
   Eraser,
-  MessageSquareQuote,
-  ChevronUp
+  MessageSquare
 } from 'lucide-react';
 
 interface AdvancedEditorToolbarProps {
@@ -224,7 +223,7 @@ export const AdvancedEditorToolbar: React.FC<AdvancedEditorToolbarProps> = ({
           className="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition active:scale-90 flex-shrink-0"
           title="Sisipkan Kutipan Dialog"
         >
-          <MessageSquareQuote className="w-4 h-4" />
+          <MessageSquare className="w-4 h-4" />
         </button>
 
         <div className="w-[1px] h-5 bg-slate-200 dark:bg-slate-800 mx-1 flex-shrink-0" />
