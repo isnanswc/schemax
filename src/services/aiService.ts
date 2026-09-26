@@ -40,11 +40,11 @@ export function getDefaultAISettings(): AISettingsConfig {
     smartAdjustEnabled: true,
     providerPriority: ['gemini', 'groq'],
     geminiConfig: {
-      fallbackModels: ['gemini-3.1-flash', 'gemini-3.1-pro', 'gemini-3.0-flash'],
+      fallbackModels: ['', '', ''],
       cachedModels: DEFAULT_GEMINI_MODELS,
     },
     groqConfig: {
-      fallbackModels: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768'],
+      fallbackModels: ['', '', ''],
       cachedModels: DEFAULT_GROQ_MODELS,
     },
     slots: [
@@ -92,7 +92,7 @@ export function loadAISettings(): AISettingsConfig {
             // Restore saved keys
             migrated.slots = oldConfig.slots.map((s: any) => ({
               ...s,
-              models: undefined, // Reset to provider global 3.1
+              models: undefined,
             }));
           }
           saveAISettings(migrated);
@@ -105,26 +105,33 @@ export function loadAISettings(): AISettingsConfig {
     const parsed = JSON.parse(raw);
     if (!parsed.slots || !Array.isArray(parsed.slots)) return getDefaultAISettings();
 
-    // Ensure geminiConfig & groqConfig exist with 3.1 models
+    // Ensure geminiConfig & groqConfig exist
     if (!parsed.geminiConfig) {
       parsed.geminiConfig = {
-        fallbackModels: ['gemini-3.1-flash', 'gemini-3.1-pro', 'gemini-3.0-flash'],
+        fallbackModels: ['', '', ''],
         cachedModels: DEFAULT_GEMINI_MODELS,
       };
     } else {
-      // Ensure cachedModels contains the new 3.1 models
-      parsed.geminiConfig.cachedModels = DEFAULT_GEMINI_MODELS;
-      // If previous fallback had legacy models, upgrade to 3.1
-      if (!parsed.geminiConfig.fallbackModels || !parsed.geminiConfig.fallbackModels[0]?.includes('3.')) {
-        parsed.geminiConfig.fallbackModels = ['gemini-3.1-flash', 'gemini-3.1-pro', 'gemini-3.0-flash'];
+      if (!Array.isArray(parsed.geminiConfig.fallbackModels)) {
+        parsed.geminiConfig.fallbackModels = ['', '', ''];
+      }
+      if (!parsed.geminiConfig.cachedModels || parsed.geminiConfig.cachedModels.length === 0) {
+        parsed.geminiConfig.cachedModels = DEFAULT_GEMINI_MODELS;
       }
     }
 
     if (!parsed.groqConfig) {
       parsed.groqConfig = {
-        fallbackModels: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768'],
+        fallbackModels: ['', '', ''],
         cachedModels: DEFAULT_GROQ_MODELS,
       };
+    } else {
+      if (!Array.isArray(parsed.groqConfig.fallbackModels)) {
+        parsed.groqConfig.fallbackModels = ['', '', ''];
+      }
+      if (!parsed.groqConfig.cachedModels || parsed.groqConfig.cachedModels.length === 0) {
+        parsed.groqConfig.cachedModels = DEFAULT_GROQ_MODELS;
+      }
     }
 
     return parsed;

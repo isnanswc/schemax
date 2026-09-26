@@ -121,9 +121,15 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
         // If current fallback models are not in the new list, pick top 3 available
         const availableIds = liveModels.map((m) => m.id);
         const newFallbacks: [string, string, string] = [
-          availableIds[0] || targetConfig.fallbackModels[0],
-          availableIds[1] || availableIds[0] || targetConfig.fallbackModels[1],
-          availableIds[2] || availableIds[1] || targetConfig.fallbackModels[2],
+          targetConfig.fallbackModels[0] && availableIds.includes(targetConfig.fallbackModels[0])
+            ? targetConfig.fallbackModels[0]
+            : '',
+          targetConfig.fallbackModels[1] && availableIds.includes(targetConfig.fallbackModels[1])
+            ? targetConfig.fallbackModels[1]
+            : '',
+          targetConfig.fallbackModels[2] && availableIds.includes(targetConfig.fallbackModels[2])
+            ? targetConfig.fallbackModels[2]
+            : '',
         ];
         targetConfig.fallbackModels = newFallbacks;
 
@@ -365,10 +371,11 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
                   1. Model Utama
                 </span>
                 <select
-                  value={currentGlobalConfig.fallbackModels[0]}
+                  value={currentGlobalConfig.fallbackModels[0] || ''}
                   onChange={(e) => handleUpdateGlobalModel(0, e.target.value)}
                   className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-2 text-xs text-amber-800 dark:text-amber-300 font-bold focus:outline-none focus:border-amber-400 shadow-sm"
                 >
+                  <option value="">-- Pilih Model Utama --</option>
                   {currentGlobalConfig.cachedModels.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name}
@@ -383,10 +390,11 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
                   2. Cadangan 1 (Jika Limit)
                 </span>
                 <select
-                  value={currentGlobalConfig.fallbackModels[1]}
+                  value={currentGlobalConfig.fallbackModels[1] || ''}
                   onChange={(e) => handleUpdateGlobalModel(1, e.target.value)}
                   className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-2 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-amber-400 shadow-sm"
                 >
+                  <option value="">-- Nonaktif (Opsional) --</option>
                   {currentGlobalConfig.cachedModels.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name}
@@ -401,10 +409,11 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
                   3. Cadangan 2
                 </span>
                 <select
-                  value={currentGlobalConfig.fallbackModels[2]}
+                  value={currentGlobalConfig.fallbackModels[2] || ''}
                   onChange={(e) => handleUpdateGlobalModel(2, e.target.value)}
                   className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-2 text-xs text-slate-700 dark:text-slate-300 focus:outline-none focus:border-amber-400 shadow-sm"
                 >
+                  <option value="">-- Nonaktif (Opsional) --</option>
                   {currentGlobalConfig.cachedModels.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name}
