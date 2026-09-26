@@ -12,12 +12,14 @@ import {
   ImagePromptSettings,
 } from '../types';
 
-// Modern baseline defaults (Gemini 2.5/2.0 series & Groq current lineup)
+// Modern baseline defaults (Gemini 3.1 / 3.0 series & Groq current lineup)
 export const DEFAULT_GEMINI_MODELS: AIModelOption[] = [
-  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: 'Rekomendasi Utama: Cepat, cerdas, efisien' },
-  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', description: 'Kemampuan penalaran mendalam & analisis luas' },
-  { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', description: 'Kecepatan tinggi generasi teks kreatif' },
-  { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite', description: 'Latensi ultra-rendah & hemat kuota' },
+  { id: 'gemini-3.1-flash', name: 'Gemini 3.1 Flash (Rekomendasi Utama)', description: 'Generasi 3.1: Super Cepat, Cerdas, Konteks Masif untuk Naskah Panjang' },
+  { id: 'gemini-3.1-pro', name: 'Gemini 3.1 Pro', description: 'Generasi 3.1: Penalaran Mendalam & Analisis Sastra Luas' },
+  { id: 'gemini-3.0-flash', name: 'Gemini 3.0 Flash', description: 'Generasi 3.0: Kecepatan Tinggi & Efisiensi Kuota' },
+  { id: 'gemini-3.0-pro', name: 'Gemini 3.0 Pro', description: 'Generasi 3.0: Analisis Struktur Plot Kompleks' },
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: 'Generasi 2.5: Cepat & Handal' },
+  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', description: 'Generasi 2.5: Analisis Luas' },
 ];
 
 export const DEFAULT_GROQ_MODELS: AIModelOption[] = [
@@ -27,14 +29,14 @@ export const DEFAULT_GROQ_MODELS: AIModelOption[] = [
   { id: 'gemma2-9b-it', name: 'Gemma 2 9B IT', description: 'Model open weights Google presisi tinggi' },
 ];
 
-const STORAGE_KEY = 'schemax_ai_config_v2';
+const STORAGE_KEY = 'schemax_ai_config_v3';
 
 export function getDefaultAISettings(): AISettingsConfig {
   return {
     smartAdjustEnabled: true,
     providerPriority: ['gemini', 'groq'],
     geminiConfig: {
-      fallbackModels: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'],
+      fallbackModels: ['gemini-3.1-flash', 'gemini-3.1-pro', 'gemini-3.0-flash'],
       cachedModels: DEFAULT_GEMINI_MODELS,
     },
     groqConfig: {
@@ -74,18 +76,46 @@ export function getDefaultAISettings(): AISettingsConfig {
 
 export function loadAISettings(): AISettingsConfig {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return getDefaultAISettings();
+    let raw = localStorage.getItem(STORAGE_KEY);
+    // Auto-migrate from older version while preserving all user API keys
+    if (!raw) {
+      const v2 = localStorage.getItem('schemax_ai_config_v2') || localStorage.getItem('schemax_ai_config');
+      if (v2) {
+        try {
+          const oldConfig = JSON.parse(v2);
+          const migrated = getDefaultAISettings();
+          if (Array.isArray(oldConfig.slots)) {
+            // Restore saved keys
+            migrated.slots = oldConfig.slots.map((s: any) => ({
+              ...s,
+              models: undefined, // Reset to provider global 3.1
+            }));
+          }
+          saveAISettings(migrated);
+          return migrated;
+        } catch (_) {}
+      }
+      return getDefaultAISettings();
+    }
+
     const parsed = JSON.parse(raw);
     if (!parsed.slots || !Array.isArray(parsed.slots)) return getDefaultAISettings();
 
-    // Ensure geminiConfig & groqConfig exist
+    // Ensure geminiConfig & groqConfig exist with 3.1 models
     if (!parsed.geminiConfig) {
       parsed.geminiConfig = {
-        fallbackModels: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'],
+        fallbackModels: ['gemini-3.1-flash', 'gemini-3.1-pro', 'gemini-3.0-flash'],
         cachedModels: DEFAULT_GEMINI_MODELS,
       };
+    } else {
+      // Ensure cachedModels contains the new 3.1 models
+      parsed.geminiConfig.cachedModels = DEFAULT_GEMINI_MODELS;
+      // If previous fallback had legacy models, upgrade to 3.1
+      if (!parsed.geminiConfig.fallbackModels || !parsed.geminiConfig.fallbackModels[0]?.includes('3.')) {
+        parsed.geminiConfig.fallbackModels = ['gemini-3.1-flash', 'gemini-3.1-pro', 'gemini-3.0-flash'];
+      }
     }
+
     if (!parsed.groqConfig) {
       parsed.groqConfig = {
         fallbackModels: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768'],
@@ -250,7 +280,7 @@ async function executeGeminiRequest(
       ],
       generationConfig: {
         temperature: 0.7,
-        maxOutputTokens: 2048,
+        maxOutputTokens: 8192,
       },
     }),
   });
@@ -295,7 +325,7 @@ async function executeGroqRequest(
       model: model,
       messages: messages,
       temperature: 0.7,
-      max_tokens: 2048,
+      max_tokens: 8192,
     }),
   });
 
@@ -481,6 +511,85 @@ export async function testSlotConnection(
 // 📖 CHAPTER STUDIO AI INTELLIGENCE ENGINES
 // ==========================================
 
+// Resilient JSON Parsers for LLM Output (Handles Long 4000+ words outputs, trailing commas, fences, and truncation)
+export function resilientParseJsonArray<T = any>(rawText: string): T[] {
+  if (!rawText) return [];
+  let clean = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+  // 1. Direct parse
+  try {
+    const parsed = JSON.parse(clean);
+    if (Array.isArray(parsed)) return parsed;
+    if (typeof parsed === 'object' && parsed !== null) {
+      const arrayKey = Object.keys(parsed).find((k) => Array.isArray(parsed[k]));
+      if (arrayKey && Array.isArray(parsed[arrayKey])) {
+        return parsed[arrayKey];
+      }
+    }
+  } catch (_) {}
+
+  // 2. Extract array bounds
+  const firstBracket = clean.indexOf('[');
+  const lastBracket = clean.lastIndexOf(']');
+  if (firstBracket !== -1 && lastBracket > firstBracket) {
+    const candidate = clean.slice(firstBracket, lastBracket + 1);
+    try {
+      const parsed = JSON.parse(candidate);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (_) {
+      const fixed = candidate.replace(/,\s*([\]}])/g, '$1');
+      try {
+        const parsed = JSON.parse(fixed);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (_) {}
+    }
+  }
+
+  // 3. Resilient regex extraction of individual objects
+  const results: T[] = [];
+  const objectRegex = /\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
+  let match: RegExpExecArray | null;
+  while ((match = objectRegex.exec(clean)) !== null) {
+    try {
+      const fixedObj = match[0].replace(/,\s*}/g, '}');
+      const parsedObj = JSON.parse(fixedObj);
+      if (typeof parsedObj === 'object' && parsedObj !== null) {
+        results.push(parsedObj);
+      }
+    } catch (_) {}
+  }
+
+  return results;
+}
+
+export function resilientParseJsonObject<T = any>(rawText: string): Record<string, any> {
+  if (!rawText) return {};
+  let clean = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+  try {
+    const parsed = JSON.parse(clean);
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      return parsed;
+    }
+  } catch (_) {}
+
+  const firstBrace = clean.indexOf('{');
+  const lastBrace = clean.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    const candidate = clean.slice(firstBrace, lastBrace + 1);
+    try {
+      return JSON.parse(candidate);
+    } catch (_) {
+      const fixed = candidate.replace(/,\s*([\]}])/g, '$1');
+      try {
+        return JSON.parse(fixed);
+      } catch (_) {}
+    }
+  }
+
+  return {};
+}
+
 // 1. Chapter Auto-Summary Engine
 export async function generateChapterSummary(
   chapterTitle: string,
@@ -493,7 +602,7 @@ Judul Buku: "${bookTitle}"
 Judul Bab: "${chapterTitle}"
 
 Naskah Cerita Bab:
-${contentText.slice(0, 7000)}
+${contentText.slice(0, 60000)}
 
 Instruksi:
 - Fokus pada kejadian utama, perkembangan karakter, dan perubahan situasi penting dalam bab ini.
@@ -522,7 +631,7 @@ Judul Bab: "${chapterTitle}"
 Premis Bab: ${premise || 'Tidak ada premis awal'}
 
 Isi Naskah Bab:
-${contentText ? contentText.slice(0, 7000) : (premise || 'Gunakan premis bab')}
+${contentText ? contentText.slice(0, 60000) : (premise || 'Gunakan premis bab')}
 
 Berikan output HANYA berupa JSON valid persis dengan struktur ini tanpa teks pembuka atau penutup lain:
 {
@@ -535,24 +644,23 @@ Berikan output HANYA berupa JSON valid persis dengan struktur ini tanpa teks pem
   const systemPrompt = 'Anda adalah konsultan plot dan story analyst profesional. Hasilkan hanya JSON yang valid.';
   const res = await generateWithSmartFallback(prompt, systemPrompt);
 
-  try {
-    const cleanJson = res.text.replace(/```json/gi, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(cleanJson);
+  const parsed = resilientParseJsonObject(res.text);
+  if (parsed.hook || parsed.risingAction || parsed.climax || parsed.resolution) {
     return {
       hook: parsed.hook || '',
       risingAction: parsed.risingAction || '',
       climax: parsed.climax || '',
       resolution: parsed.resolution || '',
     };
-  } catch (err) {
-    // Regex or fallback parser if JSON was surrounded by text
-    return {
-      hook: extractSection(res.text, 'Hook') || res.text.slice(0, 150),
-      risingAction: extractSection(res.text, 'Rising Action') || extractSection(res.text, 'Eskalasi') || '',
-      climax: extractSection(res.text, 'Climax') || extractSection(res.text, 'Puncak') || '',
-      resolution: extractSection(res.text, 'Resolution') || extractSection(res.text, 'Penutup') || '',
-    };
   }
+
+  // Regex fallback parser
+  return {
+    hook: extractSection(res.text, 'Hook') || res.text.slice(0, 150),
+    risingAction: extractSection(res.text, 'Rising Action') || extractSection(res.text, 'Eskalasi') || '',
+    climax: extractSection(res.text, 'Climax') || extractSection(res.text, 'Puncak') || '',
+    resolution: extractSection(res.text, 'Resolution') || extractSection(res.text, 'Penutup') || '',
+  };
 }
 
 // Helper to extract section in fallback
@@ -595,7 +703,7 @@ Judul Buku: "${bookTitle}"
 Judul Bab: "${chapterTitle}"${entityContext}
 
 Isi Naskah Bab:
-${contentText.slice(0, 7000)}
+${contentText.slice(0, 60000)}
 
 Instruksi Analisis Tiap Adegan:
 1. Timeline: Tentukan tipe kronologi ("linear", "parallel" / "branched" jika simultan, atau "flashback"), timeMarker (penanda waktu), dan branchGroup.
@@ -636,35 +744,32 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
     'Anda adalah script reader, visual concept artist, dan continuity editor novel. Berikan HANYA format JSON array valid.';
   const res = await generateWithSmartFallback(prompt, systemPrompt);
 
-  try {
-    const cleanJson = res.text.replace(/```json/gi, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(cleanJson);
-    if (Array.isArray(parsed)) {
-      return parsed.map((item, idx) => ({
-        id: 'scene_' + Math.random().toString(36).substring(2, 9),
-        sceneNumber: item.sceneNumber || idx + 1,
-        title: item.title || `Adegan ${idx + 1}`,
-        setting: item.setting || '',
-        characters: Array.isArray(item.characters) ? item.characters : [],
-        summary: item.summary || '',
-        goalConflict: item.goalConflict || '',
-        timelineType: item.timelineType || 'linear',
-        timeMarker: item.timeMarker || '',
-        branchGroup: item.branchGroup || 'Garis Waktu Utama',
-        entitiesPresent: Array.isArray(item.entitiesPresent)
-          ? item.entitiesPresent.map((e: any) => ({
-              name: e.name || '',
-              category: ['character', 'location', 'item', 'lore'].includes(e.category)
-                ? e.category
-                : 'character',
-              entityId: e.entityId || undefined,
-            }))
-          : [],
-        imagePrompt: item.imagePrompt || '',
-      }));
-    }
-  } catch (err) {
-    console.warn('Gagal parse JSON auto scenes, fallback to basic list:', err);
+  const parsedScenes = resilientParseJsonArray(res.text);
+  if (parsedScenes.length > 0) {
+    return parsedScenes.map((item: any, idx: number) => ({
+      id: 'scene_' + Math.random().toString(36).substring(2, 9),
+      sceneNumber: item.sceneNumber || idx + 1,
+      title: item.title || `Adegan ${idx + 1}`,
+      setting: item.setting || '',
+      characters: Array.isArray(item.characters) ? item.characters : [],
+      summary: item.summary || '',
+      goalConflict: item.goalConflict || '',
+      timelineType: ['linear', 'parallel', 'flashback', 'branched'].includes(item.timelineType)
+        ? item.timelineType
+        : 'linear',
+      timeMarker: item.timeMarker || '',
+      branchGroup: item.branchGroup || 'Garis Waktu Utama',
+      entitiesPresent: Array.isArray(item.entitiesPresent)
+        ? item.entitiesPresent.map((e: any) => ({
+            name: e.name || '',
+            category: ['character', 'location', 'item', 'lore'].includes(e.category)
+              ? e.category
+              : 'character',
+            entityId: e.entityId || undefined,
+          }))
+        : [],
+      imagePrompt: item.imagePrompt || '',
+    }));
   }
 
   // Graceful fallback if JSON fails
@@ -805,7 +910,7 @@ Daftar Entitas Glosarium yang Sudah Ada di Buku:
 ${existingListStr}
 
 Isi Naskah Bab:
-${chapterText.slice(0, 7000)}
+${chapterText.slice(0, 60000)}
 
 Tugas Analisis:
 1. DETEKSI ENTITAS BARU:
@@ -836,9 +941,8 @@ Aturan:
   const res = await generateWithSmartFallback(prompt, systemPrompt);
 
   try {
-    const cleanJson = res.text.replace(/```json/gi, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(cleanJson);
-    if (Array.isArray(parsed)) {
+    const parsed = resilientParseJsonArray<any>(res.text);
+    if (parsed.length > 0) {
       return parsed.map((item) => ({
         id: 'det_' + Math.random().toString(36).substring(2, 9),
         name: item.name || '',
@@ -883,7 +987,7 @@ Bab Saat Ini: "${chapterTitle}"
 Premis Bab Ini: ${premise || 'Belum ada premis tertulis'}
 
 Naskah Bab Ini:
-${contentText ? contentText.slice(0, 6000) : (premise || 'Bab ini sedang ditulis')}
+${contentText ? contentText.slice(0, 60000) : (premise || 'Bab ini sedang ditulis')}
 
 Tugas:
 Rancang 3 arah alur bab selanjutnya yang sangat menarik dan berbeda:
@@ -906,9 +1010,8 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
   const res = await generateWithSmartFallback(prompt, systemPrompt);
 
   try {
-    const cleanJson = res.text.replace(/```json/gi, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(cleanJson);
-    if (Array.isArray(parsed)) {
+    const parsed = resilientParseJsonArray<any>(res.text);
+    if (parsed.length > 0) {
       return parsed.map((item, idx) => ({
         id: 'branch_' + (idx + 1) + '_' + Date.now().toString(36),
         title: item.title || `Bab Selanjutnya: Opsi ${idx + 1}`,
