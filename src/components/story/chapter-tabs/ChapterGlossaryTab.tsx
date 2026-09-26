@@ -27,7 +27,8 @@ import {
   Layers,
   Search,
   BookMarked,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Camera
 } from 'lucide-react';
 import {
   StoryChapter,
@@ -47,6 +48,8 @@ import {
 } from '../../../services/aiService';
 import { WorldEntityHologramModal } from '../../world/WorldEntityHologramModal';
 import { AddWorldEntityModal } from '../../world/AddWorldEntityModal';
+import { EntityImagePickerModal } from '../../world/EntityImagePickerModal';
+import { getConditionMeta } from '../../world/entityConditionMeta';
 import { VerticalSceneTimeline } from './VerticalSceneTimeline';
 
 interface ChapterGlossaryTabProps {
@@ -75,6 +78,26 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
   const [entitySortBy, setEntitySortBy] = useState<'chapter_first' | 'name_asc' | 'name_desc' | 'newest' | 'category'>('chapter_first');
   const [isAddEntityModalOpen, setIsAddEntityModalOpen] = useState(false);
   const [hologramEntity, setHologramEntity] = useState<WorldEntity | null>(null);
+  const [imagePickerEntity, setImagePickerEntity] = useState<WorldEntity | null>(null);
+  const [entityAvatarUrls, setEntityAvatarUrls] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let active = true;
+    const ids = entities.map((e) => e.avatarMediaId).filter((id): id is string => !!id && !entityAvatarUrls[id]);
+    if (ids.length > 0) {
+      db.media.where('id').anyOf(ids).toArray().then((items) => {
+        if (!active) return;
+        const newMap: Record<string, string> = {};
+        items.forEach((item) => {
+          newMap[item.id] = URL.createObjectURL(item.blob);
+        });
+        setEntityAvatarUrls((prev) => ({ ...prev, ...newMap }));
+      });
+    }
+    return () => {
+      active = false;
+    };
+  }, [entities]);
 
   // AI & Processing States
   const [isAnalyzingScenes, setIsAnalyzingScenes] = useState(false);
@@ -923,35 +946,84 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
                     }`}
                   >
                     <div>
-                      <div className="flex items-center justify-between gap-1.5 mb-1.5">
-                        <span
-                          className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${meta.badge} flex items-center gap-1`}
+                      <div className="flex items-start gap-2.5 mb-2">
+                        {/* Avatar / Main picture with quick camera changer */}
+                        <div
+                          onClick={() => setImagePickerEntity(ent)}
+                          className="relative group w-11 h-11 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex-shrink-0 flex items-center justify-center cursor-pointer shadow-inner"
+                          title="Pasang / ubah gambar utama"
                         >
-                          <Icon className="w-2.5 h-2.5" />
-                          <span>{meta.label}</span>
-                        </span>
-
-                        <div className="flex items-center gap-1">
-                          {isPresent && (
-                            <span className="text-[9px] font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
-                              Di Bab Ini
-                            </span>
+                          {ent.avatarMediaId && entityAvatarUrls[ent.avatarMediaId] ? (
+                            <img
+                              src={entityAvatarUrls[ent.avatarMediaId]}
+                              alt={ent.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <Icon className={`w-5 h-5 ${meta.color}`} />
                           )}
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                            <Camera className="w-3.5 h-3.5 text-white" />
+                          </div>
+                        </div>
 
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteEntity(ent.id, ent.name)}
-                            className="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition"
-                            title="Hapus entitas"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1.5 mb-1">
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <span
+                                className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${meta.badge} flex items-center gap-1`}
+                              >
+                                <Icon className="w-2.5 h-2.5" />
+                                <span>{meta.label}</span>
+                              </span>
+
+                              {ent.faction && (
+                                <span
+                                  className="text-[9px] font-bold px-1.5 py-0.2 rounded-full border"
+                                  style={{
+                                    borderColor: `${ent.factionColor || '#ec4899'}40`,
+                                    color: ent.factionColor || '#ec4899',
+                                    backgroundColor: `${ent.factionColor || '#ec4899'}15`,
+                                  }}
+                                >
+                                  {ent.faction}
+                                </span>
+                              )}
+
+                              {ent.condition && (
+                                <span
+                                  className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full border ${
+                                    getConditionMeta(ent.condition).badgeClass
+                                  }`}
+                                >
+                                  {getConditionMeta(ent.condition).emoji} {getConditionMeta(ent.condition).shortLabel}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                              {isPresent && (
+                                <span className="text-[9px] font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded-full border border-amber-500/20">
+                                  Di Bab Ini
+                                </span>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteEntity(ent.id, ent.name)}
+                                className="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition"
+                                title="Hapus entitas"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                            {ent.name}
+                          </h4>
                         </div>
                       </div>
-
-                      <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
-                        {ent.name}
-                      </h4>
 
                       {ent.aliases && ent.aliases.length > 0 && (
                         <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 font-medium flex items-center gap-1 truncate">
@@ -1847,6 +1919,18 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
         entity={hologramEntity}
         isOpen={!!hologramEntity}
         onClose={() => setHologramEntity(null)}
+      />
+
+      {/* Main Image Picker Modal */}
+      <EntityImagePickerModal
+        isOpen={!!imagePickerEntity}
+        bookId={chapter.bookId}
+        entity={imagePickerEntity}
+        onClose={() => setImagePickerEntity(null)}
+        onSuccess={(updated) => {
+          setImagePickerEntity(null);
+          showToast(`Gambar utama untuk "${updated.name}" berhasil dipasang!`);
+        }}
       />
     </div>
   );

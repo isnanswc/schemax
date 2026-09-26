@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { X, Image as ImageIcon, Sparkles, Plus, Trash2, Tag, User, MapPin, Shield, Scroll } from 'lucide-react';
-import { WorldEntity, WorldCategory, WorldAttribute } from '../../types';
+import React, { useState, useEffect } from 'react';
+import { X, Image as ImageIcon, Sparkles, Plus, Trash2, Tag, User, MapPin, Shield, Scroll, Check } from 'lucide-react';
+import { WorldEntity, WorldCategory, WorldAttribute, MediaItem } from '../../types';
 import { db, saveMediaItem, createSvgBlob } from '../../db';
+import { ENTITY_CONDITIONS, getConditionMeta } from './entityConditionMeta';
 
 interface AddWorldEntityModalProps {
   isOpen: boolean;
@@ -20,6 +21,9 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
 }) => {
   const [name, setName] = useState('');
   const [category, setCategory] = useState<WorldCategory>(initialCategory);
+  const [faction, setFaction] = useState('');
+  const [condition, setCondition] = useState('aktif');
+  const [conditionDetails, setConditionDetails] = useState('');
   const [shortDescription, setShortDescription] = useState('');
   const [detailedNotes, setDetailedNotes] = useState('');
   const [tagsInput, setTagsInput] = useState('');
@@ -27,8 +31,23 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
     { id: '1', label: 'Peran', value: '' },
   ]);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [selectedGalleryMediaId, setSelectedGalleryMediaId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [galleryItems, setGalleryItems] = useState<Array<MediaItem & { url: string }>>([]);
+  const [showGalleryPicker, setShowGalleryPicker] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    db.media.where('bookId').equals(bookId).toArray().then((items) => {
+      setGalleryItems(
+        items.map((i) => ({
+          ...i,
+          url: URL.createObjectURL(i.blob),
+        }))
+      );
+    });
+  }, [isOpen, bookId]);
 
   if (!isOpen) return null;
 
@@ -36,6 +55,7 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       setAvatarFile(file);
+      setSelectedGalleryMediaId(null);
       setPreviewUrl(URL.createObjectURL(file));
     }
   };
@@ -75,6 +95,8 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
 
       if (avatarFile) {
         avatarMediaId = await saveMediaItem(bookId, avatarFile, avatarFile.name, entityId);
+      } else if (selectedGalleryMediaId) {
+        avatarMediaId = selectedGalleryMediaId;
       } else {
         // Preset icon based on category
         const iconMap: Record<WorldCategory, string> = {
@@ -107,6 +129,9 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
         bookId,
         category,
         name: name.trim(),
+        faction: faction.trim() || undefined,
+        condition,
+        conditionDetails: conditionDetails.trim() || undefined,
         shortDescription: shortDescription.trim(),
         detailedNotes: detailedNotes.trim(),
         tags,
@@ -212,13 +237,109 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
             </div>
           </div>
 
-          {/* Upload Image Button */}
+          {/* Upload Image & Gallery Picker Buttons */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl cursor-pointer border border-slate-200 dark:border-slate-700 transition shadow-sm">
+                <ImageIcon className="w-3.5 h-3.5 text-amber-500" />
+                <span>{previewUrl ? 'Ganti Berkas Foto' : 'Unggah Foto/Ilustrasi'}</span>
+                <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+              </label>
+
+              {galleryItems.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowGalleryPicker(!showGalleryPicker)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 transition shadow-sm"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-pink-500" />
+                  <span>Pilih dari Galeri ({galleryItems.length})</span>
+                </button>
+              )}
+            </div>
+
+            {/* Gallery Picker Mini Grid */}
+            {showGalleryPicker && (
+              <div className="p-3 bg-slate-50 dark:bg-slate-950/80 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2 animate-in fade-in">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Pilih Gambar Utama dari Galeri Buku:
+                </span>
+                <div className="grid grid-cols-4 gap-2 max-h-36 overflow-y-auto no-scrollbar">
+                  {galleryItems.map((item) => {
+                    const isSelected = selectedGalleryMediaId === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedGalleryMediaId(item.id);
+                          setAvatarFile(null);
+                          setPreviewUrl(item.url);
+                          setShowGalleryPicker(false);
+                        }}
+                        className={`relative aspect-square rounded-xl overflow-hidden border-2 transition ${
+                          isSelected ? 'border-pink-500 ring-2 ring-pink-500/30' : 'border-slate-200 dark:border-slate-800'
+                        }`}
+                      >
+                        <img src={item.url} alt={item.name} className="w-full h-full object-cover" />
+                        {isSelected && (
+                          <div className="absolute inset-0 bg-pink-500/40 flex items-center justify-center">
+                            <Check className="w-4 h-4 text-white" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Faction & Condition Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
+                Faksi / Kelompok / Kubu
+              </label>
+              <input
+                type="text"
+                value={faction}
+                onChange={(e) => setFaction(e.target.value)}
+                placeholder="Cth: Kerajaan Surya, Klan Naga"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-500 text-xs shadow-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
+                Kondisi / Status Saat Ini
+              </label>
+              <select
+                value={condition}
+                onChange={(e) => setCondition(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-amber-500 text-xs shadow-sm"
+              >
+                {Object.values(ENTITY_CONDITIONS).map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.emoji} {c.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Condition Details input */}
           <div>
-            <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl cursor-pointer border border-slate-200 dark:border-slate-700 transition shadow-sm">
-              <ImageIcon className="w-3.5 h-3.5 text-amber-500" />
-              <span>{previewUrl ? 'Ganti Gambar Visual' : 'Unggah Visual / Foto (IndexedDB)'}</span>
-              <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
+              Keterangan Kondisi Spesifik (Opsional)
             </label>
+            <input
+              type="text"
+              value={conditionDetails}
+              onChange={(e) => setConditionDetails(e.target.value)}
+              placeholder="Cth: Terluka di lengan kiri, Memimpin pasukan gerilya, Berkhianat sejak Bab 2"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-500 text-xs shadow-sm"
+            />
           </div>
 
           {/* Short Description */}

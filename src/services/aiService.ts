@@ -10,6 +10,10 @@ import {
   ChapterSceneItem,
   SceneGlosariumItem,
   ImagePromptSettings,
+  WorldEntity,
+  EntityRelationship,
+  EntityCondition,
+  RelationshipType,
 } from '../types';
 
 // Modern baseline defaults (Gemini 3.1 / 3.0 series & Groq current lineup)
@@ -1228,4 +1232,107 @@ Berikan output HANYA berupa JSON valid persis format ini:
   throw new Error(lastError?.message || 'Gagal menganalisis gambar dengan AI Vision.');
 }
 
+// 12. World Building Auto-Mapping Engine (Factions, Network Relationships & Current Conditions)
+export interface AutoMapResult {
+  factions: Array<{
+    name: string;
+    description: string;
+    color: string;
+  }>;
+  mappedEntities: Array<{
+    id: string;
+    name: string;
+    faction: string;
+    factionColor?: string;
+    condition: EntityCondition;
+    conditionDetails: string;
+    relationships: EntityRelationship[];
+  }>;
+}
 
+export async function autoMapWorldEntities(
+  bookTitle: string,
+  entities: WorldEntity[],
+  storyContext?: string
+): Promise<AutoMapResult> {
+  if (!entities || entities.length === 0) {
+    return { factions: [], mappedEntities: [] };
+  }
+
+  const entitySummaries = entities.map((e) => {
+    return {
+      id: e.id,
+      name: e.name,
+      category: e.category,
+      shortDesc: e.shortDescription,
+      notes: e.detailedNotes ? e.detailedNotes.slice(0, 300) : '',
+      tags: e.tags,
+      currentFaction: e.faction || '',
+      currentCondition: e.condition || 'aktif',
+    };
+  });
+
+  const prompt = `Anda adalah Master Worldbuilding Architect & Strategic Narrative Analyst.
+Analisis seluruh entitas (karakter, faksi, item, dan lokasi) dalam karya fiksi berjudul "${bookTitle}".
+
+Daftar Entitas yang terdaftar:
+${JSON.stringify(entitySummaries, null, 2)}
+
+${storyContext ? `Konteks Tambahan / Sinopsis Naskah:\n${storyContext.slice(0, 4000)}\n` : ''}
+
+Tugas Utama Anda:
+1. "factions": Kelompokkan entitas ke dalam FAKSI / KELOMPOK / HIMPUNAN yang bermakna (misal: "Kekaisaran Timur", "Pemberontak Lembah", "Kultus Bayangan", "Pengelana Bebas / Netral", "Ordo Penyihir", dll.).
+   - name: Nama faksi
+   - description: 1 kalimat peran faksi dalam cerita
+   - color: Kode warna HEX estetis yang cocok (misal: "#06b6d4" cyan, "#ec4899" pink, "#eab308" gold, "#a855f7" purple, "#ef4444" red, "#10b981" emerald)
+
+2. "mappedEntities": Untuk SETIAP entitas dalam daftar di atas:
+   - id: ID entitas persis seperti daftar
+   - name: Nama entitas
+   - faction: Nama faksi dari daftar factions di atas
+   - factionColor: Kode warna hex faksi
+   - condition: Tentukan kondisi terkini dari entitas. Pilih salah satu persis: "aktif" | "luka" | "gugur" | "hilang" | "berkhianat" | "terkutuk" | "ditawan" | "pelarian" | "koma" | "spesial"
+   - conditionDetails: Keterangan kondisi 1 kalimat singkat (misal: "Kondisi prima memimpin garis depan", "Kehilangan mata kiri di pertempuran", "Menyusup di pihak musuh sebagai agen ganda", "Tewas secara misterius", dll.)
+   - relationships: Jaringan relasi dengan entitas lain dalam daftar:
+     * targetEntityId: ID entitas tujuan (HARUS ADA di daftar entitas)
+     * relationshipType: salah satu dari "sekutu" | "musuh" | "keluarga" | "bawahan" | "atasan" | "kekasih" | "guru_murid" | "rival" | "khianat" | "netral" | "lainnya"
+     * label: Label ringkas (misal: "Kakak Kandung", "Musuh Bebuyutan", "Pengawal Setia", "Mantan Murid", "Target Dendam")
+     * description: 1 kalimat penjelasan dinamika hubungan mereka
+
+Berikan output HANYA berupa JSON valid persis dengan struktur ini:
+{
+  "factions": [
+    { "name": "...", "description": "...", "color": "#..." }
+  ],
+  "mappedEntities": [
+    {
+      "id": "...",
+      "name": "...",
+      "faction": "...",
+      "factionColor": "#...",
+      "condition": "aktif",
+      "conditionDetails": "...",
+      "relationships": [
+        {
+          "targetEntityId": "...",
+          "relationshipType": "sekutu",
+          "label": "...",
+          "description": "..."
+        }
+      ]
+    }
+  ]
+}`;
+
+  const systemPrompt = 'Anda adalah Narrative Engine & Lore Architect. Hasilkan analisis relasi dan faksi yang presisi dalam format JSON murni.';
+  const res = await generateWithSmartFallback(prompt, systemPrompt);
+  const parsed = resilientParseJsonObject<AutoMapResult>(res.text);
+
+  const factions = Array.isArray(parsed.factions) ? parsed.factions : [];
+  const mappedEntities = Array.isArray(parsed.mappedEntities) ? parsed.mappedEntities : [];
+
+  return {
+    factions,
+    mappedEntities,
+  };
+}

@@ -95,6 +95,47 @@ export interface StoryChapter {
 
 export type WorldCategory = 'character' | 'location' | 'item' | 'lore';
 
+export type EntityCondition =
+  | 'aktif'
+  | 'luka'
+  | 'gugur'
+  | 'hilang'
+  | 'berkhianat'
+  | 'terkutuk'
+  | 'ditawan'
+  | 'pelarian'
+  | 'koma'
+  | 'spesial';
+
+export type RelationshipType =
+  | 'sekutu'
+  | 'musuh'
+  | 'keluarga'
+  | 'bawahan'
+  | 'atasan'
+  | 'kekasih'
+  | 'guru_murid'
+  | 'rival'
+  | 'khianat'
+  | 'netral'
+  | 'lainnya';
+
+export interface EntityRelationship {
+  id?: string;
+  targetEntityId: string;
+  targetEntityName?: string;
+  relationshipType: RelationshipType;
+  label: string;
+  description?: string;
+}
+
+export interface FactionClusterInfo {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+}
+
 export interface WorldAttribute {
   id: string;
   label: string;
@@ -111,8 +152,17 @@ export interface WorldEntity {
   detailedNotes: string;
   tags: string[];
   avatarMediaId?: string;
+  avatarUrl?: string;
   galleryMediaIds: string[];
   attributes: WorldAttribute[];
+  // Faksi & Kelompok
+  faction?: string;
+  factionColor?: string;
+  // Kondisi Status Terkini
+  condition?: EntityCondition | string;
+  conditionDetails?: string;
+  // Jaringan Relasi Antar Entitas
+  relationships?: EntityRelationship[];
   createdAt: number;
   updatedAt: number;
 }

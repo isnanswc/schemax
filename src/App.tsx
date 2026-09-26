@@ -291,6 +291,7 @@ export function App() {
                 {activeTab === 'world' && (
                   <WorldBuildingView
                     bookId={currentBook.id}
+                    bookTitle={currentBook.title}
                     entities={bookEntities}
                     onRefresh={triggerRefresh}
                   />

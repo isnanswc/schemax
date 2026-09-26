@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { WorldEntity, WorldCategory } from '../../types';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
+import { getConditionMeta } from './entityConditionMeta';
+import { EntityImagePickerModal } from './EntityImagePickerModal';
 import {
   X,
   User,
@@ -9,23 +11,35 @@ import {
   Scroll,
   Tag,
   Sparkles,
-  Info
+  Info,
+  Camera
 } from 'lucide-react';
 
 interface WorldEntityHologramModalProps {
   entity: WorldEntity | null;
   isOpen: boolean;
   onClose: () => void;
+  onEntityUpdated?: (updated: WorldEntity) => void;
 }
 
 export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> = ({
   entity,
   isOpen,
   onClose,
+  onEntityUpdated,
 }) => {
-  if (!isOpen || !entity) return null;
+  const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
+  const [currentEntity, setCurrentEntity] = useState<WorldEntity | null>(entity);
 
-  const { url } = useMediaUrl(entity.avatarMediaId);
+  // Sync internal entity when prop changes
+  React.useEffect(() => {
+    setCurrentEntity(entity);
+  }, [entity]);
+
+  const activeEntity = currentEntity || entity;
+  const { url } = useMediaUrl(activeEntity?.avatarMediaId);
+
+  if (!isOpen || !activeEntity) return null;
 
   const categoryMeta: Record<WorldCategory, { label: string; icon: any; color: string; border: string; glow: string }> = {
     character: {
@@ -58,8 +72,9 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
     },
   };
 
-  const meta = categoryMeta[entity.category] || categoryMeta.character;
+  const meta = categoryMeta[activeEntity.category] || categoryMeta.character;
   const Icon = meta.icon;
+  const condMeta = getConditionMeta(activeEntity.condition);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
@@ -77,22 +92,48 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
         {/* Top Header */}
         <div className="flex items-start justify-between gap-3 mb-4">
           <div className="flex items-center gap-3 min-w-0">
-            {/* Avatar Preview */}
-            <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex-shrink-0 flex items-center justify-center shadow-sm">
+            {/* Avatar Preview with Camera Quick Picker */}
+            <div
+              onClick={() => setIsImagePickerOpen(true)}
+              className="relative group w-16 h-16 rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex-shrink-0 flex items-center justify-center shadow-sm cursor-pointer"
+              title="Klik untuk pasang / ubah gambar utama"
+            >
               {url ? (
-                <img src={url} alt={entity.name} className="w-full h-full object-cover" />
+                <img src={url} alt={activeEntity.name} className="w-full h-full object-cover" />
               ) : (
                 <Icon className={`w-8 h-8 ${meta.color}`} />
               )}
+              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                <Camera className="w-5 h-5 text-white" />
+              </div>
             </div>
 
             <div className="min-w-0">
-              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${meta.border} ${meta.color} mb-1`}>
-                <Icon className="w-3 h-3" />
-                <span>{meta.label}</span>
-              </span>
+              <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${meta.border} ${meta.color}`}>
+                  <Icon className="w-3 h-3" />
+                  <span>{meta.label}</span>
+                </span>
+                {activeEntity.faction && (
+                  <span
+                    className="px-2 py-0.5 rounded-full text-[10px] font-bold border"
+                    style={{
+                      borderColor: `${activeEntity.factionColor || '#ec4899'}40`,
+                      color: activeEntity.factionColor || '#ec4899',
+                      backgroundColor: `${activeEntity.factionColor || '#ec4899'}15`,
+                    }}
+                  >
+                    {activeEntity.faction}
+                  </span>
+                )}
+                {/* Condition Badge */}
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${condMeta.badgeClass}`}>
+                  <span>{condMeta.emoji}</span>
+                  <span>{condMeta.label}</span>
+                </span>
+              </div>
               <h3 className="text-lg font-black text-slate-900 dark:text-white truncate">
-                {entity.name}
+                {activeEntity.name}
               </h3>
             </div>
           </div>
@@ -105,10 +146,17 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
           </button>
         </div>
 
+        {/* Condition Note if specified */}
+        {activeEntity.conditionDetails && (
+          <div className="mb-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-600 dark:text-amber-300">
+            <strong>Kondisi Saat Ini:</strong> {activeEntity.conditionDetails}
+          </div>
+        )}
+
         {/* Short Description */}
-        {entity.shortDescription && (
+        {activeEntity.shortDescription && (
           <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-950/60 p-3 rounded-2xl border border-slate-200 dark:border-slate-800/80 mb-3.5">
-            {entity.shortDescription}
+            {activeEntity.shortDescription}
           </p>
         )}
 
@@ -145,9 +193,9 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
         )}
 
         {/* Tags */}
-        {entity.tags && entity.tags.length > 0 && (
+        {activeEntity.tags && activeEntity.tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-4">
-            {entity.tags.map((tag, i) => (
+            {activeEntity.tags.map((tag, i) => (
               <span
                 key={i}
                 className="px-2 py-0.5 rounded-lg text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700/60"
@@ -158,14 +206,37 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
           </div>
         )}
 
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs transition active:scale-95 text-center border border-slate-200 dark:border-slate-700 shadow-sm"
-        >
-          Tutup Pratinjau
-        </button>
+        {/* Action Buttons: Ganti Gambar Utama & Tutup */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsImagePickerOpen(true)}
+            className="flex-1 py-2.5 px-3 rounded-xl bg-pink-500/10 hover:bg-pink-500/20 text-pink-500 dark:text-pink-400 font-bold text-xs transition active:scale-95 flex items-center justify-center gap-1.5 border border-pink-500/30"
+          >
+            <Camera className="w-4 h-4" />
+            <span>Pasang Gambar Utama</span>
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs transition active:scale-95 text-center border border-slate-200 dark:border-slate-700 shadow-sm"
+          >
+            Tutup Pratinjau
+          </button>
+        </div>
       </div>
+
+      {/* Main Image Picker Modal */}
+      <EntityImagePickerModal
+        isOpen={isImagePickerOpen}
+        bookId={activeEntity.bookId}
+        entity={activeEntity}
+        onClose={() => setIsImagePickerOpen(false)}
+        onSuccess={(updated) => {
+          setCurrentEntity(updated);
+          if (onEntityUpdated) onEntityUpdated(updated);
+        }}
+      />
     </div>
   );
 };
+
