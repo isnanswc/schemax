@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { WorldEntity, WorldCategory } from '../../types';
+import { WorldEntity, WorldCategory, StoryChapter } from '../../types';
 import { AddWorldEntityModal } from './AddWorldEntityModal';
 import { WorldEntityHologramModal } from './WorldEntityHologramModal';
 import { EntityImagePickerModal } from './EntityImagePickerModal';
@@ -34,6 +34,7 @@ interface WorldBuildingViewProps {
   bookTitle?: string;
   entities: WorldEntity[];
   onRefresh: () => void;
+  chapters?: StoryChapter[];
 }
 
 const EntityCard: React.FC<{
@@ -264,6 +265,7 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
   bookTitle = 'Karya Buku',
   entities,
   onRefresh,
+  chapters = [],
 }) => {
   // Primary View Mode: 'list' (Daftar Kartu) or 'automap' (Peta Relasi & Visual Faksi)
   const [worldMode, setWorldMode] = useState<'list' | 'automap'>('list');
@@ -362,6 +364,7 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
           bookTitle={bookTitle}
           entities={entities}
           onRefresh={onRefresh}
+          chapters={chapters}
         />
       ) : (
         /* Mode 2: Standard Entity Cards Grid */

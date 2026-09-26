@@ -5,7 +5,8 @@ import {
   EntityCondition,
   RelationshipType,
   StoryChapter,
-  ChapterEntityState
+  ChapterEntityState,
+  WorldCategory
 } from '../../types';
 import { db } from '../../db';
 import { autoMapWorldEntities, AutoMapResult } from '../../services/aiService';
@@ -22,6 +23,7 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize2,
+  Minimize2,
   Filter,
   Eye,
   Camera,
@@ -39,7 +41,10 @@ import {
   User,
   MapPin,
   Scroll,
-  BookOpen
+  BookOpen,
+  Wand2,
+  Compass,
+  CheckCircle2
 } from 'lucide-react';
 
 interface WorldAutoMapViewProps {
@@ -47,9 +52,11 @@ interface WorldAutoMapViewProps {
   bookTitle: string;
   entities: WorldEntity[];
   onRefresh: () => void;
-  // Optional Chapter context if used inside Chapter Glossary!
+  // Specific chapter when used inside Chapter Studio Glossary
   chapter?: StoryChapter;
   onUpdateChapter?: (fields: Partial<StoryChapter>) => void;
+  // All chapters when used inside Worldbuilding View (for Timeline Chapter Switcher)
+  chapters?: StoryChapter[];
 }
 
 interface NodePosition {
@@ -64,13 +71,34 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
   onRefresh,
   chapter,
   onUpdateChapter,
+  chapters = [],
 }) => {
-  // Modes: 'network' (Hubungan Garis) or 'clusters' (Himpunan Faksi)
+  // Modes: 'network' (Garis Relasi) or 'clusters' (Himpunan Faksi)
   const [viewMode, setViewMode] = useState<'network' | 'clusters'>('network');
+  
+  // Chapter Timeline Switcher (when used in Worldbuilding)
+  const [selectedTimelineChapterId, setSelectedTimelineChapterId] = useState<string>(
+    chapter ? chapter.id : 'global'
+  );
+
+  // Active Chapter Context: if passed as prop OR selected from timeline dropdown
+  const activeChapter = useMemo(() => {
+    if (chapter) return chapter;
+    if (selectedTimelineChapterId !== 'global') {
+      return chapters.find((c) => c.id === selectedTimelineChapterId) || null;
+    }
+    return null;
+  }, [chapter, selectedTimelineChapterId, chapters]);
+
+  // Filters
   const [searchQuery, setSearchQuery] = useState('');
+  const [entityScopeFilter, setEntityScopeFilter] = useState<'all' | 'character_only' | 'character_location' | 'character_item'>('all');
   const [selectedFactionFilter, setSelectedFactionFilter] = useState<string>('all');
   const [selectedConditionFilter, setSelectedConditionFilter] = useState<string>('all');
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
+
+  // Mobile Fullscreen Mode
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Modals & Popups
   const [isAiLoading, setIsAiLoading] = useState(false);
@@ -82,10 +110,10 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
 
   // Canvas Viewport State (Zoom & Pan)
   const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 50, y: 50 });
+  const [pan, setPan] = useState({ x: 30, y: 30 });
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Pointer Dragging States (Mouse & Touch Unified via Pointer Events)
+  // Unified Pointer Dragging (Touch & Mouse with setPointerCapture)
   const [isDraggingCanvas, setIsDraggingCanvas] = useState(false);
   const [dragStartPointer, setDragStartPointer] = useState({ x: 0, y: 0 });
   const [draggedNodeId, setDraggedNodeId] = useState<string | null>(null);
@@ -125,7 +153,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
   }, [entities]);
 
   // Derive active conditions & relationships for each entity
-  // If in chapter mode: prioritize chapter.chapterEntityStates
+  // Prioritizes activeChapter.chapterEntityStates if viewing a specific chapter!
   const entityEffectiveData = useMemo(() => {
     const map: Record<
       string,
@@ -139,11 +167,10 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
     > = {};
 
     entities.forEach((ent) => {
-      const chapterState = chapter?.chapterEntityStates?.[ent.id];
+      const chapterState = activeChapter?.chapterEntityStates?.[ent.id];
       const effCondition = chapterState?.condition || ent.condition || 'aktif';
       const effConditionDetails = chapterState?.conditionDetails || ent.conditionDetails || '';
-      
-      // Combine chapter-specific relationships and general entity relationships
+
       const rels: EntityRelationship[] = [];
       if (chapterState?.relationships && chapterState.relationships.length > 0) {
         rels.push(...chapterState.relationships);
@@ -166,9 +193,9 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
     });
 
     return map;
-  }, [entities, chapter]);
+  }, [entities, activeChapter]);
 
-  // Derive unique factions
+  // Available unique factions
   const availableFactions = useMemo(() => {
     const set = new Set<string>();
     entities.forEach((e) => {
@@ -177,60 +204,110 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
     return Array.from(set);
   }, [entities]);
 
-  // Initial circular/clustered layout calculation
-  useEffect(() => {
+  // ---------------------------------------------------------------------------
+  // Structured Clustered Faction Layout Engine (Mencegah Tumpang Tindih)
+  // ---------------------------------------------------------------------------
+  const arrangeNeatFactionLayout = () => {
     if (entities.length === 0) return;
 
-    setNodePositions((prev) => {
-      const next = { ...prev };
-      const centerX = 380;
-      const centerY = 300;
-      const total = entities.length;
-      const radius = Math.min(260, 100 + total * 20);
-
-      // Group entities by faction
-      const factionGroups: Record<string, WorldEntity[]> = {};
-      entities.forEach((e) => {
-        const fac = e.faction?.trim() || 'Independen / Netral';
-        if (!factionGroups[fac]) factionGroups[fac] = [];
-        factionGroups[fac].push(e);
-      });
-
-      const factions = Object.keys(factionGroups);
-
-      factions.forEach((fac, facIdx) => {
-        const group = factionGroups[fac];
-        const groupAngleCenter = (2 * Math.PI * facIdx) / Math.max(1, factions.length);
-        const groupRadius = factions.length > 1 ? radius * 0.75 : 0;
-        const groupCenterX = centerX + Math.cos(groupAngleCenter) * groupRadius;
-        const groupCenterY = centerY + Math.sin(groupAngleCenter) * groupRadius;
-
-        group.forEach((ent, entIdx) => {
-          if (!next[ent.id]) {
-            if (group.length === 1 && factions.length > 1) {
-              next[ent.id] = { x: groupCenterX, y: groupCenterY };
-            } else {
-              const subAngle = (2 * Math.PI * entIdx) / Math.max(1, group.length);
-              const subRadius = Math.min(100, 40 + group.length * 15);
-              next[ent.id] = {
-                x: groupCenterX + Math.cos(subAngle) * subRadius,
-                y: groupCenterY + Math.sin(subAngle) * subRadius,
-              };
-            }
-          }
-        });
-      });
-
-      return next;
+    // Group entities by faction
+    const factionGroups: Record<string, WorldEntity[]> = {};
+    entities.forEach((e) => {
+      const fac = entityEffectiveData[e.id]?.faction?.trim() || e.faction?.trim() || 'Independen / Netral';
+      if (!factionGroups[fac]) factionGroups[fac] = [];
+      factionGroups[fac].push(e);
     });
-  }, [entities]);
 
-  // Filtered entities based on search, faction, condition
+    const factions = Object.keys(factionGroups);
+    const newPositions: Record<string, NodePosition> = {};
+
+    const canvasCenterX = 450;
+    const canvasCenterY = 380;
+    // Widely space factions with radius based on faction count
+    const factionCenterRadius = Math.max(260, 160 + factions.length * 60);
+
+    factions.forEach((fac, facIdx) => {
+      const members = factionGroups[fac];
+      const facAngle = (2 * Math.PI * facIdx) / Math.max(1, factions.length) - Math.PI / 2;
+
+      const facCenterX =
+        factions.length === 1
+          ? canvasCenterX
+          : canvasCenterX + Math.cos(facAngle) * factionCenterRadius;
+      const facCenterY =
+        factions.length === 1
+          ? canvasCenterY
+          : canvasCenterY + Math.sin(facAngle) * factionCenterRadius;
+
+      // Distribute members inside this faction cluster with minimum 85px clearance
+      if (members.length === 1) {
+        newPositions[members[0].id] = { x: facCenterX, y: facCenterY };
+      } else if (members.length <= 4) {
+        const memberRadius = 85;
+        members.forEach((m, mIdx) => {
+          const mAngle = (2 * Math.PI * mIdx) / members.length;
+          newPositions[m.id] = {
+            x: facCenterX + Math.cos(mAngle) * memberRadius,
+            y: facCenterY + Math.sin(mAngle) * memberRadius,
+          };
+        });
+      } else {
+        // Two concentric rings for larger factions
+        const innerCount = Math.min(4, Math.floor(members.length / 2));
+        const outerCount = members.length - innerCount;
+
+        members.slice(0, innerCount).forEach((m, mIdx) => {
+          const mAngle = (2 * Math.PI * mIdx) / innerCount;
+          newPositions[m.id] = {
+            x: facCenterX + Math.cos(mAngle) * 75,
+            y: facCenterY + Math.sin(mAngle) * 75,
+          };
+        });
+
+        members.slice(innerCount).forEach((m, mIdx) => {
+          const mAngle = (2 * Math.PI * mIdx) / outerCount;
+          newPositions[m.id] = {
+            x: facCenterX + Math.cos(mAngle) * 155,
+            y: facCenterY + Math.sin(mAngle) * 155,
+          };
+        });
+      }
+    });
+
+    setNodePositions(newPositions);
+  };
+
+  // Initialize or re-calculate clean layout on mount or entity count changes
+  useEffect(() => {
+    arrangeNeatFactionLayout();
+  }, [entities.length]);
+
+  // Filtered entities based on Scope, Faction, Condition, and Search
   const filteredEntities = useMemo(() => {
     return entities.filter((ent) => {
       const eff = entityEffectiveData[ent.id];
       if (!eff) return true;
 
+      // 1. Scope Filter (Hanya Karakter, Karakter & Tempat, dll.)
+      if (entityScopeFilter === 'character_only') {
+        if (ent.category !== 'character') return false;
+      } else if (entityScopeFilter === 'character_location') {
+        if (ent.category !== 'character' && ent.category !== 'location') return false;
+      } else if (entityScopeFilter === 'character_item') {
+        if (ent.category !== 'character' && ent.category !== 'item') return false;
+      }
+
+      // 2. Faction Filter
+      if (selectedFactionFilter !== 'all' && eff.faction !== selectedFactionFilter) {
+        return false;
+      }
+
+      // 3. Condition Filter
+      if (selectedConditionFilter !== 'all' && eff.condition !== selectedConditionFilter) {
+        return false;
+      }
+
+      // 4. Live Search
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchName = ent.name.toLowerCase().includes(q);
@@ -239,17 +316,9 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
         if (!matchName && !matchFaction && !matchDesc) return false;
       }
 
-      if (selectedFactionFilter !== 'all' && eff.faction !== selectedFactionFilter) {
-        return false;
-      }
-
-      if (selectedConditionFilter !== 'all' && eff.condition !== selectedConditionFilter) {
-        return false;
-      }
-
       return true;
     });
-  }, [entities, entityEffectiveData, searchQuery, selectedFactionFilter, selectedConditionFilter]);
+  }, [entities, entityEffectiveData, entityScopeFilter, selectedFactionFilter, selectedConditionFilter, searchQuery]);
 
   const selectedEntity = useMemo(() => {
     return entities.find((e) => e.id === selectedEntityId) || null;
@@ -276,18 +345,18 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
 
     const addedPairs = new Set<string>();
 
-    entities.forEach((source) => {
+    filteredEntities.forEach((source) => {
       const eff = entityEffectiveData[source.id];
       if (!eff || !eff.relationships) return;
 
       eff.relationships.forEach((rel) => {
-        // Resolve target via ID OR Name
         const target =
           entityById.get(rel.targetEntityId) ||
           entityByName.get((rel.targetEntityId || '').toLowerCase().trim()) ||
           entityByName.get((rel.targetEntityName || '').toLowerCase().trim());
 
-        if (target && target.id !== source.id) {
+        // Both source and target must be in filtered list to draw line
+        if (target && target.id !== source.id && filteredEntities.some((fe) => fe.id === target.id)) {
           const pairKey = [source.id, target.id].sort().join('_');
           links.push({
             id: `${source.id}_${target.id}_${rel.label || 'rel'}`,
@@ -303,13 +372,13 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
     });
 
     return links;
-  }, [entities, entityEffectiveData]);
+  }, [entities, filteredEntities, entityEffectiveData]);
 
-  // Faction clusters for Cluster Sets Mode
+  // Faction clusters for Cluster Sets Mode and Halos
   const factionClusters = useMemo(() => {
     const map: Record<string, { name: string; color: string; members: WorldEntity[] }> = {};
 
-    entities.forEach((ent) => {
+    filteredEntities.forEach((ent) => {
       const eff = entityEffectiveData[ent.id];
       const facName = eff?.faction || 'Independen / Netral';
       if (!map[facName]) {
@@ -323,7 +392,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
     });
 
     return Object.values(map);
-  }, [entities, entityEffectiveData]);
+  }, [filteredEntities, entityEffectiveData]);
 
   // Execute Auto-Map AI with Chapter-Specific or Book-Wide context
   const handleTriggerAutoMap = async () => {
@@ -334,8 +403,8 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
 
     setIsAiLoading(true);
     try {
-      const storyContext = chapter
-        ? `Bab Ini: "${chapter.title}"\nPremis: ${chapter.premise || ''}\nNaskah Cerita Bab:\n${(chapter.contentHtml || '').replace(/<[^>]*>/g, ' ').slice(0, 10000)}`
+      const storyContext = activeChapter
+        ? `Bab Ini: "${activeChapter.title}"\nPremis: ${activeChapter.premise || ''}\nNaskah Cerita Bab:\n${(activeChapter.contentHtml || '').replace(/<[^>]*>/g, ' ').slice(0, 10000)}`
         : undefined;
 
       const result = await autoMapWorldEntities(bookTitle, entities, storyContext);
@@ -362,10 +431,10 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
       const entityById = new Map(entities.map((e) => [e.id, e]));
       const entityByName = new Map(entities.map((e) => [e.name.toLowerCase().trim(), e]));
 
-      if (chapter && onUpdateChapter) {
-        // Save chapter-specific states to chapter.chapterEntityStates
+      if (activeChapter) {
+        // Save chapter-specific states
         const nextChapterEntityStates: Record<string, ChapterEntityState> = {
-          ...(chapter.chapterEntityStates || {}),
+          ...(activeChapter.chapterEntityStates || {}),
         };
 
         aiPreviewData.mappedEntities.forEach((item) => {
@@ -381,14 +450,14 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
           }
         });
 
-        await db.chapters.update(chapter.id, {
+        await db.chapters.update(activeChapter.id, {
           chapterEntityStates: nextChapterEntityStates,
           updatedAt: Date.now(),
         });
 
-        onUpdateChapter({
-          chapterEntityStates: nextChapterEntityStates,
-        });
+        if (onUpdateChapter) {
+          onUpdateChapter({ chapterEntityStates: nextChapterEntityStates });
+        }
       } else {
         // Global Worldbuilding update
         for (const item of aiPreviewData.mappedEntities) {
@@ -407,6 +476,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
       }
 
       setAiPreviewData(null);
+      arrangeNeatFactionLayout();
       onRefresh();
     } catch (err) {
       console.error('Gagal menerapkan hasil auto-map:', err);
@@ -416,15 +486,10 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
     }
   };
 
-  // ---------------------------------------------------------------------------
-  // Smooth Unified Pointer Events (Mouse, Trackpad & Touch Devices)
-  // ---------------------------------------------------------------------------
+  // Pointer Events for Canvas Dragging & Touch Pan
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const targetEl = e.target as HTMLElement;
-    if (targetEl.closest('.interactive-node')) {
-      // Handled by node pointer down
-      return;
-    }
+    if (targetEl.closest('.interactive-node')) return;
 
     setIsDraggingCanvas(true);
     setDragStartPointer({
@@ -462,14 +527,12 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
     setDraggedNodeId(null);
   };
 
-  // Wheel Zoom
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     e.preventDefault();
     const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
     setZoom((z) => Math.min(3, Math.max(0.3, z * zoomFactor)));
   };
 
-  // Node Pointer Down
   const handleNodePointerDown = (e: React.PointerEvent, entId: string) => {
     e.stopPropagation();
     const container = containerRef.current;
@@ -487,42 +550,55 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
     (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
   };
 
-  // Reset Canvas View
   const handleResetView = () => {
     setZoom(1);
-    setPan({ x: 50, y: 50 });
+    setPan({ x: 30, y: 30 });
     setSelectedEntityId(null);
+    arrangeNeatFactionLayout();
   };
 
   return (
-    <div className="space-y-3 pb-20">
-      {/* Top Banner & Mode Switcher */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 shadow-sm space-y-3">
-        {/* Title & Mode Switcher */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-gradient-to-r from-pink-500/20 to-amber-500/20 text-pink-500">
+    <div className={`space-y-3 ${isFullscreen ? 'fixed inset-0 z-50 bg-slate-950 p-2 sm:p-4 flex flex-col' : 'pb-20'}`}>
+      {/* Top Header Card */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 shadow-sm space-y-3 flex-shrink-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          {/* Title & Chapter Timeline Switcher */}
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="p-2 rounded-xl bg-gradient-to-r from-pink-500/20 to-amber-500/20 text-pink-500 flex-shrink-0">
               <GitFork className="w-5 h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
-                  {chapter ? `Peta Relasi Bab: ${chapter.title}` : 'Peta Relasi & Faksi Tokoh'}
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
+                  {activeChapter ? `Peta Relasi: ${activeChapter.title}` : 'Peta Relasi & Faksi Tokoh'}
                 </h3>
-                {chapter && (
-                  <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/30">
-                    Spesifik Bab Ini
-                  </span>
-                )}
               </div>
-              <p className="text-[11px] text-slate-500">
-                Visualisasikan hubungan garis antar karakter, faksi, dan kondisi hidup/luka/gugur.
-              </p>
+
+              {/* Chapter Timeline Dropdown Selector (if in Worldbuilding) */}
+              {!chapter && chapters.length > 0 && (
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">
+                    Lihat Situasi Bab:
+                  </span>
+                  <select
+                    value={selectedTimelineChapterId}
+                    onChange={(e) => setSelectedTimelineChapterId(e.target.value)}
+                    className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-2 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400 focus:outline-none"
+                  >
+                    <option value="global">🌐 Baseline Global (Awal Cerita)</option>
+                    {chapters.map((ch) => (
+                      <option key={ch.id} value={ch.id}>
+                        Bab {ch.order}: {ch.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Mode Switcher Tabs */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-950 rounded-xl text-xs font-semibold self-start sm:self-auto">
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-950 rounded-xl text-xs font-semibold self-start sm:self-auto flex-shrink-0">
             <button
               type="button"
               onClick={() => setViewMode('network')}
@@ -550,46 +626,85 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
           </div>
         </div>
 
-        {/* Action Controls & Filters */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
-          {/* Search bar */}
-          <div className="relative flex-1 max-w-sm">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari karakter, faksi..."
-              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-pink-500"
-            />
+        {/* Filters Bar: Scope (Karakter/Tempat), Faksi, dan Live Search */}
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
+          {/* Scope Filters Pills */}
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
+            <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap mr-1">Tampilkan:</span>
+            {[
+              { id: 'all', label: 'Semua' },
+              { id: 'character_only', label: 'Hanya Karakter' },
+              { id: 'character_location', label: 'Karakter & Lokasi' },
+              { id: 'character_item', label: 'Karakter & Item' },
+            ].map((sc) => (
+              <button
+                key={sc.id}
+                type="button"
+                onClick={() => setEntityScopeFilter(sc.id as any)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition active:scale-95 ${
+                  entityScopeFilter === sc.id
+                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-950 shadow-sm'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-white'
+                }`}
+              >
+                {sc.label}
+              </button>
+            ))}
           </div>
 
-          {/* Action Buttons */}
+          {/* Faction Filter Dropdown */}
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Auto Map AI Button */}
-            <button
-              type="button"
-              onClick={handleTriggerAutoMap}
-              disabled={isAiLoading}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 hover:from-pink-400 hover:to-amber-400 text-white font-bold rounded-xl text-xs shadow-md shadow-pink-500/20 active:scale-95 transition disabled:opacity-50"
-            >
-              {isAiLoading ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Sparkles className="w-3.5 h-3.5 text-yellow-200" />
-              )}
-              <span>{chapter ? 'Auto-Map Bab Ini (AI)' : 'Auto-Map AI'}</span>
-            </button>
+            <div className="flex items-center gap-1 text-[11px]">
+              <span className="text-slate-400 font-semibold whitespace-nowrap">Faksi:</span>
+              <select
+                value={selectedFactionFilter}
+                onChange={(e) => setSelectedFactionFilter(e.target.value)}
+                className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 text-slate-700 dark:text-slate-300 font-medium focus:outline-none"
+              >
+                <option value="all">Semua Faksi ({availableFactions.length})</option>
+                {availableFactions.map((f) => (
+                  <option key={f} value={f}>
+                    {f}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-            {/* Manual Add Relation */}
-            <button
-              type="button"
-              onClick={() => setIsAddRelationOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold rounded-xl text-xs border border-slate-200 dark:border-slate-700 active:scale-95 transition"
-            >
-              <Plus className="w-3.5 h-3.5 text-pink-500" />
-              <span>+ Hubungan</span>
-            </button>
+            {/* Auto Arrange & AI Actions */}
+            <div className="flex items-center gap-1.5 ml-auto">
+              <button
+                type="button"
+                onClick={arrangeNeatFactionLayout}
+                className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center gap-1 transition"
+                title="Atur Ulang Tata Letak agar Rapi & Tidak Tumpang Tindih"
+              >
+                <Wand2 className="w-3.5 h-3.5 text-amber-500" />
+                <span className="hidden sm:inline">Tata Rapi</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleTriggerAutoMap}
+                disabled={isAiLoading}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 text-white font-bold rounded-xl text-xs shadow-md shadow-pink-500/20 active:scale-95 transition disabled:opacity-50"
+              >
+                {isAiLoading ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5 text-yellow-200" />
+                )}
+                <span>{activeChapter ? 'Auto-Map Bab Ini' : 'Auto-Map AI'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsAddRelationOpen(true)}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-800 dark:text-slate-200 font-semibold rounded-xl text-xs border border-slate-200 dark:border-slate-700"
+              >
+                <Plus className="w-3.5 h-3.5 text-pink-500" />
+                <span className="hidden sm:inline">Hubungan</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -604,7 +719,9 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
           onPointerCancel={handlePointerUp}
           onWheel={handleWheel}
           style={{ touchAction: 'none' }}
-          className="relative w-full h-[580px] sm:h-[650px] bg-slate-950 rounded-3xl border border-slate-800 overflow-hidden shadow-2xl select-none cursor-grab active:cursor-grabbing"
+          className={`relative w-full bg-slate-950 rounded-3xl border border-slate-800 overflow-hidden shadow-2xl select-none cursor-grab active:cursor-grabbing ${
+            isFullscreen ? 'flex-1 h-full rounded-none border-0' : 'h-[560px] sm:h-[640px]'
+          }`}
         >
           {/* Cyber Grid Background */}
           <div
@@ -615,8 +732,8 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
             }}
           />
 
-          {/* Floating Canvas Controls (Zoom In, Zoom Out, Reset) */}
-          <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md p-1.5 rounded-xl border border-slate-700 text-xs text-slate-200 shadow-lg">
+          {/* Floating Canvas Controls (Zoom In, Zoom Out, Reset, Fullscreen) */}
+          <div className="absolute top-3 left-3 z-20 flex items-center gap-1 bg-slate-900/90 backdrop-blur-md p-1.5 rounded-xl border border-slate-700 text-xs text-slate-200 shadow-lg">
             <button
               type="button"
               onClick={(e) => {
@@ -647,30 +764,87 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                 handleResetView();
               }}
               className="p-1.5 hover:text-white rounded-lg hover:bg-slate-800 active:scale-95 transition border-l border-slate-700 pl-2"
-              title="Reset Tampilan"
+              title="Reset Tampilan &amp; Tata Rapi"
             >
-              <Maximize2 className="w-4 h-4 text-cyan-400" />
+              <Compass className="w-4 h-4 text-cyan-400" />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsFullscreen(!isFullscreen);
+              }}
+              className="p-1.5 hover:text-white rounded-lg hover:bg-slate-800 active:scale-95 transition border-l border-slate-700 pl-2 text-pink-400"
+              title={isFullscreen ? 'Keluar Layar Penuh' : 'Layar Penuh (Mobile Optimized)'}
+            >
+              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
             </button>
           </div>
 
-          {/* Micro Instructions Overlay */}
-          <div className="absolute top-3 right-3 z-20 hidden sm:flex items-center gap-2 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700 text-[11px] text-slate-300 shadow-lg">
-            <Info className="w-3.5 h-3.5 text-pink-400" />
-            <span>Geser kanvas atau seret foto karakter untuk atur posisi</span>
+          {/* Quick Stats Banner */}
+          <div className="absolute top-3 right-3 z-20 flex items-center gap-2 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700 text-[10px] text-slate-300 shadow-lg">
+            <span>{filteredEntities.length} Entitas</span>
+            <span className="text-slate-500">•</span>
+            <span className="text-pink-400 font-bold">{allRelationshipLinks.length} Garis Hubungan</span>
           </div>
 
           {/* Active SVG Canvas */}
           <svg className="w-full h-full pointer-events-none">
             <defs>
-              <clipPath id="chapter-avatar-clip">
+              <clipPath id="neat-avatar-clip">
                 <circle cx="28" cy="28" r="24" />
               </clipPath>
             </defs>
 
             {/* Transform Group for Pan and Zoom */}
             <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
-              {/* Relationship Connecting Lines */}
-              {allRelationshipLinks.map((link) => {
+              {/* Faction Visual Halos (Himpunan Boundary Background Circles) */}
+              {factionClusters.map((cluster, cIdx) => {
+                if (cluster.members.length === 0) return null;
+                const memberPositions = cluster.members
+                  .map((m) => nodePositions[m.id])
+                  .filter((p): p is NodePosition => !!p);
+
+                if (memberPositions.length === 0) return null;
+
+                const avgX = memberPositions.reduce((sum, p) => sum + p.x, 0) / memberPositions.length;
+                const avgY = memberPositions.reduce((sum, p) => sum + p.y, 0) / memberPositions.length;
+
+                const maxDist = Math.max(
+                  110,
+                  ...memberPositions.map((p) => Math.sqrt((p.x - avgX) ** 2 + (p.y - avgY) ** 2) + 65)
+                );
+
+                return (
+                  <g key={`halo_${cluster.name}_${cIdx}`}>
+                    <circle
+                      cx={avgX}
+                      cy={avgY}
+                      r={maxDist}
+                      fill={cluster.color}
+                      fillOpacity="0.05"
+                      stroke={cluster.color}
+                      strokeWidth="1.5"
+                      strokeDasharray="6,4"
+                      strokeOpacity="0.35"
+                    />
+                    <text
+                      x={avgX}
+                      y={avgY - maxDist + 18}
+                      fill={cluster.color}
+                      fontSize="11"
+                      fontWeight="bold"
+                      textAnchor="middle"
+                      className="select-none font-sans uppercase tracking-wider opacity-60"
+                    >
+                      {cluster.name}
+                    </text>
+                  </g>
+                );
+              })}
+
+              {/* Relationship Connecting Lines with Curved Bézier arcs */}
+              {allRelationshipLinks.map((link, idx) => {
                 const sourcePos = nodePositions[link.sourceId];
                 const targetPos = nodePositions[link.targetId];
                 if (!sourcePos || !targetPos) return null;
@@ -682,11 +856,11 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
 
                 const relMeta = getRelationshipMeta(link.relationship.relationshipType);
 
-                // Calculate curved Bézier midpoint
                 const dx = targetPos.x - sourcePos.x;
                 const dy = targetPos.y - sourcePos.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
-                const curvature = Math.min(45, dist * 0.15);
+                // Alternating curvature so multiple lines don't collide
+                const curvature = Math.min(45, dist * 0.12) * (idx % 2 === 0 ? 1 : -1);
 
                 const midX = (sourcePos.x + targetPos.x) / 2 - (dy / (dist || 1)) * curvature;
                 const midY = (sourcePos.y + targetPos.y) / 2 + (dx / (dist || 1)) * curvature;
@@ -695,7 +869,6 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
 
                 return (
                   <g key={link.id} className="transition-opacity duration-200">
-                    {/* Glowing outer shadow line */}
                     <path
                       d={pathData}
                       fill="none"
@@ -703,7 +876,6 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                       strokeWidth={isConnectedToSelected ? '4' : '2'}
                       strokeOpacity={isConnectedToSelected ? '0.35' : '0.1'}
                     />
-                    {/* Main line */}
                     <path
                       d={pathData}
                       fill="none"
@@ -713,7 +885,6 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                       strokeOpacity={isConnectedToSelected ? '0.95' : '0.3'}
                     />
 
-                    {/* Relationship Label Pill in Midpoint */}
                     {isConnectedToSelected && link.relationship.label && (
                       <g transform={`translate(${midX}, ${midY})`}>
                         <rect
@@ -746,7 +917,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
 
               {/* Entity Nodes */}
               {filteredEntities.map((entity) => {
-                const pos = nodePositions[entity.id] || { x: 380, y: 300 };
+                const pos = nodePositions[entity.id] || { x: 450, y: 380 };
                 const isSelected = selectedEntityId === entity.id;
                 const eff = entityEffectiveData[entity.id];
                 const condMeta = getConditionMeta(eff?.condition);
@@ -775,7 +946,6 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                       setSelectedEntityId(isSelected ? null : entity.id);
                     }}
                   >
-                    {/* Glowing outer ring when selected or active */}
                     <circle
                       cx="28"
                       cy="28"
@@ -783,16 +953,14 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                       fill="none"
                       stroke={isSelected ? '#38bdf8' : factionColor}
                       strokeWidth={isSelected ? '3.5' : '2'}
-                      strokeOpacity={isSelected ? '1' : '0.7'}
+                      strokeOpacity={isSelected ? '1' : '0.75'}
                       className={isSelected ? 'animate-pulse' : ''}
                     />
 
-                    {/* Dark Background Circle */}
                     <circle cx="28" cy="28" r="25" fill="#0f172a" />
 
-                    {/* Character Avatar Image or Fallback Category Icon */}
                     {avatarUrl ? (
-                      <g clipPath="url(#chapter-avatar-clip)">
+                      <g clipPath="url(#neat-avatar-clip)">
                         <image
                           href={avatarUrl}
                           x="4"
@@ -811,7 +979,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                       </g>
                     )}
 
-                    {/* Condition Status Badge (Top-Right) */}
+                    {/* Condition Emoji Badge */}
                     <g transform="translate(38, 2)">
                       <circle cx="9" cy="9" r="10" fill="#0f172a" stroke={condMeta.colorHex} strokeWidth="1.5" />
                       <text x="9" y="12" fontSize="10" textAnchor="middle">
@@ -819,7 +987,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                       </text>
                     </g>
 
-                    {/* Entity Name Pill Label (Bottom) */}
+                    {/* Name Pill */}
                     <g transform="translate(28, 65)">
                       <rect
                         x={-Math.max(30, entity.name.length * 3.6)}
@@ -845,7 +1013,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                       </text>
                     </g>
 
-                    {/* Faction tag label below name */}
+                    {/* Faction Text */}
                     {eff?.faction && (
                       <g transform="translate(28, 80)">
                         <text
@@ -867,12 +1035,11 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
             </g>
           </svg>
 
-          {/* Bottom Floating Inspector Panel when Entity Selected */}
+          {/* Bottom Floating Inspector Panel (Mobile Responsive Drawer) */}
           {selectedEntity && (
             <div className="absolute bottom-3 inset-x-3 sm:inset-x-auto sm:left-4 sm:w-96 bg-slate-900/95 backdrop-blur-xl border border-slate-700 rounded-2xl p-4 shadow-2xl z-20 animate-in slide-in-from-bottom-3 duration-200">
               <div className="flex items-start justify-between gap-3 mb-2.5">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  {/* Avatar / Camera Quick Changer */}
                   <div
                     onClick={() => setImagePickerEntity(selectedEntity)}
                     className="relative group w-12 h-12 rounded-xl overflow-hidden bg-slate-950 border border-slate-700 flex-shrink-0 cursor-pointer"
@@ -909,14 +1076,13 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                           {entityEffectiveData[selectedEntity.id]?.faction}
                         </span>
                       )}
-                      {/* Condition Badge with Quick Edit */}
                       <button
                         type="button"
                         onClick={() => setConditionEditorEntity(selectedEntity)}
                         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition hover:scale-105 ${
                           getConditionMeta(entityEffectiveData[selectedEntity.id]?.condition).badgeClass
                         }`}
-                        title="Klik untuk ubah kondisi di bab ini"
+                        title="Klik untuk ubah kondisi"
                       >
                         <span>{getConditionMeta(entityEffectiveData[selectedEntity.id]?.condition).emoji}</span>
                         <span>{getConditionMeta(entityEffectiveData[selectedEntity.id]?.condition).label}</span>
@@ -934,15 +1100,13 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                 </button>
               </div>
 
-              {/* Condition Note if exists */}
               {entityEffectiveData[selectedEntity.id]?.conditionDetails && (
                 <p className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/20 p-2 rounded-xl mb-2.5 leading-snug">
-                  <strong>Kondisi {chapter ? 'di Bab Ini' : 'Terkini'}:</strong>{' '}
+                  <strong>Kondisi {activeChapter ? 'di Bab Ini' : 'Terkini'}:</strong>{' '}
                   {entityEffectiveData[selectedEntity.id]?.conditionDetails}
                 </p>
               )}
 
-              {/* Connected Relationships in Inspector */}
               <div className="space-y-1 mb-3 max-h-24 overflow-y-auto no-scrollbar">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                   Jaringan Relasi ({entityEffectiveData[selectedEntity.id]?.relationships?.length || 0})
@@ -976,7 +1140,6 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                 )}
               </div>
 
-              {/* Inspector Quick Action Buttons */}
               <div className="flex items-center gap-2 pt-1 border-t border-slate-800">
                 <button
                   type="button"
@@ -984,7 +1147,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                   className="flex-1 py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition"
                 >
                   <Eye className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Profil &amp; Kronologi</span>
+                  <span>Profil &amp; Kronologi Bab</span>
                 </button>
                 <button
                   type="button"
@@ -1012,13 +1175,11 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                     borderColor: `${clusterColor}40`,
                   }}
                 >
-                  {/* Glowing background */}
                   <div
                     className="absolute -top-12 -right-12 w-32 h-32 rounded-full blur-3xl pointer-events-none"
                     style={{ backgroundColor: `${clusterColor}20` }}
                   />
 
-                  {/* Header */}
                   <div className="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
                     <div className="flex items-center gap-2.5">
                       <div
@@ -1036,7 +1197,6 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Members Grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     {cluster.members.map((member) => {
                       const eff = entityEffectiveData[member.id];
@@ -1093,7 +1253,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
               <div className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-yellow-500" />
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  Hasil Pemetaan Otomatis AI {chapter ? `(Bab: ${chapter.title})` : ''}
+                  Hasil Pemetaan Otomatis AI {activeChapter ? `(Bab: ${activeChapter.title})` : ''}
                 </h3>
               </div>
               <button
@@ -1173,7 +1333,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                 disabled={isAiLoading}
                 className="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 text-white font-bold text-xs shadow-md shadow-pink-500/20 active:scale-95 transition"
               >
-                Terapkan ke {chapter ? 'Bab Ini' : 'Worldbuilding'}
+                Terapkan ke {activeChapter ? 'Bab Ini' : 'Worldbuilding'}
               </button>
             </div>
           </div>
@@ -1186,7 +1346,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
           isOpen={isAddRelationOpen}
           entities={entities}
           initialSourceId={selectedEntityId || undefined}
-          chapter={chapter}
+          chapter={activeChapter || undefined}
           onUpdateChapter={onUpdateChapter}
           onClose={() => setIsAddRelationOpen(false)}
           onSuccess={() => {
@@ -1201,7 +1361,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
         <EditConditionModal
           isOpen={!!conditionEditorEntity}
           entity={conditionEditorEntity}
-          chapter={chapter}
+          chapter={activeChapter || undefined}
           onUpdateChapter={onUpdateChapter}
           onClose={() => setConditionEditorEntity(null)}
           onSuccess={() => {
@@ -1280,7 +1440,6 @@ const AddRelationshipModal: React.FC<{
       };
 
       if (chapter && onUpdateChapter) {
-        // Save to chapter.chapterEntityStates
         const nextStates = { ...(chapter.chapterEntityStates || {}) };
         const existingRel = nextStates[source.id]?.relationships || source.relationships || [];
         nextStates[source.id] = {
@@ -1438,7 +1597,6 @@ const EditConditionModal: React.FC<{
     setIsSubmitting(true);
     try {
       if (chapter && onUpdateChapter) {
-        // Save chapter-specific condition
         const nextStates = { ...(chapter.chapterEntityStates || {}) };
         nextStates[entity.id] = {
           ...nextStates[entity.id],

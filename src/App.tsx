@@ -293,6 +293,7 @@ export function App() {
                     bookId={currentBook.id}
                     bookTitle={currentBook.title}
                     entities={bookEntities}
+                    chapters={bookChapters}
                     onRefresh={triggerRefresh}
                   />
                 )}
