@@ -436,7 +436,7 @@ export function formatTextWithEmotionTags(
  */
 export async function generateGeminiSpeechAudio(
   text: string,
-  modelName: string = 'gemini-3.8-flash-tts',
+  modelName: string = 'gemini-2.0-flash',
   voiceName: string = 'Aoede',
   emotionTag?: {
     emotion?: string;
@@ -911,6 +911,7 @@ export async function generateUnifiedSpeechAudio(
 }
 
 export function getModelsForEngine(engine: TTSEngineMode): AITTSModelOption[] {
+  const aiConfig = loadAISettings();
   switch (engine) {
     case 'auto':
       return AUTO_TTS_MODELS;
@@ -920,10 +921,97 @@ export function getModelsForEngine(engine: TTSEngineMode): AITTSModelOption[] {
       return GOOGLE_CLOUD_TTS_MODELS;
     case 'wasm':
       return WASM_TTS_MODELS;
-    case 'gemini':
-      return GEMINI_TTS_MODELS;
-    case 'groq':
-      return GROQ_TTS_MODELS;
+    case 'gemini': {
+      const dynamicModels: AITTSModelOption[] = [];
+      const seen = new Set<string>();
+
+      // 1. Models from active Gemini slots
+      aiConfig.slots
+        .filter((s) => s.provider === 'gemini' && s.model && s.model.trim())
+        .forEach((s) => {
+          const mId = s.model!.trim();
+          if (!seen.has(mId)) {
+            seen.add(mId);
+            dynamicModels.push({
+              id: mId,
+              name: `${mId} (Slot Aktif)`,
+              provider: 'gemini',
+              description: `Model dari konfigurasi ${s.label}`,
+            });
+          }
+        });
+
+      // 2. Models cached from live API fetch
+      (aiConfig.geminiConfig?.cachedModels || []).forEach((m) => {
+        if (!seen.has(m.id)) {
+          seen.add(m.id);
+          dynamicModels.push({
+            id: m.id,
+            name: m.name,
+            provider: 'gemini',
+            description: m.description,
+          });
+        }
+      });
+
+      // 3. Recommended Gemini models as fallback
+      const fallbackList: AITTSModelOption[] = [
+        { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'gemini', description: 'Model Cepat & Multimodal Rekomendasi' },
+        { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash Audio', provider: 'gemini', description: 'Model Audio Resmi Google AI' },
+        { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash Exp', provider: 'gemini', description: 'Model Multimodal Eksperimental' },
+        { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', provider: 'gemini', description: 'Model Ringan & Efisien' },
+        { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'gemini', description: 'Model Penalaran Tinggi' },
+      ];
+
+      fallbackList.forEach((m) => {
+        if (!seen.has(m.id)) {
+          seen.add(m.id);
+          dynamicModels.push(m);
+        }
+      });
+
+      return dynamicModels;
+    }
+    case 'groq': {
+      const dynamicModels: AITTSModelOption[] = [];
+      const seen = new Set<string>();
+
+      aiConfig.slots
+        .filter((s) => s.provider === 'groq' && s.model && s.model.trim())
+        .forEach((s) => {
+          const mId = s.model!.trim();
+          if (!seen.has(mId)) {
+            seen.add(mId);
+            dynamicModels.push({
+              id: mId,
+              name: `${mId} (Slot Aktif)`,
+              provider: 'groq',
+              description: `Model dari konfigurasi ${s.label}`,
+            });
+          }
+        });
+
+      (aiConfig.groqConfig?.cachedModels || []).forEach((m) => {
+        if (!seen.has(m.id)) {
+          seen.add(m.id);
+          dynamicModels.push({
+            id: m.id,
+            name: m.name,
+            provider: 'groq',
+            description: m.description,
+          });
+        }
+      });
+
+      GROQ_TTS_MODELS.forEach((m) => {
+        if (!seen.has(m.id)) {
+          seen.add(m.id);
+          dynamicModels.push(m);
+        }
+      });
+
+      return dynamicModels;
+    }
     default:
       return AUTO_TTS_MODELS;
   }

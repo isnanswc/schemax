@@ -42,7 +42,14 @@ import {
   GROQ_VOICES,
   GROQ_TTS_MODELS,
   AUTO_TTS_MODELS,
+  loadTTSExtraConfig,
 } from '../../../services/geminiTtsService';
+import {
+  fetchLiveGeminiModels,
+  fetchLiveGroqModels,
+  loadAISettings,
+  saveAISettings,
+} from '../../../services/aiService';
 import { TTSConfigModal } from './TTSConfigModal';
 
 export type FullTTSEngine = TTSEngineMode | 'browser';
@@ -87,6 +94,8 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
   // Pickers modal toggles
   const [isModelPickerOpen, setIsModelPickerOpen] = useState(false);
   const [isVoicePickerOpen, setIsVoicePickerOpen] = useState(false);
+  const [isRefreshingModels, setIsRefreshingModels] = useState(false);
+  const [customModelInput, setCustomModelInput] = useState('');
 
   // Browser voices state
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -580,9 +589,55 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
     }
   };
 
+  const handleRefreshModels = async () => {
+    setIsRefreshingModels(true);
+    setEngineNotice(null);
+    try {
+      if (ttsEngine === 'gemini') {
+        const extraConfig = loadTTSExtraConfig();
+        const aiConfig = loadAISettings();
+        const key =
+          extraConfig.dedicatedGeminiApiKey ||
+          aiConfig.slots.find((s) => s.provider === 'gemini' && s.apiKey)?.apiKey ||
+          '';
+        if (!key) {
+          throw new Error('Masukkan API Key Gemini di Pengaturan Kunci (ikon ⚙️) terlebih dahulu.');
+        }
+        const liveModels = await fetchLiveGeminiModels(key);
+        aiConfig.geminiConfig.cachedModels = liveModels;
+        saveAISettings(aiConfig);
+        if (liveModels.length > 0 && !liveModels.some((m) => m.id === selectedModel)) {
+          setSelectedModel(liveModels[0].id);
+        }
+      } else if (ttsEngine === 'groq') {
+        const aiConfig = loadAISettings();
+        const key = aiConfig.slots.find((s) => s.provider === 'groq' && s.apiKey)?.apiKey || '';
+        if (!key) {
+          throw new Error('Masukkan API Key Groq di Pengaturan AI terlebih dahulu.');
+        }
+        const liveModels = await fetchLiveGroqModels(key);
+        aiConfig.groqConfig.cachedModels = liveModels;
+        saveAISettings(aiConfig);
+        if (liveModels.length > 0 && !liveModels.some((m) => m.id === selectedModel)) {
+          setSelectedModel(liveModels[0].id);
+        }
+      }
+    } catch (err: any) {
+      console.warn('Gagal memuat model:', err);
+      setEngineNotice(`Gagal muat model: ${err.message}`);
+    } finally {
+      setIsRefreshingModels(false);
+    }
+  };
+
   const currentModels = ttsEngine !== 'browser' ? getModelsForEngine(ttsEngine as TTSEngineMode) : [];
   const currentVoices = ttsEngine !== 'browser' ? getVoicesForEngine(ttsEngine as TTSEngineMode) : [];
-  const selectedModelObj = currentModels.find((m) => m.id === selectedModel) || currentModels[0];
+  const selectedModelObj = currentModels.find((m) => m.id === selectedModel) || {
+    id: selectedModel,
+    name: selectedModel || 'Pilih Model',
+    provider: ttsEngine as any,
+    description: 'Model Pilihan Pengguna',
+  };
   const selectedVoiceObj = currentVoices.find((v) => v.id === selectedVoice) || currentVoices[0];
   const isIndonesianBrowserVoice = selectedBrowserVoice?.lang.toLowerCase().startsWith('id');
 
@@ -826,33 +881,81 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
 
                 {/* Model Dropdown */}
                 {isModelPickerOpen && (
-                  <div className="absolute left-0 bottom-full mb-2 w-64 max-h-56 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-1.5 z-50 animate-in fade-in zoom-in-95 text-xs">
-                    <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                      Model TTS Tersedia
-                    </div>
-                    {currentModels.map((m) => {
-                      const isSel = selectedModel === m.id;
-                      return (
+                  <div className="absolute left-0 bottom-full mb-2 w-72 max-h-72 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-2 z-50 animate-in fade-in zoom-in-95 text-xs">
+                    <div className="flex items-center justify-between px-1 pb-1 mb-1.5 border-b border-slate-100 dark:border-slate-800 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      <span>Model TTS ({currentModels.length})</span>
+                      {(ttsEngine === 'gemini' || ttsEngine === 'groq') && (
                         <button
-                          key={m.id}
+                          type="button"
+                          onClick={handleRefreshModels}
+                          disabled={isRefreshingModels}
+                          className="text-amber-500 hover:text-amber-400 flex items-center gap-1 font-bold lowercase disabled:opacity-50 transition"
+                          title="Ambil model resmi yang tersedia langsung dari API Key Anda"
+                        >
+                          <RefreshCw className={`w-2.5 h-2.5 ${isRefreshingModels ? 'animate-spin' : ''}`} />
+                          <span>muat api</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Manual Custom Model Input */}
+                    {(ttsEngine === 'gemini' || ttsEngine === 'groq') && (
+                      <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl mb-1.5 border border-slate-200 dark:border-slate-700">
+                        <input
+                          type="text"
+                          value={customModelInput}
+                          onChange={(e) => setCustomModelInput(e.target.value)}
+                          placeholder="Ketik ID model manual..."
+                          className="w-full bg-transparent text-[10px] px-1.5 py-0.5 outline-hidden text-slate-800 dark:text-slate-200 font-mono"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && customModelInput.trim()) {
+                              setSelectedModel(customModelInput.trim());
+                              setIsModelPickerOpen(false);
+                              setCustomModelInput('');
+                            }
+                          }}
+                        />
+                        <button
                           type="button"
                           onClick={() => {
-                            setSelectedModel(m.id);
-                            setIsModelPickerOpen(false);
+                            if (customModelInput.trim()) {
+                              setSelectedModel(customModelInput.trim());
+                              setIsModelPickerOpen(false);
+                              setCustomModelInput('');
+                            }
                           }}
-                          className={`w-full text-left px-2.5 py-1.5 rounded-xl transition flex flex-col text-xs mb-0.5 ${
-                            isSel
-                              ? 'bg-amber-500 text-slate-950 font-bold'
-                              : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-                          }`}
+                          className="px-2 py-0.5 rounded-lg bg-amber-500 text-slate-950 font-bold text-[9px] hover:bg-amber-400 transition flex-shrink-0"
                         >
-                          <span className="truncate font-semibold">{m.name}</span>
-                          <span className={`text-[10px] truncate ${isSel ? 'text-slate-900/80' : 'text-slate-400'}`}>
-                            {m.description}
-                          </span>
+                          Pilih
                         </button>
-                      );
-                    })}
+                      </div>
+                    )}
+
+                    <div className="space-y-0.5">
+                      {currentModels.map((m) => {
+                        const isSel = selectedModel === m.id;
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedModel(m.id);
+                              setIsModelPickerOpen(false);
+                            }}
+                            className={`w-full text-left px-2.5 py-1.5 rounded-xl transition flex flex-col text-xs ${
+                              isSel
+                                ? 'bg-amber-500 text-slate-950 font-bold'
+                                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                            }`}
+                          >
+                            <span className="truncate font-semibold text-[11px]">{m.name}</span>
+                            <span className={`text-[9px] truncate ${isSel ? 'text-slate-900/80' : 'text-slate-400'}`}>
+                              {m.description || m.id}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
