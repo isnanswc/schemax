@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   FileText,
-  FileEdit,
+  Layers,
   Feather,
   Compass,
   GitBranch,
@@ -50,7 +50,7 @@ export const ChapterBottomNav: React.FC<ChapterBottomNavProps> = ({
           </span>
         </button>
 
-        {/* 2. Tulisan Kasar (Kiri 2) */}
+        {/* 2. Story Plot (Kiri 2) */}
         <button
           type="button"
           onClick={() => onChangeTab('raw')}
@@ -59,21 +59,16 @@ export const ChapterBottomNav: React.FC<ChapterBottomNavProps> = ({
               ? 'text-amber-600 dark:text-amber-400 font-bold'
               : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
           }`}
-          title="Tulisan Kasar (Draf Coretan & Ide Mentah)"
+          title="Story Plot (Paket Konteks AI & Coretan Alur Bab)"
         >
           <div className="relative">
-            <FileEdit className={`w-5 h-5 ${activeTab === 'raw' ? 'stroke-[2.5]' : 'stroke-2'}`} />
-            {rawDraftCount > 0 && (
-              <span className="absolute -top-1 -right-2 px-1 min-w-[13px] text-[8px] font-black rounded-full bg-indigo-500 text-white flex items-center justify-center">
-                {rawDraftCount}
-              </span>
-            )}
+            <Layers className={`w-5 h-5 ${activeTab === 'raw' ? 'stroke-[2.5]' : 'stroke-2'}`} />
             {activeTab === 'raw' && (
               <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-amber-500" />
             )}
           </div>
-          <span className="text-[9px] mt-1 tracking-tight truncate max-w-full">
-            Tulisan Kasar
+          <span className="text-[9px] mt-1 tracking-tight truncate max-w-full font-bold">
+            Story Plot
           </span>
         </button>
 
@@ -130,7 +125,7 @@ export const ChapterBottomNav: React.FC<ChapterBottomNavProps> = ({
           </span>
         </button>
 
-        {/* 5. Ringkasan & Auto Plot + Cabang (Kanan 2) */}
+        {/* 5. Alur & Scene (Kanan 2) */}
         <button
           type="button"
           onClick={() => onChangeTab('plot')}
@@ -139,7 +134,7 @@ export const ChapterBottomNav: React.FC<ChapterBottomNavProps> = ({
               ? 'text-amber-600 dark:text-amber-400 font-bold'
               : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
           }`}
-          title="Ringkasan, Auto Plot & Rekomendasi Cabang Bab Selanjutnya"
+          title="Alur, Scene & Cabang Bab Selanjutnya"
         >
           <div className="relative">
             <GitBranch className={`w-5 h-5 ${activeTab === 'plot' ? 'stroke-[2.5]' : 'stroke-2'}`} />
@@ -151,7 +146,7 @@ export const ChapterBottomNav: React.FC<ChapterBottomNavProps> = ({
             )}
           </div>
           <span className="text-[9px] mt-1 tracking-tight truncate max-w-full">
-            Ringkasan & Plot
+            Alur &amp; Scene
           </span>
         </button>
       </div>

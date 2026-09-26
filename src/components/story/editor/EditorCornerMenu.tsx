@@ -14,7 +14,8 @@ import {
   Settings,
   Sun,
   Moon,
-  Monitor
+  Monitor,
+  Search
 } from 'lucide-react';
 import { ChapterStatus } from '../../../types';
 import { ThemeMode, getStoredThemeMode, applyTheme } from '../../../services/themeService';
@@ -34,6 +35,7 @@ interface EditorCornerMenuProps {
   onChangeFontSize: (size: 'sm' | 'base' | 'lg') => void;
   onOpenAIAssistant: () => void;
   onOpenAISettings: () => void;
+  onOpenFindReplace?: () => void;
   onNavigateToTab: (tab: 'info' | 'raw' | 'glossary' | 'plot') => void;
 }
 
@@ -52,6 +54,7 @@ export const EditorCornerMenu: React.FC<EditorCornerMenuProps> = ({
   onChangeFontSize,
   onOpenAIAssistant,
   onOpenAISettings,
+  onOpenFindReplace,
   onNavigateToTab,
 }) => {
   const [currentTheme, setCurrentTheme] = React.useState<ThemeMode>(getStoredThemeMode());
@@ -235,6 +238,26 @@ export const EditorCornerMenu: React.FC<EditorCornerMenuProps> = ({
                 {isFocusMode ? 'Aktif' : 'Nonaktif'}
               </span>
             </button>
+
+            {/* Cari & Ganti Kata */}
+            {onOpenFindReplace && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenFindReplace();
+                }}
+                className="w-full py-2.5 px-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold transition flex items-center justify-between active:scale-95 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <div className="flex items-center gap-2">
+                  <Search className="w-4 h-4 text-amber-500" />
+                  <span>Cari &amp; Ganti Kata</span>
+                </div>
+                <span className="text-[10px] text-slate-400 font-mono bg-slate-200 dark:bg-slate-700/80 px-1.5 py-0.5 rounded">
+                  Ctrl+F
+                </span>
+              </button>
+            )}
 
             {/* Theme Switcher */}
             <button

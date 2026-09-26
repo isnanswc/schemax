@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { StoryChapter, ChapterStatus } from '../../types';
 import { useLongPress } from '../../hooks/useLongPress';
+import { useMediaUrl } from '../../hooks/useMediaUrl';
 import {
   FileText,
   ChevronRight,
@@ -26,6 +27,8 @@ export const ChapterCard: React.FC<ChapterCardProps> = ({
   onQuickStatusToggle,
 }) => {
   const [isPressing, setIsPressing] = useState(false);
+  const { url: coverUrl } = useMediaUrl(chapter.coverMediaId);
+  const effectiveCover = coverUrl || chapter.coverImageUrl;
 
   const longPressEvents = useLongPress(
     () => {
@@ -78,7 +81,18 @@ export const ChapterCard: React.FC<ChapterCardProps> = ({
           : 'border-slate-200/90 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700/80'
       }`}
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start gap-3">
+        {effectiveCover && (
+          <div className="w-14 h-20 sm:w-16 sm:h-22 rounded-xl overflow-hidden flex-shrink-0 border border-slate-200/80 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 shadow-xs">
+            <img
+              src={effectiveCover}
+              alt={chapter.title}
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
+          </div>
+        )}
+
         <div className="min-w-0 flex-1">
           {/* Badge & Order */}
           <div className="flex items-center gap-1.5 mb-1 flex-wrap">

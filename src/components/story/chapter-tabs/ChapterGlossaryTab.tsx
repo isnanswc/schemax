@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Compass,
   User,
@@ -82,6 +82,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
   const [hologramEntity, setHologramEntity] = useState<WorldEntity | null>(null);
   const [imagePickerEntity, setImagePickerEntity] = useState<WorldEntity | null>(null);
   const [entityAvatarUrls, setEntityAvatarUrls] = useState<Record<string, string>>({});
+  const createdUrlsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     let active = true;
@@ -91,7 +92,9 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
         if (!active) return;
         const newMap: Record<string, string> = {};
         items.forEach((item) => {
-          newMap[item.id] = URL.createObjectURL(item.blob);
+          const u = URL.createObjectURL(item.blob);
+          createdUrlsRef.current.add(u);
+          newMap[item.id] = u;
         });
         setEntityAvatarUrls((prev) => ({ ...prev, ...newMap }));
       });
@@ -100,6 +103,16 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
       active = false;
     };
   }, [entities]);
+
+  // Clean up all blob URLs when Glossary tab unmounts
+  useEffect(() => {
+    return () => {
+      createdUrlsRef.current.forEach((url) => {
+        URL.revokeObjectURL(url);
+      });
+      createdUrlsRef.current.clear();
+    };
+  }, []);
 
   // AI & Processing States
   const [isAnalyzingScenes, setIsAnalyzingScenes] = useState(false);

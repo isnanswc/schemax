@@ -21,8 +21,12 @@ import {
   BarChart3,
   ArrowLeft,
   Eraser,
+  Search,
+  Layers,
+  Activity,
   MessageSquare
 } from 'lucide-react';
+import { TensionDisplayMode } from '../../../types';
 
 interface AdvancedEditorToolbarProps {
   onFormat: (command: string, value?: string) => void;
@@ -32,6 +36,13 @@ interface AdvancedEditorToolbarProps {
   onOpenStatsModal: () => void;
   onOpenInsertImageModal: () => void;
   onOpenAIAssistant: () => void;
+  onOpenFindReplace?: () => void;
+  isPeekRawOpen?: boolean;
+  onTogglePeekRaw?: () => void;
+  rawDraftCount?: number;
+  onOpenTensionModal?: () => void;
+  tensionDisplayMode?: TensionDisplayMode;
+  hasTensionData?: boolean;
   onExitToTabs: () => void;
 }
 
@@ -43,6 +54,13 @@ export const AdvancedEditorToolbar: React.FC<AdvancedEditorToolbarProps> = ({
   onOpenStatsModal,
   onOpenInsertImageModal,
   onOpenAIAssistant,
+  onOpenFindReplace,
+  isPeekRawOpen = false,
+  onTogglePeekRaw,
+  rawDraftCount = 0,
+  onOpenTensionModal,
+  tensionDisplayMode = 'both',
+  hasTensionData = false,
   onExitToTabs,
 }) => {
   const [keyboardOffset, setKeyboardOffset] = useState(0);
@@ -76,38 +94,83 @@ export const AdvancedEditorToolbar: React.FC<AdvancedEditorToolbarProps> = ({
       className="fixed bottom-0 inset-x-0 z-40 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 shadow-xl safe-bottom"
     >
       {/* Floating Info & Quick Action Bar (Top of toolbar) */}
-      <div className="max-w-4xl mx-auto px-3 py-1 flex items-center justify-between border-b border-slate-100 dark:border-slate-800/60 text-xs">
-        {/* Exit back to tabs */}
-        <button
-          type="button"
-          onClick={onExitToTabs}
-          className="flex items-center gap-1.5 py-1 px-2.5 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition active:scale-95 text-[11px] font-bold"
-          title="Kembali ke Ringkasan & Tab Bab"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Tab Bab</span>
-        </button>
+      <div className="max-w-4xl mx-auto px-2 sm:px-3 py-1 flex items-center justify-between gap-1.5 overflow-x-auto no-scrollbar border-b border-slate-100 dark:border-slate-800/60 text-xs">
+        <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+          {/* Exit back to tabs */}
+          <button
+            type="button"
+            onClick={onExitToTabs}
+            className="flex items-center gap-1 py-1 px-1.5 sm:px-2 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition active:scale-95 text-[11px] font-bold"
+            title="Kembali ke Ringkasan &amp; Tab Bab"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Tab Bab</span>
+          </button>
 
-        {/* Center: AI Quick Co-Pilot Button */}
-        <button
-          type="button"
-          onClick={onOpenAIAssistant}
-          className="flex items-center gap-1 py-1 px-2.5 rounded-full bg-gradient-to-r from-amber-500/15 to-indigo-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 hover:border-amber-500/60 transition active:scale-95 text-[11px] font-bold shadow-xs"
-        >
-          <Sparkles className="w-3 h-3 text-amber-500" />
-          <span>AI Co-Pilot</span>
-        </button>
+          {/* Peek Story Plot */}
+          {onTogglePeekRaw && (
+            <button
+              type="button"
+              onClick={onTogglePeekRaw}
+              className={`flex items-center gap-1 py-1 px-2 sm:px-2.5 rounded-full transition active:scale-95 text-[11px] font-bold ${
+                isPeekRawOpen
+                  ? 'bg-amber-500 text-slate-950 shadow-xs'
+                  : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700/80'
+              }`}
+              title="Lihat / Contek Story Plot & Coretan Bab"
+            >
+              <Layers className={`w-3 h-3 ${isPeekRawOpen ? 'text-slate-950' : 'text-amber-500'}`} />
+              <span><span className="hidden sm:inline">Peek </span>Plot</span>
+              {rawDraftCount > 0 && (
+                <span className={`text-[9px] px-1 rounded-full ${isPeekRawOpen ? 'bg-black/20 text-slate-950' : 'bg-amber-400/30 text-amber-900 dark:text-amber-200'}`}>
+                  {rawDraftCount}
+                </span>
+              )}
+            </button>
+          )}
+        </div>
+
+        {/* Center: AI Tools (Co-Pilot & Tension Meter) */}
+        <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+          <button
+            type="button"
+            onClick={onOpenAIAssistant}
+            className="flex items-center gap-1 py-1 px-2 sm:px-2.5 rounded-full bg-gradient-to-r from-amber-500/15 to-indigo-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 hover:border-amber-500/60 transition active:scale-95 text-[11px] font-bold shadow-xs"
+          >
+            <Sparkles className="w-3 h-3 text-amber-500" />
+            <span><span className="hidden sm:inline">AI </span>Co-Pilot</span>
+          </button>
+
+          {onOpenTensionModal && (
+            <button
+              type="button"
+              onClick={onOpenTensionModal}
+              className={`flex items-center gap-1 py-1 px-2 sm:px-2.5 rounded-full border transition active:scale-95 text-[11px] font-bold ${
+                tensionDisplayMode !== 'none'
+                  ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/40 shadow-xs'
+                  : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border-slate-200 dark:border-slate-700/80'
+              }`}
+              title="Analisis & Pengaturan Tensi Cerita (AI Arc)"
+            >
+              <Activity className={`w-3 h-3 ${tensionDisplayMode !== 'none' ? 'text-rose-500' : 'text-slate-400'}`} />
+              <span>Tensi</span>
+              {hasTensionData && (
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+              )}
+            </button>
+          )}
+        </div>
 
         {/* Right: Floating Word Counter Button (Click to open Stats) */}
         <button
           type="button"
           onClick={onOpenStatsModal}
-          className="flex items-center gap-1.5 py-1 px-2.5 rounded-full bg-slate-100 dark:bg-slate-800/80 hover:bg-amber-500/15 border border-slate-200 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 transition active:scale-95 text-[11px] font-mono font-bold"
+          className="flex items-center gap-1 py-1 px-2 sm:px-2.5 rounded-full bg-slate-100 dark:bg-slate-800/80 hover:bg-amber-500/15 border border-slate-200 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 transition active:scale-95 text-[11px] font-mono font-bold flex-shrink-0"
           title="Klik untuk membuka detail statistik kata, karakter & waktu baca"
         >
           <BarChart3 className="w-3.5 h-3.5 text-amber-500" />
-          <span>{wordCount.toLocaleString()} kata</span>
-          <span className="text-[10px] text-slate-400 font-sans">
+          <span>{wordCount.toLocaleString()} <span className="hidden sm:inline">kata</span></span>
+          <span className="hidden md:inline text-[10px] text-slate-400 font-sans">
             (~{readingTimeMin} mnt)
           </span>
         </button>
@@ -132,6 +195,18 @@ export const AdvancedEditorToolbar: React.FC<AdvancedEditorToolbarProps> = ({
         >
           <Redo2 className="w-4 h-4" />
         </button>
+
+        {/* Find & Replace (Cari & Ganti Kata) */}
+        {onOpenFindReplace && (
+          <button
+            type="button"
+            onClick={onOpenFindReplace}
+            className="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-amber-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition active:scale-90 flex-shrink-0"
+            title="Cari & Ganti Kata (Find & Replace)"
+          >
+            <Search className="w-4 h-4" />
+          </button>
+        )}
 
         <div className="w-[1px] h-5 bg-slate-200 dark:bg-slate-800 mx-1 flex-shrink-0" />
 

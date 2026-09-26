@@ -90,6 +90,23 @@ export const StoryPlannerView: React.FC<StoryPlannerViewProps> = ({
     await handleStatusChange(chapter, nextStatus[chapter.status]);
   };
 
+  const handleMoveChapter = async (chapter: StoryChapter, direction: 'up' | 'down') => {
+    const sorted = [...chapters].sort((a, b) => (a.order || 0) - (b.order || 0));
+    const currentIndex = sorted.findIndex((c) => c.id === chapter.id);
+    if (currentIndex === -1) return;
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= sorted.length) return;
+
+    const targetChapter = sorted[targetIndex];
+    const currentOrder = chapter.order || currentIndex + 1;
+    const targetOrder = targetChapter.order || targetIndex + 1;
+
+    // Swap orders
+    await db.chapters.update(chapter.id, { order: targetOrder, updatedAt: Date.now() });
+    await db.chapters.update(targetChapter.id, { order: currentOrder, updatedAt: Date.now() });
+    onRefresh();
+  };
+
   return (
     <div className="space-y-3 pb-24">
       {/* Top Stats Banner */}
@@ -221,6 +238,16 @@ export const StoryPlannerView: React.FC<StoryPlannerViewProps> = ({
         onOpenEditor={onOpenEditor}
         onStatusChange={handleStatusChange}
         onDelete={handleDelete}
+        onMoveUp={(c) => handleMoveChapter(c, 'up')}
+        onMoveDown={(c) => handleMoveChapter(c, 'down')}
+        canMoveUp={Boolean(
+          activeSheetChapter &&
+          chapters.findIndex((c) => c.id === activeSheetChapter.chapter.id) > 0
+        )}
+        canMoveDown={Boolean(
+          activeSheetChapter &&
+          chapters.findIndex((c) => c.id === activeSheetChapter.chapter.id) < chapters.length - 1
+        )}
       />
     </div>
   );

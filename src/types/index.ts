@@ -91,8 +91,25 @@ export interface StoryChapter {
   coverImageUrl?: string;
   chapterEntityStates?: Record<string, ChapterEntityState>;
   chapterRelationships?: EntityRelationship[];
+  tensionData?: ChapterTensionData;
   createdAt: number;
   updatedAt: number;
+}
+
+export type TensionDisplayMode = 'both' | 'gutter' | 'underline' | 'none';
+
+export interface ParagraphTensionItem {
+  paragraphIndex: number;
+  textHash: string;
+  tensionScore: number; // 0 to 100
+  label?: string; // 'Tenang', 'Kecurigaan', 'Konflik', 'Klimaks'
+  note?: string; // brief reason
+}
+
+export interface ChapterTensionData {
+  items: ParagraphTensionItem[];
+  lastAnalyzedAt: number;
+  displayMode: TensionDisplayMode;
 }
 
 export type WorldCategory = 'character' | 'location' | 'item' | 'lore';

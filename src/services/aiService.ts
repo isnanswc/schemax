@@ -313,11 +313,17 @@ async function executeGroqRequest(
 ): Promise<string> {
   const url = 'https://api.groq.com/openai/v1/chat/completions';
 
+  // Budget prompt safely for Groq's token/minute limits
+  const budgetedPrompt =
+    prompt.length > 32000
+      ? prompt.slice(0, 32000) + '\n\n[...konteks dipotong sesuai batas token Groq...]'
+      : prompt;
+
   const messages: any[] = [];
   if (systemPrompt) {
     messages.push({ role: 'system', content: systemPrompt });
   }
-  messages.push({ role: 'user', content: prompt });
+  messages.push({ role: 'user', content: budgetedPrompt });
 
   const response = await fetch(url, {
     method: 'POST',
@@ -329,7 +335,7 @@ async function executeGroqRequest(
       model: model,
       messages: messages,
       temperature: 0.7,
-      max_tokens: 8192,
+      max_tokens: 4096,
     }),
   });
 

@@ -10,7 +10,9 @@ import {
   Sparkles,
   FileText,
   Target,
-  ArrowRight
+  ArrowRight,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 
 interface ChapterActionSheetProps {
@@ -21,6 +23,10 @@ interface ChapterActionSheetProps {
   onOpenEditor: (chapter: StoryChapter) => void;
   onStatusChange: (chapter: StoryChapter, newStatus: ChapterStatus) => void;
   onDelete: (chapterId: string, title: string) => void;
+  onMoveUp?: (chapter: StoryChapter) => void;
+  onMoveDown?: (chapter: StoryChapter) => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
 }
 
 export const ChapterActionSheet: React.FC<ChapterActionSheetProps> = ({
@@ -31,6 +37,10 @@ export const ChapterActionSheet: React.FC<ChapterActionSheetProps> = ({
   onOpenEditor,
   onStatusChange,
   onDelete,
+  onMoveUp,
+  onMoveDown,
+  canMoveUp = false,
+  canMoveDown = false,
 }) => {
   if (!isOpen || !chapter) return null;
 
@@ -89,6 +99,41 @@ export const ChapterActionSheet: React.FC<ChapterActionSheetProps> = ({
           <span>Buka Studio &amp; Naskah Bab Ini</span>
           <ArrowRight className="w-4 h-4" />
         </button>
+
+        {/* Urutan Bab: Geser Naik / Turun */}
+        {(onMoveUp || onMoveDown) && (
+          <div className="space-y-1.5 mb-4">
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">
+              Urutan Bab
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={!canMoveUp}
+                onClick={() => {
+                  onMoveUp?.(chapter);
+                  onClose();
+                }}
+                className="py-2.5 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center justify-center gap-1.5 disabled:opacity-40 transition active:scale-95 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <ArrowUp className="w-4 h-4 text-amber-500" />
+                <span>Geser ke Atas</span>
+              </button>
+              <button
+                type="button"
+                disabled={!canMoveDown}
+                onClick={() => {
+                  onMoveDown?.(chapter);
+                  onClose();
+                }}
+                className="py-2.5 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center justify-center gap-1.5 disabled:opacity-40 transition active:scale-95 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <ArrowDown className="w-4 h-4 text-amber-500" />
+                <span>Geser ke Bawah</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Status Selector */}
         <div className="space-y-2 mb-4">
