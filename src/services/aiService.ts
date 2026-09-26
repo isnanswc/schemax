@@ -1329,10 +1329,44 @@ Berikan output HANYA berupa JSON valid persis dengan struktur ini:
   const parsed = resilientParseJsonObject<AutoMapResult>(res.text);
 
   const factions = Array.isArray(parsed.factions) ? parsed.factions : [];
-  const mappedEntities = Array.isArray(parsed.mappedEntities) ? parsed.mappedEntities : [];
+  const rawMappedEntities = Array.isArray(parsed.mappedEntities) ? parsed.mappedEntities : [];
+
+  const entityMap = new Map(entities.map((e) => [e.id, e]));
+  const entityByName = new Map(entities.map((e) => [e.name.toLowerCase().trim(), e]));
+  entities.forEach((e) => {
+    if (e.aliases) {
+      e.aliases.forEach((a) => entityByName.set(a.toLowerCase().trim(), e));
+    }
+  });
+
+  const sanitizedMappedEntities = rawMappedEntities.map((item) => {
+    const matchedSelf = entityMap.get(item.id) || entityByName.get(item.name.toLowerCase().trim());
+    const realId = matchedSelf ? matchedSelf.id : item.id;
+    const realName = matchedSelf ? matchedSelf.name : item.name;
+
+    const sanitizedRelationships = (item.relationships || []).map((rel) => {
+      const targetMatch =
+        entityMap.get(rel.targetEntityId) ||
+        entityByName.get((rel.targetEntityId || '').toLowerCase().trim()) ||
+        entityByName.get((rel.targetEntityName || '').toLowerCase().trim());
+
+      return {
+        ...rel,
+        targetEntityId: targetMatch ? targetMatch.id : rel.targetEntityId,
+        targetEntityName: targetMatch ? targetMatch.name : (rel.targetEntityName || rel.targetEntityId),
+      };
+    });
+
+    return {
+      ...item,
+      id: realId,
+      name: realName,
+      relationships: sanitizedRelationships,
+    };
+  });
 
   return {
     factions,
-    mappedEntities,
+    mappedEntities: sanitizedMappedEntities,
   };
 }

@@ -89,6 +89,8 @@ export interface StoryChapter {
   aiDetectedEntities?: DetectedEntityCandidate[];
   coverMediaId?: string;
   coverImageUrl?: string;
+  chapterEntityStates?: Record<string, ChapterEntityState>;
+  chapterRelationships?: EntityRelationship[];
   createdAt: number;
   updatedAt: number;
 }
@@ -142,6 +144,31 @@ export interface WorldAttribute {
   value: string;
 }
 
+export interface ChapterSceneCondition {
+  sceneNumber: number;
+  sceneTitle: string;
+  condition: EntityCondition | string;
+  conditionDetails?: string;
+}
+
+export interface ChapterEntityRecord {
+  chapterId: string;
+  chapterTitle: string;
+  chapterOrder: number;
+  condition: EntityCondition | string;
+  conditionDetails?: string;
+  scenes?: ChapterSceneCondition[];
+}
+
+export interface ChapterEntityState {
+  entityId: string;
+  entityName?: string;
+  condition?: EntityCondition | string;
+  conditionDetails?: string;
+  relationships?: EntityRelationship[];
+  sceneConditions?: Record<number, { condition: string; conditionDetails?: string }>;
+}
+
 export interface WorldEntity {
   id: string;
   bookId: string;
@@ -163,6 +190,8 @@ export interface WorldEntity {
   conditionDetails?: string;
   // Jaringan Relasi Antar Entitas
   relationships?: EntityRelationship[];
+  // Kronologi Kondisi Bab & Scene
+  chapterChronology?: Record<string, ChapterEntityRecord>;
   createdAt: number;
   updatedAt: number;
 }

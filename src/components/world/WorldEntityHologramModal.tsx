@@ -3,6 +3,7 @@ import { WorldEntity, WorldCategory } from '../../types';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { getConditionMeta } from './entityConditionMeta';
 import { EntityImagePickerModal } from './EntityImagePickerModal';
+import { ChapterSceneChronologyAccordion } from './ChapterSceneChronologyAccordion';
 import {
   X,
   User,
@@ -85,12 +86,12 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
       />
 
       {/* Hologram Floating Card */}
-      <div className={`relative w-full max-w-md bg-white dark:bg-slate-900/95 border border-slate-200 dark:${meta.border} rounded-3xl p-5 shadow-2xl ${meta.glow} z-10 animate-in zoom-in-95 duration-200 overflow-hidden`}>
+      <div className={`relative w-full max-w-2xl max-h-[92vh] flex flex-col bg-white dark:bg-slate-900/95 border border-slate-200 dark:${meta.border} rounded-3xl p-5 shadow-2xl ${meta.glow} z-10 animate-in zoom-in-95 duration-200 overflow-hidden`}>
         {/* Glow ambient background pill */}
         <div className="absolute -top-16 -right-16 w-36 h-36 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Top Header */}
-        <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="flex items-start justify-between gap-3 mb-4 pb-3 border-b border-slate-100 dark:border-slate-800 flex-shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             {/* Avatar Preview with Camera Quick Picker */}
             <div
@@ -146,6 +147,9 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
           </button>
         </div>
 
+        {/* Scrollable Body Content */}
+        <div className="flex-1 overflow-y-auto pr-1 space-y-4">
+
         {/* Condition Note if specified */}
         {activeEntity.conditionDetails && (
           <div className="mb-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-600 dark:text-amber-300">
@@ -194,7 +198,7 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
 
         {/* Tags */}
         {activeEntity.tags && activeEntity.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-4">
+          <div className="flex flex-wrap gap-1.5">
             {activeEntity.tags.map((tag, i) => (
               <span
                 key={i}
@@ -206,23 +210,33 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
           </div>
         )}
 
-        {/* Action Buttons: Ganti Gambar Utama & Tutup */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsImagePickerOpen(true)}
-            className="flex-1 py-2.5 px-3 rounded-xl bg-pink-500/10 hover:bg-pink-500/20 text-pink-500 dark:text-pink-400 font-bold text-xs transition active:scale-95 flex items-center justify-center gap-1.5 border border-pink-500/30"
-          >
-            <Camera className="w-4 h-4" />
-            <span>Pasang Gambar Utama</span>
-          </button>
-          <button
-            onClick={onClose}
-            className="flex-1 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs transition active:scale-95 text-center border border-slate-200 dark:border-slate-700 shadow-sm"
-          >
-            Tutup Pratinjau
-          </button>
+        {/* Kronologi Kondisi Bab & Scene Accordion */}
+        <div className="pt-3 border-t border-slate-200 dark:border-slate-800">
+          <ChapterSceneChronologyAccordion
+            entity={activeEntity}
+            bookId={activeEntity.bookId}
+            onUpdate={() => onEntityUpdated?.(activeEntity)}
+          />
         </div>
+      </div>
+
+      {/* Action Buttons Footer */}
+      <div className="flex items-center gap-2 pt-3 border-t border-slate-100 dark:border-slate-800 flex-shrink-0">
+        <button
+          type="button"
+          onClick={() => setIsImagePickerOpen(true)}
+          className="flex-1 py-2.5 px-3 rounded-xl bg-pink-500/10 hover:bg-pink-500/20 text-pink-500 dark:text-pink-400 font-bold text-xs transition active:scale-95 flex items-center justify-center gap-1.5 border border-pink-500/30"
+        >
+          <Camera className="w-4 h-4" />
+          <span>Pasang Gambar Utama</span>
+        </button>
+        <button
+          onClick={onClose}
+          className="flex-1 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs transition active:scale-95 text-center border border-slate-200 dark:border-slate-700 shadow-sm"
+        >
+          Tutup Pratinjau
+        </button>
+      </div>
       </div>
 
       {/* Main Image Picker Modal */}

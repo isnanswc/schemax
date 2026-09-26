@@ -4,7 +4,8 @@ import {
   EntityRelationship,
   EntityCondition,
   RelationshipType,
-  WorldCategory
+  StoryChapter,
+  ChapterEntityState
 } from '../../types';
 import { db } from '../../db';
 import { autoMapWorldEntities, AutoMapResult } from '../../services/aiService';
@@ -37,7 +38,8 @@ import {
   Flame,
   User,
   MapPin,
-  Scroll
+  Scroll,
+  BookOpen
 } from 'lucide-react';
 
 interface WorldAutoMapViewProps {
@@ -45,13 +47,14 @@ interface WorldAutoMapViewProps {
   bookTitle: string;
   entities: WorldEntity[];
   onRefresh: () => void;
+  // Optional Chapter context if used inside Chapter Glossary!
+  chapter?: StoryChapter;
+  onUpdateChapter?: (fields: Partial<StoryChapter>) => void;
 }
 
 interface NodePosition {
   x: number;
   y: number;
-  vx?: number;
-  vy?: number;
 }
 
 export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
@@ -59,6 +62,8 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
   bookTitle,
   entities,
   onRefresh,
+  chapter,
+  onUpdateChapter,
 }) => {
   // Modes: 'network' (Hubungan Garis) or 'clusters' (Himpunan Faksi)
   const [viewMode, setViewMode] = useState<'network' | 'clusters'>('network');
@@ -67,7 +72,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
   const [selectedConditionFilter, setSelectedConditionFilter] = useState<string>('all');
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
 
-  // Modals
+  // Modals & Popups
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiPreviewData, setAiPreviewData] = useState<AutoMapResult | null>(null);
   const [isAddRelationOpen, setIsAddRelationOpen] = useState(false);
@@ -75,20 +80,24 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
   const [hologramEntity, setHologramEntity] = useState<WorldEntity | null>(null);
   const [conditionEditorEntity, setConditionEditorEntity] = useState<WorldEntity | null>(null);
 
-  // Interactive Canvas State
+  // Canvas Viewport State (Zoom & Pan)
   const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [pan, setPan] = useState({ x: 50, y: 50 });
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Pointer Dragging States (Mouse & Touch Unified via Pointer Events)
   const [isDraggingCanvas, setIsDraggingCanvas] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [dragStartPointer, setDragStartPointer] = useState({ x: 0, y: 0 });
   const [draggedNodeId, setDraggedNodeId] = useState<string | null>(null);
+  const [nodeDragOffset, setNodeDragOffset] = useState({ x: 0, y: 0 });
 
   // Node Positions Map { [entityId]: { x, y } }
   const [nodePositions, setNodePositions] = useState<Record<string, NodePosition>>({});
 
-  // Media blobs URLs cache
+  // Media avatar URLs cache
   const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
 
-  // Load avatar blobs for all entities
+  // Load avatar blobs for entities
   useEffect(() => {
     let active = true;
     const mediaIdsToFetch = entities
@@ -115,28 +124,71 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
     };
   }, [entities]);
 
-  // Derive all unique factions from entities
+  // Derive active conditions & relationships for each entity
+  // If in chapter mode: prioritize chapter.chapterEntityStates
+  const entityEffectiveData = useMemo(() => {
+    const map: Record<
+      string,
+      {
+        condition: string;
+        conditionDetails: string;
+        relationships: EntityRelationship[];
+        faction: string;
+        factionColor: string;
+      }
+    > = {};
+
+    entities.forEach((ent) => {
+      const chapterState = chapter?.chapterEntityStates?.[ent.id];
+      const effCondition = chapterState?.condition || ent.condition || 'aktif';
+      const effConditionDetails = chapterState?.conditionDetails || ent.conditionDetails || '';
+      
+      // Combine chapter-specific relationships and general entity relationships
+      const rels: EntityRelationship[] = [];
+      if (chapterState?.relationships && chapterState.relationships.length > 0) {
+        rels.push(...chapterState.relationships);
+      }
+      if (ent.relationships && ent.relationships.length > 0) {
+        ent.relationships.forEach((r) => {
+          if (!rels.some((existing) => existing.targetEntityId === r.targetEntityId)) {
+            rels.push(r);
+          }
+        });
+      }
+
+      map[ent.id] = {
+        condition: effCondition,
+        conditionDetails: effConditionDetails,
+        relationships: rels,
+        faction: ent.faction || 'Independen / Netral',
+        factionColor: ent.factionColor || '#ec4899',
+      };
+    });
+
+    return map;
+  }, [entities, chapter]);
+
+  // Derive unique factions
   const availableFactions = useMemo(() => {
     const set = new Set<string>();
     entities.forEach((e) => {
-      if (e.faction?.trim()) {
-        set.add(e.faction.trim());
-      }
+      if (e.faction?.trim()) set.add(e.faction.trim());
     });
     return Array.from(set);
   }, [entities]);
 
-  // Calculate layout / positions on entity changes
+  // Initial circular/clustered layout calculation
   useEffect(() => {
     if (entities.length === 0) return;
 
     setNodePositions((prev) => {
       const next = { ...prev };
-      const centerX = 450;
-      const centerY = 350;
-      const radius = Math.min(320, 120 + entities.length * 25);
+      const centerX = 380;
+      const centerY = 300;
+      const total = entities.length;
+      const radius = Math.min(260, 100 + total * 20);
 
-      // Group entities by faction for organic initial clustering
+      // Group entities by faction
       const factionGroups: Record<string, WorldEntity[]> = {};
       entities.forEach((e) => {
         const fac = e.faction?.trim() || 'Independen / Netral';
@@ -145,8 +197,6 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
       });
 
       const factions = Object.keys(factionGroups);
-      let angleIndex = 0;
-      const totalEntities = entities.length;
 
       factions.forEach((fac, facIdx) => {
         const group = factionGroups[fac];
@@ -161,14 +211,13 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
               next[ent.id] = { x: groupCenterX, y: groupCenterY };
             } else {
               const subAngle = (2 * Math.PI * entIdx) / Math.max(1, group.length);
-              const subRadius = Math.min(100, 35 + group.length * 12);
+              const subRadius = Math.min(100, 40 + group.length * 15);
               next[ent.id] = {
                 x: groupCenterX + Math.cos(subAngle) * subRadius,
                 y: groupCenterY + Math.sin(subAngle) * subRadius,
               };
             }
           }
-          angleIndex++;
         });
       });
 
@@ -176,38 +225,40 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
     });
   }, [entities]);
 
-  // Filtered entities based on search, faction, and condition
+  // Filtered entities based on search, faction, condition
   const filteredEntities = useMemo(() => {
     return entities.filter((ent) => {
+      const eff = entityEffectiveData[ent.id];
+      if (!eff) return true;
+
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchName = ent.name.toLowerCase().includes(q);
-        const matchFaction = ent.faction?.toLowerCase().includes(q);
+        const matchFaction = eff.faction.toLowerCase().includes(q);
         const matchDesc = ent.shortDescription?.toLowerCase().includes(q);
         if (!matchName && !matchFaction && !matchDesc) return false;
       }
 
-      if (selectedFactionFilter !== 'all') {
-        const fac = ent.faction?.trim() || 'Independen / Netral';
-        if (fac !== selectedFactionFilter) return false;
+      if (selectedFactionFilter !== 'all' && eff.faction !== selectedFactionFilter) {
+        return false;
       }
 
-      if (selectedConditionFilter !== 'all') {
-        const cond = ent.condition || 'aktif';
-        if (cond !== selectedConditionFilter) return false;
+      if (selectedConditionFilter !== 'all' && eff.condition !== selectedConditionFilter) {
+        return false;
       }
 
       return true;
     });
-  }, [entities, searchQuery, selectedFactionFilter, selectedConditionFilter]);
+  }, [entities, entityEffectiveData, searchQuery, selectedFactionFilter, selectedConditionFilter]);
 
   const selectedEntity = useMemo(() => {
     return entities.find((e) => e.id === selectedEntityId) || null;
   }, [entities, selectedEntityId]);
 
-  // Extract all links/relationships between existing entities
+  // Robust Relationship Links Extractor with Dual Matching (ID and Name)
   const allRelationshipLinks = useMemo(() => {
     const links: Array<{
+      id: string;
       sourceId: string;
       targetId: string;
       sourceName: string;
@@ -215,40 +266,56 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
       relationship: EntityRelationship;
     }> = [];
 
-    const entityMap = new Map(entities.map((e) => [e.id, e]));
-
-    entities.forEach((source) => {
-      if (source.relationships && source.relationships.length > 0) {
-        source.relationships.forEach((rel) => {
-          const target = entityMap.get(rel.targetEntityId);
-          if (target) {
-            // Avoid duplicate bidirectional render if identical
-            links.push({
-              sourceId: source.id,
-              targetId: target.id,
-              sourceName: source.name,
-              targetName: target.name,
-              relationship: rel,
-            });
-          }
-        });
+    const entityById = new Map(entities.map((e) => [e.id, e]));
+    const entityByName = new Map(entities.map((e) => [e.name.toLowerCase().trim(), e]));
+    entities.forEach((e) => {
+      if (e.aliases) {
+        e.aliases.forEach((a) => entityByName.set(a.toLowerCase().trim(), e));
       }
     });
 
-    return links;
-  }, [entities]);
+    const addedPairs = new Set<string>();
 
-  // Faction clusters grouping for Cluster / Himpunan Mode
+    entities.forEach((source) => {
+      const eff = entityEffectiveData[source.id];
+      if (!eff || !eff.relationships) return;
+
+      eff.relationships.forEach((rel) => {
+        // Resolve target via ID OR Name
+        const target =
+          entityById.get(rel.targetEntityId) ||
+          entityByName.get((rel.targetEntityId || '').toLowerCase().trim()) ||
+          entityByName.get((rel.targetEntityName || '').toLowerCase().trim());
+
+        if (target && target.id !== source.id) {
+          const pairKey = [source.id, target.id].sort().join('_');
+          links.push({
+            id: `${source.id}_${target.id}_${rel.label || 'rel'}`,
+            sourceId: source.id,
+            targetId: target.id,
+            sourceName: source.name,
+            targetName: target.name,
+            relationship: rel,
+          });
+          addedPairs.add(pairKey);
+        }
+      });
+    });
+
+    return links;
+  }, [entities, entityEffectiveData]);
+
+  // Faction clusters for Cluster Sets Mode
   const factionClusters = useMemo(() => {
-    const map: Record<string, { name: string; color: string; description: string; members: WorldEntity[] }> = {};
+    const map: Record<string, { name: string; color: string; members: WorldEntity[] }> = {};
 
     entities.forEach((ent) => {
-      const facName = ent.faction?.trim() || 'Independen / Netral';
+      const eff = entityEffectiveData[ent.id];
+      const facName = eff?.faction || 'Independen / Netral';
       if (!map[facName]) {
         map[facName] = {
           name: facName,
-          color: ent.factionColor || '#ec4899',
-          description: '',
+          color: eff?.factionColor || '#ec4899',
           members: [],
         };
       }
@@ -256,9 +323,9 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
     });
 
     return Object.values(map);
-  }, [entities]);
+  }, [entities, entityEffectiveData]);
 
-  // AI Auto-Map execution
+  // Execute Auto-Map AI with Chapter-Specific or Book-Wide context
   const handleTriggerAutoMap = async () => {
     if (entities.length === 0) {
       alert('Tambahkan setidaknya 1 atau 2 entitas sebelum menjalankan Auto-Map.');
@@ -267,7 +334,11 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
 
     setIsAiLoading(true);
     try {
-      const result = await autoMapWorldEntities(bookTitle, entities);
+      const storyContext = chapter
+        ? `Bab Ini: "${chapter.title}"\nPremis: ${chapter.premise || ''}\nNaskah Cerita Bab:\n${(chapter.contentHtml || '').replace(/<[^>]*>/g, ' ').slice(0, 10000)}`
+        : undefined;
+
+      const result = await autoMapWorldEntities(bookTitle, entities, storyContext);
       setAiPreviewData(result);
     } catch (err: any) {
       console.error('Auto map failed:', err);
@@ -277,7 +348,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
     }
   };
 
-  // Apply AI Auto-Map results to Dexie
+  // Apply AI Auto-Map Results
   const handleApplyAiResults = async () => {
     if (!aiPreviewData) return;
     setIsAiLoading(true);
@@ -288,17 +359,50 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
         factionColorMap[f.name] = f.color;
       });
 
-      for (const item of aiPreviewData.mappedEntities) {
-        const ent = entities.find((e) => e.id === item.id);
-        if (ent) {
-          await db.worldEntities.update(ent.id, {
-            faction: item.faction || ent.faction,
-            factionColor: item.factionColor || factionColorMap[item.faction] || ent.factionColor || '#ec4899',
-            condition: item.condition || ent.condition || 'aktif',
-            conditionDetails: item.conditionDetails || ent.conditionDetails || '',
-            relationships: item.relationships && item.relationships.length > 0 ? item.relationships : ent.relationships,
-            updatedAt: Date.now(),
-          });
+      const entityById = new Map(entities.map((e) => [e.id, e]));
+      const entityByName = new Map(entities.map((e) => [e.name.toLowerCase().trim(), e]));
+
+      if (chapter && onUpdateChapter) {
+        // Save chapter-specific states to chapter.chapterEntityStates
+        const nextChapterEntityStates: Record<string, ChapterEntityState> = {
+          ...(chapter.chapterEntityStates || {}),
+        };
+
+        aiPreviewData.mappedEntities.forEach((item) => {
+          const matched = entityById.get(item.id) || entityByName.get(item.name.toLowerCase().trim());
+          if (matched) {
+            nextChapterEntityStates[matched.id] = {
+              entityId: matched.id,
+              entityName: matched.name,
+              condition: item.condition,
+              conditionDetails: item.conditionDetails,
+              relationships: item.relationships,
+            };
+          }
+        });
+
+        await db.chapters.update(chapter.id, {
+          chapterEntityStates: nextChapterEntityStates,
+          updatedAt: Date.now(),
+        });
+
+        onUpdateChapter({
+          chapterEntityStates: nextChapterEntityStates,
+        });
+      } else {
+        // Global Worldbuilding update
+        for (const item of aiPreviewData.mappedEntities) {
+          const matched = entityById.get(item.id) || entityByName.get(item.name.toLowerCase().trim());
+          if (matched) {
+            await db.worldEntities.update(matched.id, {
+              faction: item.faction || matched.faction,
+              factionColor: item.factionColor || factionColorMap[item.faction] || matched.factionColor || '#ec4899',
+              condition: item.condition || matched.condition || 'aktif',
+              conditionDetails: item.conditionDetails || matched.conditionDetails || '',
+              relationships: item.relationships && item.relationships.length > 0 ? item.relationships : matched.relationships,
+              updatedAt: Date.now(),
+            });
+          }
         }
       }
 
@@ -312,52 +416,113 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
     }
   };
 
-  // Handle Dragging Canvas (Panning)
-  const handleCanvasMouseDown = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('.interactive-node')) return;
+  // ---------------------------------------------------------------------------
+  // Smooth Unified Pointer Events (Mouse, Trackpad & Touch Devices)
+  // ---------------------------------------------------------------------------
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const targetEl = e.target as HTMLElement;
+    if (targetEl.closest('.interactive-node')) {
+      // Handled by node pointer down
+      return;
+    }
+
     setIsDraggingCanvas(true);
-    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+    setDragStartPointer({
+      x: e.clientX - pan.x,
+      y: e.clientY - pan.y,
+    });
+    targetEl.setPointerCapture?.(e.pointerId);
   };
 
-  const handleCanvasMouseMove = (e: React.MouseEvent) => {
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (draggedNodeId) {
-      // Dragging a specific node
-      const rect = e.currentTarget.getBoundingClientRect();
+      const container = containerRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
       const mouseX = (e.clientX - rect.left - pan.x) / zoom;
       const mouseY = (e.clientY - rect.top - pan.y) / zoom;
 
       setNodePositions((prev) => ({
         ...prev,
-        [draggedNodeId]: { x: mouseX, y: mouseY },
+        [draggedNodeId]: {
+          x: mouseX - nodeDragOffset.x,
+          y: mouseY - nodeDragOffset.y,
+        },
       }));
     } else if (isDraggingCanvas) {
-      // Panning canvas
       setPan({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y,
+        x: e.clientX - dragStartPointer.x,
+        y: e.clientY - dragStartPointer.y,
       });
     }
   };
 
-  const handleCanvasMouseUp = () => {
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     setIsDraggingCanvas(false);
     setDraggedNodeId(null);
   };
 
-  // Reset View
+  // Wheel Zoom
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+    setZoom((z) => Math.min(3, Math.max(0.3, z * zoomFactor)));
+  };
+
+  // Node Pointer Down
+  const handleNodePointerDown = (e: React.PointerEvent, entId: string) => {
+    e.stopPropagation();
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const mouseX = (e.clientX - rect.left - pan.x) / zoom;
+    const mouseY = (e.clientY - rect.top - pan.y) / zoom;
+    const currentPos = nodePositions[entId] || { x: 380, y: 300 };
+
+    setDraggedNodeId(entId);
+    setNodeDragOffset({
+      x: mouseX - currentPos.x,
+      y: mouseY - currentPos.y,
+    });
+    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+  };
+
+  // Reset Canvas View
   const handleResetView = () => {
     setZoom(1);
-    setPan({ x: 0, y: 0 });
+    setPan({ x: 50, y: 50 });
     setSelectedEntityId(null);
   };
 
   return (
-    <div className="space-y-3 pb-24">
-      {/* Top Main Toolbar */}
+    <div className="space-y-3 pb-20">
+      {/* Top Banner & Mode Switcher */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 shadow-sm space-y-3">
+        {/* Title & Mode Switcher */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-gradient-to-r from-pink-500/20 to-amber-500/20 text-pink-500">
+              <GitFork className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                  {chapter ? `Peta Relasi Bab: ${chapter.title}` : 'Peta Relasi & Faksi Tokoh'}
+                </h3>
+                {chapter && (
+                  <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/30">
+                    Spesifik Bab Ini
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Visualisasikan hubungan garis antar karakter, faksi, dan kondisi hidup/luka/gugur.
+              </p>
+            </div>
+          </div>
+
           {/* Mode Switcher Tabs */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-950 rounded-xl text-xs font-semibold">
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-950 rounded-xl text-xs font-semibold self-start sm:self-auto">
             <button
               type="button"
               onClick={() => setViewMode('network')}
@@ -368,7 +533,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
               }`}
             >
               <GitFork className="w-3.5 h-3.5" />
-              <span>Garis Relasi (Network)</span>
+              <span>Garis Relasi</span>
             </button>
             <button
               type="button"
@@ -380,8 +545,23 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
               }`}
             >
               <Boxes className="w-3.5 h-3.5" />
-              <span>Himpunan Faksi (Cluster)</span>
+              <span>Himpunan Faksi</span>
             </button>
+          </div>
+        </div>
+
+        {/* Action Controls & Filters */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
+          {/* Search bar */}
+          <div className="relative flex-1 max-w-sm">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari karakter, faksi..."
+              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-pink-500"
+            />
           </div>
 
           {/* Action Buttons */}
@@ -398,7 +578,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
               ) : (
                 <Sparkles className="w-3.5 h-3.5 text-yellow-200" />
               )}
-              <span>Auto-Map AI</span>
+              <span>{chapter ? 'Auto-Map Bab Ini (AI)' : 'Auto-Map AI'}</span>
             </button>
 
             {/* Manual Add Relation */}
@@ -410,178 +590,87 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
               <Plus className="w-3.5 h-3.5 text-pink-500" />
               <span>+ Hubungan</span>
             </button>
-
-            {/* Reset View */}
-            <button
-              type="button"
-              onClick={handleResetView}
-              className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 text-xs transition"
-              title="Reset Zoom & Posisi"
-            >
-              <Maximize2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Search & Filters Bar */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/80 text-xs">
-          {/* Live Search */}
-          <div className="relative flex-1">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari karakter, faksi, relasi..."
-              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-pink-500"
-            />
-          </div>
-
-          {/* Faction Filter Pill */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-            <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">Faksi:</span>
-            <select
-              value={selectedFactionFilter}
-              onChange={(e) => setSelectedFactionFilter(e.target.value)}
-              className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1 text-xs text-slate-700 dark:text-slate-300 font-medium focus:outline-none"
-            >
-              <option value="all">Semua Faksi ({availableFactions.length})</option>
-              {availableFactions.map((f) => (
-                <option key={f} value={f}>
-                  {f}
-                </option>
-              ))}
-            </select>
-
-            <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap ml-2">Kondisi:</span>
-            <select
-              value={selectedConditionFilter}
-              onChange={(e) => setSelectedConditionFilter(e.target.value)}
-              className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1 text-xs text-slate-700 dark:text-slate-300 font-medium focus:outline-none"
-            >
-              <option value="all">Semua Kondisi</option>
-              {Object.values(ENTITY_CONDITIONS).map((cond) => (
-                <option key={cond.id} value={cond.id}>
-                  {cond.emoji} {cond.label}
-                </option>
-              ))}
-            </select>
           </div>
         </div>
       </div>
 
-      {/* Main Interactive Map Canvas */}
+      {/* Main Interactive Map Viewport */}
       {viewMode === 'network' ? (
-        <div className="relative w-full h-[620px] sm:h-[680px] bg-slate-950 rounded-3xl border border-slate-800 overflow-hidden shadow-2xl select-none">
-          {/* Subtle Cyber Grid Background */}
+        <div
+          ref={containerRef}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          onWheel={handleWheel}
+          style={{ touchAction: 'none' }}
+          className="relative w-full h-[580px] sm:h-[650px] bg-slate-950 rounded-3xl border border-slate-800 overflow-hidden shadow-2xl select-none cursor-grab active:cursor-grabbing"
+        >
+          {/* Cyber Grid Background */}
           <div
-            className="absolute inset-0 pointer-events-none opacity-25"
+            className="absolute inset-0 pointer-events-none opacity-20"
             style={{
               backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.15) 1px, transparent 0)`,
               backgroundSize: '24px 24px',
             }}
           />
 
-          {/* Canvas Floating Overlay Controls */}
-          <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 bg-slate-900/80 backdrop-blur-md p-1.5 rounded-xl border border-slate-800 text-xs text-slate-300">
+          {/* Floating Canvas Controls (Zoom In, Zoom Out, Reset) */}
+          <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md p-1.5 rounded-xl border border-slate-700 text-xs text-slate-200 shadow-lg">
             <button
-              onClick={() => setZoom((z) => Math.min(2.5, z + 0.15))}
-              className="p-1 hover:text-white rounded-lg hover:bg-slate-800"
-              title="Perbesar"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setZoom((z) => Math.min(3, z + 0.2));
+              }}
+              className="p-1.5 hover:text-white rounded-lg hover:bg-slate-800 active:scale-95 transition"
+              title="Perbesar (Zoom In)"
             >
-              <ZoomIn className="w-4 h-4" />
+              <ZoomIn className="w-4 h-4 text-amber-400" />
             </button>
-            <span className="text-[10px] font-mono px-1">{Math.round(zoom * 100)}%</span>
+            <span className="text-[11px] font-mono px-1 font-bold">{Math.round(zoom * 100)}%</span>
             <button
-              onClick={() => setZoom((z) => Math.max(0.4, z - 0.15))}
-              className="p-1 hover:text-white rounded-lg hover:bg-slate-800"
-              title="Perkecil"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setZoom((z) => Math.max(0.3, z - 0.2));
+              }}
+              className="p-1.5 hover:text-white rounded-lg hover:bg-slate-800 active:scale-95 transition"
+              title="Perkecil (Zoom Out)"
             >
-              <ZoomOut className="w-4 h-4" />
+              <ZoomOut className="w-4 h-4 text-amber-400" />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleResetView();
+              }}
+              className="p-1.5 hover:text-white rounded-lg hover:bg-slate-800 active:scale-95 transition border-l border-slate-700 pl-2"
+              title="Reset Tampilan"
+            >
+              <Maximize2 className="w-4 h-4 text-cyan-400" />
             </button>
           </div>
 
-          {/* Quick Legend Drawer in Canvas */}
-          <div className="absolute top-3 right-3 z-10 hidden sm:flex items-center gap-2 bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-800 text-[10px] text-slate-300">
-            <div className="flex items-center gap-1">
-              <span className="w-2.5 h-0.5 bg-cyan-400 inline-block" />
-              <span>Sekutu</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="w-2.5 h-0.5 bg-red-500 border-b border-dashed inline-block" />
-              <span>Musuh</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="w-2.5 h-0.5 bg-amber-400 inline-block" />
-              <span>Keluarga</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="w-2.5 h-0.5 bg-fuchsia-400 border-b border-dotted inline-block" />
-              <span>Khianat</span>
-            </div>
+          {/* Micro Instructions Overlay */}
+          <div className="absolute top-3 right-3 z-20 hidden sm:flex items-center gap-2 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700 text-[11px] text-slate-300 shadow-lg">
+            <Info className="w-3.5 h-3.5 text-pink-400" />
+            <span>Geser kanvas atau seret foto karakter untuk atur posisi</span>
           </div>
 
-          {/* Interactive SVG Canvas */}
-          <svg
-            className="w-full h-full cursor-grab active:cursor-grabbing"
-            onMouseDown={handleCanvasMouseDown}
-            onMouseMove={handleCanvasMouseMove}
-            onMouseUp={handleCanvasMouseUp}
-            onMouseLeave={handleCanvasMouseUp}
-          >
+          {/* Active SVG Canvas */}
+          <svg className="w-full h-full pointer-events-none">
             <defs>
-              {/* Arrow markers for directional relations */}
-              <marker
-                id="arrowhead-cyan"
-                markerWidth="8"
-                markerHeight="6"
-                refX="7"
-                refY="3"
-                orient="auto"
-              >
-                <polygon points="0 0, 8 3, 0 6" fill="#06b6d4" />
-              </marker>
-              <marker
-                id="arrowhead-red"
-                markerWidth="8"
-                markerHeight="6"
-                refX="7"
-                refY="3"
-                orient="auto"
-              >
-                <polygon points="0 0, 8 3, 0 6" fill="#ef4444" />
-              </marker>
-              <marker
-                id="arrowhead-amber"
-                markerWidth="8"
-                markerHeight="6"
-                refX="7"
-                refY="3"
-                orient="auto"
-              >
-                <polygon points="0 0, 8 3, 0 6" fill="#eab308" />
-              </marker>
-              <marker
-                id="arrowhead-fuchsia"
-                markerWidth="8"
-                markerHeight="6"
-                refX="7"
-                refY="3"
-                orient="auto"
-              >
-                <polygon points="0 0, 8 3, 0 6" fill="#d946ef" />
-              </marker>
-
-              {/* Clip path circle for entity avatars */}
-              <clipPath id="avatar-clip">
+              <clipPath id="chapter-avatar-clip">
                 <circle cx="28" cy="28" r="24" />
               </clipPath>
             </defs>
 
-            {/* Transform Group for Pan & Zoom */}
+            {/* Transform Group for Pan and Zoom */}
             <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
-              {/* Relationship Lines & Bézier Curves */}
-              {allRelationshipLinks.map((link, idx) => {
+              {/* Relationship Connecting Lines */}
+              {allRelationshipLinks.map((link) => {
                 const sourcePos = nodePositions[link.sourceId];
                 const targetPos = nodePositions[link.targetId];
                 if (!sourcePos || !targetPos) return null;
@@ -597,7 +686,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                 const dx = targetPos.x - sourcePos.x;
                 const dy = targetPos.y - sourcePos.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
-                const curvature = Math.min(45, dist * 0.15) * (idx % 2 === 0 ? 1 : -1);
+                const curvature = Math.min(45, dist * 0.15);
 
                 const midX = (sourcePos.x + targetPos.x) / 2 - (dy / (dist || 1)) * curvature;
                 const midY = (sourcePos.y + targetPos.y) / 2 + (dx / (dist || 1)) * curvature;
@@ -605,26 +694,26 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                 const pathData = `M ${sourcePos.x} ${sourcePos.y} Q ${midX} ${midY} ${targetPos.x} ${targetPos.y}`;
 
                 return (
-                  <g key={`${link.sourceId}_${link.targetId}_${idx}`} className="transition-opacity duration-200">
-                    {/* Shadow / Glow Line */}
+                  <g key={link.id} className="transition-opacity duration-200">
+                    {/* Glowing outer shadow line */}
                     <path
                       d={pathData}
                       fill="none"
                       stroke={relMeta.colorHex}
-                      strokeWidth={isConnectedToSelected ? '4' : '1.5'}
-                      strokeOpacity={isConnectedToSelected ? '0.3' : '0.08'}
+                      strokeWidth={isConnectedToSelected ? '4' : '2'}
+                      strokeOpacity={isConnectedToSelected ? '0.35' : '0.1'}
                     />
-                    {/* Main Core Line */}
+                    {/* Main line */}
                     <path
                       d={pathData}
                       fill="none"
                       stroke={relMeta.colorHex}
-                      strokeWidth={isConnectedToSelected ? '2.5' : '1'}
+                      strokeWidth={isConnectedToSelected ? '2.5' : '1.5'}
                       strokeDasharray={relMeta.strokeDasharray}
-                      strokeOpacity={isConnectedToSelected ? '0.9' : '0.25'}
+                      strokeOpacity={isConnectedToSelected ? '0.95' : '0.3'}
                     />
 
-                    {/* Relationship floating badge pill at curve center */}
+                    {/* Relationship Label Pill in Midpoint */}
                     {isConnectedToSelected && link.relationship.label && (
                       <g transform={`translate(${midX}, ${midY})`}>
                         <rect
@@ -635,8 +724,8 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                           rx="9"
                           fill="#0f172a"
                           stroke={relMeta.colorHex}
-                          strokeWidth="1"
-                          strokeOpacity="0.8"
+                          strokeWidth="1.2"
+                          strokeOpacity="0.9"
                         />
                         <text
                           x="0"
@@ -657,32 +746,30 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
 
               {/* Entity Nodes */}
               {filteredEntities.map((entity) => {
-                const pos = nodePositions[entity.id] || { x: 450, y: 350 };
+                const pos = nodePositions[entity.id] || { x: 380, y: 300 };
                 const isSelected = selectedEntityId === entity.id;
-                const isDimmed =
-                  selectedEntityId &&
-                  selectedEntityId !== entity.id &&
-                  !allRelationshipLinks.some(
+                const eff = entityEffectiveData[entity.id];
+                const condMeta = getConditionMeta(eff?.condition);
+                const avatarUrl = (entity.avatarMediaId && mediaUrls[entity.avatarMediaId]) || entity.avatarUrl;
+                const factionColor = eff?.factionColor || '#ec4899';
+
+                const isConnected =
+                  !selectedEntityId ||
+                  selectedEntityId === entity.id ||
+                  allRelationshipLinks.some(
                     (l) =>
                       (l.sourceId === selectedEntityId && l.targetId === entity.id) ||
                       (l.targetId === selectedEntityId && l.sourceId === entity.id)
                   );
 
-                const condMeta = getConditionMeta(entity.condition);
-                const avatarUrl = (entity.avatarMediaId && mediaUrls[entity.avatarMediaId]) || entity.avatarUrl;
-                const factionColor = entity.factionColor || '#ec4899';
-
                 return (
                   <g
                     key={entity.id}
                     transform={`translate(${pos.x - 28}, ${pos.y - 28})`}
-                    className={`interactive-node cursor-pointer transition-transform duration-150 ${
-                      isDimmed ? 'opacity-30' : 'opacity-100'
+                    className={`interactive-node pointer-events-auto cursor-pointer transition-transform duration-100 ${
+                      isConnected ? 'opacity-100' : 'opacity-25'
                     }`}
-                    onMouseDown={(e) => {
-                      e.stopPropagation();
-                      setDraggedNodeId(entity.id);
-                    }}
+                    onPointerDown={(e) => handleNodePointerDown(e, entity.id)}
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedEntityId(isSelected ? null : entity.id);
@@ -696,16 +783,16 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                       fill="none"
                       stroke={isSelected ? '#38bdf8' : factionColor}
                       strokeWidth={isSelected ? '3.5' : '2'}
-                      strokeOpacity={isSelected ? '1' : '0.6'}
+                      strokeOpacity={isSelected ? '1' : '0.7'}
                       className={isSelected ? 'animate-pulse' : ''}
                     />
 
-                    {/* Node Background Base */}
+                    {/* Dark Background Circle */}
                     <circle cx="28" cy="28" r="25" fill="#0f172a" />
 
-                    {/* Character Avatar or Category Fallback Icon */}
+                    {/* Character Avatar Image or Fallback Category Icon */}
                     {avatarUrl ? (
-                      <g clipPath="url(#avatar-clip)">
+                      <g clipPath="url(#chapter-avatar-clip)">
                         <image
                           href={avatarUrl}
                           x="4"
@@ -725,25 +812,25 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                     )}
 
                     {/* Condition Status Badge (Top-Right) */}
-                    <g transform="translate(40, 2)">
-                      <circle cx="8" cy="8" r="9" fill="#0f172a" stroke={condMeta.colorHex} strokeWidth="1.5" />
-                      <text x="8" y="11" fontSize="10" textAnchor="middle">
+                    <g transform="translate(38, 2)">
+                      <circle cx="9" cy="9" r="10" fill="#0f172a" stroke={condMeta.colorHex} strokeWidth="1.5" />
+                      <text x="9" y="12" fontSize="10" textAnchor="middle">
                         {condMeta.emoji}
                       </text>
                     </g>
 
                     {/* Entity Name Pill Label (Bottom) */}
-                    <g transform="translate(28, 64)">
+                    <g transform="translate(28, 65)">
                       <rect
-                        x={-Math.max(30, entity.name.length * 3.5)}
+                        x={-Math.max(30, entity.name.length * 3.6)}
                         y="-10"
-                        width={Math.max(60, entity.name.length * 7)}
+                        width={Math.max(60, entity.name.length * 7.2)}
                         height="20"
                         rx="10"
                         fill="#020617"
                         stroke={factionColor}
-                        strokeWidth="1"
-                        strokeOpacity="0.8"
+                        strokeWidth="1.2"
+                        strokeOpacity="0.85"
                       />
                       <text
                         x="0"
@@ -758,9 +845,9 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                       </text>
                     </g>
 
-                    {/* Faction or Condition Tag Label below Name */}
-                    {entity.faction && (
-                      <g transform="translate(28, 79)">
+                    {/* Faction tag label below name */}
+                    {eff?.faction && (
+                      <g transform="translate(28, 80)">
                         <text
                           x="0"
                           y="4"
@@ -770,7 +857,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                           textAnchor="middle"
                           className="pointer-events-none select-none font-sans opacity-90"
                         >
-                          {entity.faction.slice(0, 16)}
+                          {eff.faction.slice(0, 16)}
                         </text>
                       </g>
                     )}
@@ -782,7 +869,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
 
           {/* Bottom Floating Inspector Panel when Entity Selected */}
           {selectedEntity && (
-            <div className="absolute bottom-3 inset-x-3 sm:inset-x-auto sm:left-4 sm:w-96 bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl p-4 shadow-2xl z-20 animate-in slide-in-from-bottom-3 duration-200">
+            <div className="absolute bottom-3 inset-x-3 sm:inset-x-auto sm:left-4 sm:w-96 bg-slate-900/95 backdrop-blur-xl border border-slate-700 rounded-2xl p-4 shadow-2xl z-20 animate-in slide-in-from-bottom-3 duration-200">
               <div className="flex items-start justify-between gap-3 mb-2.5">
                 <div className="flex items-center gap-2.5 min-w-0">
                   {/* Avatar / Camera Quick Changer */}
@@ -810,16 +897,16 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                   <div className="min-w-0">
                     <h4 className="font-bold text-sm text-white truncate">{selectedEntity.name}</h4>
                     <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                      {selectedEntity.faction && (
+                      {entityEffectiveData[selectedEntity.id]?.faction && (
                         <span
                           className="px-2 py-0.5 rounded-full text-[10px] font-semibold border"
                           style={{
-                            borderColor: `${selectedEntity.factionColor || '#ec4899'}40`,
-                            color: selectedEntity.factionColor || '#ec4899',
-                            backgroundColor: `${selectedEntity.factionColor || '#ec4899'}15`,
+                            borderColor: `${entityEffectiveData[selectedEntity.id]?.factionColor || '#ec4899'}40`,
+                            color: entityEffectiveData[selectedEntity.id]?.factionColor || '#ec4899',
+                            backgroundColor: `${entityEffectiveData[selectedEntity.id]?.factionColor || '#ec4899'}15`,
                           }}
                         >
-                          {selectedEntity.faction}
+                          {entityEffectiveData[selectedEntity.id]?.faction}
                         </span>
                       )}
                       {/* Condition Badge with Quick Edit */}
@@ -827,12 +914,12 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                         type="button"
                         onClick={() => setConditionEditorEntity(selectedEntity)}
                         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition hover:scale-105 ${
-                          getConditionMeta(selectedEntity.condition).badgeClass
+                          getConditionMeta(entityEffectiveData[selectedEntity.id]?.condition).badgeClass
                         }`}
-                        title="Klik untuk ubah kondisi"
+                        title="Klik untuk ubah kondisi di bab ini"
                       >
-                        <span>{getConditionMeta(selectedEntity.condition).emoji}</span>
-                        <span>{getConditionMeta(selectedEntity.condition).label}</span>
+                        <span>{getConditionMeta(entityEffectiveData[selectedEntity.id]?.condition).emoji}</span>
+                        <span>{getConditionMeta(entityEffectiveData[selectedEntity.id]?.condition).label}</span>
                         <Edit2 className="w-2.5 h-2.5 opacity-60 ml-0.5" />
                       </button>
                     </div>
@@ -848,22 +935,26 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
               </div>
 
               {/* Condition Note if exists */}
-              {selectedEntity.conditionDetails && (
+              {entityEffectiveData[selectedEntity.id]?.conditionDetails && (
                 <p className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/20 p-2 rounded-xl mb-2.5 leading-snug">
-                  <strong>Kondisi:</strong> {selectedEntity.conditionDetails}
+                  <strong>Kondisi {chapter ? 'di Bab Ini' : 'Terkini'}:</strong>{' '}
+                  {entityEffectiveData[selectedEntity.id]?.conditionDetails}
                 </p>
               )}
 
               {/* Connected Relationships in Inspector */}
               <div className="space-y-1 mb-3 max-h-24 overflow-y-auto no-scrollbar">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                  Jaringan Relasi ({selectedEntity.relationships?.length || 0})
+                  Jaringan Relasi ({entityEffectiveData[selectedEntity.id]?.relationships?.length || 0})
                 </span>
-                {(!selectedEntity.relationships || selectedEntity.relationships.length === 0) ? (
+                {(!entityEffectiveData[selectedEntity.id]?.relationships ||
+                  entityEffectiveData[selectedEntity.id]?.relationships.length === 0) ? (
                   <p className="text-[11px] text-slate-500 italic">Belum ada relasi tercatat.</p>
                 ) : (
-                  selectedEntity.relationships.map((rel, rIdx) => {
-                    const targetEnt = entities.find((e) => e.id === rel.targetEntityId);
+                  entityEffectiveData[selectedEntity.id]?.relationships.map((rel, rIdx) => {
+                    const targetEnt =
+                      entities.find((e) => e.id === rel.targetEntityId) ||
+                      entities.find((e) => e.name.toLowerCase() === (rel.targetEntityName || '').toLowerCase());
                     const relMeta = getRelationshipMeta(rel.relationshipType);
                     return (
                       <div
@@ -871,7 +962,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                         className="flex items-center justify-between text-[11px] bg-slate-950/60 border border-slate-800 rounded-lg px-2 py-1"
                       >
                         <span className="font-semibold text-slate-200 truncate">
-                          {rel.label}: {targetEnt?.name || 'Entitas Lain'}
+                          {rel.label}: {targetEnt?.name || rel.targetEntityName || 'Entitas Lain'}
                         </span>
                         <span
                           className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase"
@@ -893,7 +984,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                   className="flex-1 py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition"
                 >
                   <Eye className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Hologram Profil</span>
+                  <span>Profil &amp; Kronologi</span>
                 </button>
                 <button
                   type="button"
@@ -921,13 +1012,13 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                     borderColor: `${clusterColor}40`,
                   }}
                 >
-                  {/* Glowing corner gradient ambient */}
+                  {/* Glowing background */}
                   <div
                     className="absolute -top-12 -right-12 w-32 h-32 rounded-full blur-3xl pointer-events-none"
                     style={{ backgroundColor: `${clusterColor}20` }}
                   />
 
-                  {/* Cluster Header */}
+                  {/* Header */}
                   <div className="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
                     <div className="flex items-center gap-2.5">
                       <div
@@ -945,11 +1036,12 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Members inside the Himpunan */}
+                  {/* Members Grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     {cluster.members.map((member) => {
+                      const eff = entityEffectiveData[member.id];
                       const avatarUrl = (member.avatarMediaId && mediaUrls[member.avatarMediaId]) || member.avatarUrl;
-                      const condMeta = getConditionMeta(member.condition);
+                      const condMeta = getConditionMeta(eff?.condition);
 
                       return (
                         <div
@@ -957,20 +1049,17 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                           onClick={() => setHologramEntity(member)}
                           className="group relative bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800/80 hover:border-pink-500/50 rounded-2xl p-2.5 flex items-start gap-2.5 cursor-pointer transition hover:shadow-sm"
                         >
-                          {/* Member Avatar */}
                           <div className="relative w-11 h-11 rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-900 flex-shrink-0 flex items-center justify-center border border-slate-200 dark:border-slate-700">
                             {avatarUrl ? (
                               <img src={avatarUrl} alt={member.name} className="w-full h-full object-cover" />
                             ) : (
                               <User className="w-5 h-5 text-slate-400" />
                             )}
-                            {/* Condition mini badge */}
                             <span className="absolute bottom-0 right-0 text-[10px] leading-none">
                               {condMeta.emoji}
                             </span>
                           </div>
 
-                          {/* Member details */}
                           <div className="flex-1 min-w-0">
                             <h5 className="font-bold text-xs text-slate-900 dark:text-white truncate group-hover:text-pink-500 transition">
                               {member.name}
@@ -978,9 +1067,9 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                             <span className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-semibold border ${condMeta.badgeClass} mt-0.5`}>
                               {condMeta.label}
                             </span>
-                            {member.conditionDetails && (
+                            {eff?.conditionDetails && (
                               <p className="text-[10px] text-slate-400 line-clamp-1 mt-0.5 italic">
-                                {member.conditionDetails}
+                                {eff.conditionDetails}
                               </p>
                             )}
                           </div>
@@ -995,7 +1084,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
         </div>
       )}
 
-      {/* AI Auto-Map Preview & Apply Modal */}
+      {/* AI Auto-Map Preview Modal */}
       {aiPreviewData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
           <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm" />
@@ -1004,19 +1093,18 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
               <div className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-yellow-500" />
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  Hasil Pemetaan Otomatis AI
+                  Hasil Pemetaan Otomatis AI {chapter ? `(Bab: ${chapter.title})` : ''}
                 </h3>
               </div>
               <button
                 onClick={() => setAiPreviewData(null)}
-                className="p-1 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-white"
+                className="p-1 rounded-full text-slate-400 hover:text-white"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-4 pr-1 text-xs">
-              {/* Factions Discovered */}
               <div>
                 <span className="font-bold text-slate-500 uppercase tracking-wider block mb-1.5 text-[10px]">
                   Faksi yang Terdeteksi ({aiPreviewData.factions.length})
@@ -1037,10 +1125,9 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                 </div>
               </div>
 
-              {/* Entities Mapped */}
               <div>
                 <span className="font-bold text-slate-500 uppercase tracking-wider block mb-1.5 text-[10px]">
-                  Pemetaan Entitas & Kondisi ({aiPreviewData.mappedEntities.length})
+                  Kondisi Tokoh &amp; Hubungan ({aiPreviewData.mappedEntities.length})
                 </span>
                 <div className="space-y-2">
                   {aiPreviewData.mappedEntities.map((ent, i) => {
@@ -1076,7 +1163,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
               <button
                 type="button"
                 onClick={() => setAiPreviewData(null)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs"
+                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 font-bold text-xs"
               >
                 Batal
               </button>
@@ -1086,7 +1173,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                 disabled={isAiLoading}
                 className="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 text-white font-bold text-xs shadow-md shadow-pink-500/20 active:scale-95 transition"
               >
-                Terapkan ke Worldbuilding
+                Terapkan ke {chapter ? 'Bab Ini' : 'Worldbuilding'}
               </button>
             </div>
           </div>
@@ -1099,6 +1186,8 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
           isOpen={isAddRelationOpen}
           entities={entities}
           initialSourceId={selectedEntityId || undefined}
+          chapter={chapter}
+          onUpdateChapter={onUpdateChapter}
           onClose={() => setIsAddRelationOpen(false)}
           onSuccess={() => {
             setIsAddRelationOpen(false);
@@ -1112,6 +1201,8 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
         <EditConditionModal
           isOpen={!!conditionEditorEntity}
           entity={conditionEditorEntity}
+          chapter={chapter}
+          onUpdateChapter={onUpdateChapter}
           onClose={() => setConditionEditorEntity(null)}
           onSuccess={() => {
             setConditionEditorEntity(null);
@@ -1132,26 +1223,29 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
         }}
       />
 
-      {/* Full Hologram Modal */}
+      {/* Full Hologram Modal with Chapter-Scene Accordion */}
       <WorldEntityHologramModal
         isOpen={!!hologramEntity}
         entity={hologramEntity}
         onClose={() => setHologramEntity(null)}
+        onEntityUpdated={() => onRefresh()}
       />
     </div>
   );
 };
 
 // -------------------------------------------------------------
-// Helper Submodal: Tambah Relasi Antar Karakter
+// Submodal: Tambah Relasi Karakter
 // -------------------------------------------------------------
 const AddRelationshipModal: React.FC<{
   isOpen: boolean;
   entities: WorldEntity[];
   initialSourceId?: string;
+  chapter?: StoryChapter;
+  onUpdateChapter?: (fields: Partial<StoryChapter>) => void;
   onClose: () => void;
   onSuccess: () => void;
-}> = ({ isOpen, entities, initialSourceId, onClose, onSuccess }) => {
+}> = ({ isOpen, entities, initialSourceId, chapter, onUpdateChapter, onClose, onSuccess }) => {
   const [sourceId, setSourceId] = useState(initialSourceId || entities[0]?.id || '');
   const [targetId, setTargetId] = useState(
     entities.find((e) => e.id !== (initialSourceId || entities[0]?.id))?.id || ''
@@ -1185,17 +1279,33 @@ const AddRelationshipModal: React.FC<{
         description: description.trim(),
       };
 
-      const existingRels = source.relationships || [];
-      // Replace if existing with same target or append
-      const updatedRels = [
-        ...existingRels.filter((r) => r.targetEntityId !== target.id),
-        newRel,
-      ];
+      if (chapter && onUpdateChapter) {
+        // Save to chapter.chapterEntityStates
+        const nextStates = { ...(chapter.chapterEntityStates || {}) };
+        const existingRel = nextStates[source.id]?.relationships || source.relationships || [];
+        nextStates[source.id] = {
+          ...nextStates[source.id],
+          entityId: source.id,
+          entityName: source.name,
+          relationships: [...existingRel.filter((r) => r.targetEntityId !== target.id), newRel],
+        };
 
-      await db.worldEntities.update(source.id, {
-        relationships: updatedRels,
-        updatedAt: Date.now(),
-      });
+        await db.chapters.update(chapter.id, {
+          chapterEntityStates: nextStates,
+          updatedAt: Date.now(),
+        });
+        onUpdateChapter({ chapterEntityStates: nextStates });
+      } else {
+        const existingRels = source.relationships || [];
+        const updatedRels = [
+          ...existingRels.filter((r) => r.targetEntityId !== target.id),
+          newRel,
+        ];
+        await db.worldEntities.update(source.id, {
+          relationships: updatedRels,
+          updatedAt: Date.now(),
+        });
+      }
 
       onSuccess();
     } catch (err) {
@@ -1213,7 +1323,7 @@ const AddRelationshipModal: React.FC<{
         <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
           <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <GitFork className="w-4 h-4 text-pink-500" />
-            <span>Tambah Hubungan Karakter</span>
+            <span>Tambah Hubungan {chapter ? `(Bab: ${chapter.title})` : ''}</span>
           </h3>
           <button onClick={onClose} className="p-1 rounded-full text-slate-400 hover:text-white">
             <X className="w-4 h-4" />
@@ -1230,7 +1340,7 @@ const AddRelationshipModal: React.FC<{
             >
               {entities.map((e) => (
                 <option key={e.id} value={e.id}>
-                  {e.name} ({e.faction || 'Independen'})
+                  {e.name}
                 </option>
               ))}
             </select>
@@ -1247,7 +1357,7 @@ const AddRelationshipModal: React.FC<{
                 .filter((e) => e.id !== sourceId)
                 .map((e) => (
                   <option key={e.id} value={e.id}>
-                    {e.name} ({e.faction || 'Independen'})
+                    {e.name}
                   </option>
                 ))}
             </select>
@@ -1270,24 +1380,13 @@ const AddRelationshipModal: React.FC<{
 
           <div>
             <label className="block text-slate-500 font-semibold mb-1">
-              Label Hubungan (Misal: "Musuh Bebuyutan", "Pengawal Rahasia")
+              Label Hubungan (Misal: "Musuh Bebuyutan", "Pengawal Setia")
             </label>
             <input
               type="text"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="Contoh: Kakak Kandung / Rival Utama"
-              className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white"
-            />
-          </div>
-
-          <div>
-            <label className="block text-slate-500 font-semibold mb-1">Keterangan Tambahan (Opsional)</label>
-            <textarea
-              rows={2}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Penjelasan dinamika hubungan..."
               className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white"
             />
           </div>
@@ -1315,17 +1414,21 @@ const AddRelationshipModal: React.FC<{
 };
 
 // -------------------------------------------------------------
-// Helper Submodal: Ubah Kondisi Entitas
+// Submodal: Ubah Kondisi Entitas
 // -------------------------------------------------------------
 const EditConditionModal: React.FC<{
   isOpen: boolean;
   entity: WorldEntity;
+  chapter?: StoryChapter;
+  onUpdateChapter?: (fields: Partial<StoryChapter>) => void;
   onClose: () => void;
   onSuccess: () => void;
-}> = ({ isOpen, entity, onClose, onSuccess }) => {
-  const [condition, setCondition] = useState<string>(entity.condition || 'aktif');
-  const [conditionDetails, setConditionDetails] = useState(entity.conditionDetails || '');
-  const [faction, setFaction] = useState(entity.faction || '');
+}> = ({ isOpen, entity, chapter, onUpdateChapter, onClose, onSuccess }) => {
+  const currentChapterState = chapter?.chapterEntityStates?.[entity.id];
+  const [condition, setCondition] = useState<string>(currentChapterState?.condition || entity.condition || 'aktif');
+  const [conditionDetails, setConditionDetails] = useState(
+    currentChapterState?.conditionDetails || entity.conditionDetails || ''
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
@@ -1334,12 +1437,29 @@ const EditConditionModal: React.FC<{
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      await db.worldEntities.update(entity.id, {
-        condition,
-        conditionDetails: conditionDetails.trim(),
-        faction: faction.trim(),
-        updatedAt: Date.now(),
-      });
+      if (chapter && onUpdateChapter) {
+        // Save chapter-specific condition
+        const nextStates = { ...(chapter.chapterEntityStates || {}) };
+        nextStates[entity.id] = {
+          ...nextStates[entity.id],
+          entityId: entity.id,
+          entityName: entity.name,
+          condition,
+          conditionDetails: conditionDetails.trim(),
+        };
+
+        await db.chapters.update(chapter.id, {
+          chapterEntityStates: nextStates,
+          updatedAt: Date.now(),
+        });
+        onUpdateChapter({ chapterEntityStates: nextStates });
+      } else {
+        await db.worldEntities.update(entity.id, {
+          condition,
+          conditionDetails: conditionDetails.trim(),
+          updatedAt: Date.now(),
+        });
+      }
       onSuccess();
     } catch (err) {
       console.error('Gagal mengubah kondisi:', err);
@@ -1354,9 +1474,14 @@ const EditConditionModal: React.FC<{
       <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-2xl z-10 animate-in zoom-in-95">
         <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800 mb-3">
-          <h3 className="text-base font-bold text-slate-900 dark:text-white">
-            Ubah Kondisi: {entity.name}
-          </h3>
+          <div>
+            <span className="text-[10px] font-bold text-pink-500 uppercase tracking-wider">
+              {chapter ? `Status di Bab: ${chapter.title}` : 'Status Entitas'}
+            </span>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">
+              {entity.name}
+            </h3>
+          </div>
           <button onClick={onClose} className="p-1 rounded-full text-slate-400 hover:text-white">
             <X className="w-4 h-4" />
           </button>
@@ -1364,11 +1489,11 @@ const EditConditionModal: React.FC<{
 
         <form onSubmit={handleSave} className="space-y-3 text-xs">
           <div>
-            <label className="block text-slate-500 font-semibold mb-1">Status / Kondisi Terkini</label>
+            <label className="block text-slate-500 font-semibold mb-1">Status / Kondisi</label>
             <select
               value={condition}
               onChange={(e) => setCondition(e.target.value)}
-              className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white"
+              className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white font-medium"
             >
               {Object.values(ENTITY_CONDITIONS).map((c) => (
                 <option key={c.id} value={c.id}>
@@ -1380,24 +1505,13 @@ const EditConditionModal: React.FC<{
 
           <div>
             <label className="block text-slate-500 font-semibold mb-1">
-              Keterangan Kondisi (Misal: "Terluka di pertempuran benteng")
+              Keterangan Kondisi {chapter ? 'di Bab Ini' : ''}
             </label>
             <textarea
               rows={2}
               value={conditionDetails}
               onChange={(e) => setConditionDetails(e.target.value)}
-              placeholder="Deskripsi kondisi saat ini..."
-              className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white"
-            />
-          </div>
-
-          <div>
-            <label className="block text-slate-500 font-semibold mb-1">Faksi / Kelompok</label>
-            <input
-              type="text"
-              value={faction}
-              onChange={(e) => setFaction(e.target.value)}
-              placeholder="Contoh: Kerajaan Surya / Pemberontak"
+              placeholder="Cth: Terluka di lengan kiri setelah duel dengan musuh..."
               className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white"
             />
           </div>

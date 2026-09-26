@@ -28,7 +28,8 @@ import {
   Search,
   BookMarked,
   SlidersHorizontal,
-  Camera
+  Camera,
+  GitFork
 } from 'lucide-react';
 import {
   StoryChapter,
@@ -50,6 +51,7 @@ import { WorldEntityHologramModal } from '../../world/WorldEntityHologramModal';
 import { AddWorldEntityModal } from '../../world/AddWorldEntityModal';
 import { EntityImagePickerModal } from '../../world/EntityImagePickerModal';
 import { getConditionMeta } from '../../world/entityConditionMeta';
+import { WorldAutoMapView } from '../../world/WorldAutoMapView';
 import { VerticalSceneTimeline } from './VerticalSceneTimeline';
 
 interface ChapterGlossaryTabProps {
@@ -69,8 +71,8 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
   onUpdateChapter,
   onInsertTextToManuscript,
 }) => {
-  // Navigation Subtabs: 5 unified primary tabs
-  const [activeSubTab, setActiveSubTab] = useState<'entities' | 'detected' | 'images' | 'scenes' | 'visuals'>('entities');
+  // Navigation Subtabs: 6 primary tabs (including chapter auto-map)
+  const [activeSubTab, setActiveSubTab] = useState<'entities' | 'map' | 'detected' | 'images' | 'scenes' | 'visuals'>('entities');
   
   // 📚 Unified Entities State (Filter, Sort, Search)
   const [searchQuery, setSearchQuery] = useState('');
@@ -718,7 +720,21 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
             <span>Entitas ({entities.length})</span>
           </button>
 
-          {/* TAB 2: KANDIDAT AI */}
+          {/* TAB 2: PETA RELASI BAB (AUTO-MAP) */}
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('map')}
+            className={`py-1.5 px-3 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 flex items-center gap-1.5 ${
+              activeSubTab === 'map'
+                ? 'bg-gradient-to-r from-pink-500 to-rose-600 text-white shadow-md shadow-pink-500/20'
+                : 'bg-pink-500/10 text-pink-700 dark:text-pink-300 hover:bg-pink-500/20 border border-pink-500/30'
+            }`}
+          >
+            <GitFork className="w-3.5 h-3.5" />
+            <span>Peta Relasi Bab (Auto-Map)</span>
+          </button>
+
+          {/* TAB 3: KANDIDAT AI */}
           <button
             type="button"
             onClick={() => setActiveSubTab('detected')}
@@ -1066,7 +1082,25 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* 2. 🖼️ IMAGE GALLERY SUBTAB WORKSPACE                                      */}
+      {/* 2. 🗺️ CHAPTER AUTO-MAP & RELATIONSHIP WORKSPACE                            */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'map' && (
+        <div className="animate-in fade-in">
+          <WorldAutoMapView
+            bookId={chapter.bookId}
+            bookTitle={bookTitle}
+            entities={entities}
+            chapter={chapter}
+            onUpdateChapter={onUpdateChapter}
+            onRefresh={() => {
+              if (onUpdateChapter) onUpdateChapter({});
+            }}
+          />
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 3. 🖼️ IMAGE GALLERY SUBTAB WORKSPACE                                      */}
       {/* ========================================================================= */}
       {activeSubTab === 'images' && (
         <div className="space-y-3 animate-in fade-in">
