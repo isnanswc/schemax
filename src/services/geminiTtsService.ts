@@ -123,20 +123,180 @@ export const GROQ_VOICES: AIVoiceOption[] = [
 const audioUrlCache = new Map<string, string>();
 
 /**
+ * Maps emotion tags & tension into rich, compound, varied English vocal emotion tags
+ * (e.g. <angry>, <furious>, <whisper>, <sad>, <sobbing>, <cheerful>, <suspenseful>, <ominous>, <dramatic>, etc.)
+ */
+export function getEnglishEmotionTag(
+  emotion?: string,
+  intensity: number = 3,
+  isDialogue: boolean = false,
+  sampleText: string = ''
+): string {
+  const normIntensity = Math.max(1, Math.min(5, intensity));
+  const text = sampleText.toLowerCase();
+
+  switch (emotion) {
+    case 'anger':
+      if (normIntensity >= 5) return 'furious';
+      if (normIntensity >= 4) return 'angry';
+      if (normIntensity === 3) return 'indignant';
+      return 'annoyed';
+
+    case 'fear':
+      if (normIntensity >= 5) return 'panicked';
+      if (normIntensity >= 4) return 'terrified';
+      if (normIntensity === 3) return 'fearful';
+      return 'anxious';
+
+    case 'sadness':
+      if (normIntensity >= 5) return 'heartbroken';
+      if (normIntensity >= 4) return 'sobbing';
+      if (normIntensity === 3) return 'sad';
+      return 'melancholy';
+
+    case 'joy':
+      if (normIntensity >= 5) return 'ecstatic';
+      if (normIntensity >= 4) return 'laughing';
+      if (normIntensity === 3) return 'cheerful';
+      return 'warm';
+
+    case 'whisper':
+      if (normIntensity >= 4) return 'conspiratorial';
+      return 'whisper';
+
+    case 'suspense':
+      if (normIntensity >= 4) return 'ominous';
+      if (normIntensity === 3) return 'suspenseful';
+      return 'mysterious';
+
+    case 'climax':
+      if (normIntensity >= 4) return 'explosive';
+      return 'dramatic';
+
+    case 'solemn':
+      if (normIntensity >= 4) return 'majestic';
+      return 'solemn';
+
+    case 'neutral':
+    default:
+      // Contextual heuristic based on textual cues
+      if (isDialogue) {
+        if (/[!?]{2,}/.test(text) || text.includes('keterlaluan') || text.includes('brengsek') || text.includes('diam')) {
+          return 'angry';
+        }
+        if (text.includes('?') && (text.includes('apa') || text.includes('siapa') || text.includes('kenapa') || text.includes('bagaimana'))) {
+          return 'curious';
+        }
+        if (text.includes('!') || /[A-Z]{3,}/.test(sampleText)) {
+          return 'shouting';
+        }
+        if (text.includes('sayang') || text.includes('cinta') || text.includes('maaf')) {
+          return 'tender';
+        }
+        return 'conversational';
+      } else {
+        if (/darah|mayat|mati|hancur|meledak|klimaks|tarung/.test(text)) {
+          return 'dramatic';
+        }
+        if (/gelap|curiga|langkah|bayangan|malam|sunyi|waspada/.test(text)) {
+          return 'suspenseful';
+        }
+        if (/menangis|air mata|sedih|duka|isak|kehilangan/.test(text)) {
+          return 'sad';
+        }
+        if (/tertawa|senyum|riang|cahaya|gembira/.test(text)) {
+          return 'cheerful';
+        }
+        return 'storyteller';
+      }
+  }
+}
+
+/**
+ * Format story text with English emotion angle-brackets tags (<emotion> ... </emotion>)
+ * Distinguishes dialogue quotes from surrounding narration within the same paragraph for lively acting.
+ */
+export function formatTextWithEmotionTags(
+  text: string,
+  emotion?: string,
+  intensity: number = 3,
+  speaker?: string,
+  isDialogue?: boolean
+): string {
+  const clean = text.trim();
+  if (!clean) return '';
+
+  const primaryTag = getEnglishEmotionTag(emotion, intensity, Boolean(isDialogue), clean);
+
+  // If text contains dialogue quotes ("..." or “...”), format dialogue segments with primaryTag
+  // and surrounding narration with appropriate storytelling or narrative tags
+  const quoteRegex = /([“"'][^"”']+["”'])/g;
+  if (quoteRegex.test(clean)) {
+    const parts = clean.split(quoteRegex);
+    const taggedParts = parts
+      .map((part) => {
+        const trimmed = part.trim();
+        if (!trimmed) return '';
+        if (
+          (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+          (trimmed.startsWith('“') && trimmed.endsWith('”')) ||
+          (trimmed.startsWith("'") && trimmed.endsWith("'"))
+        ) {
+          // Inner dialogue quote
+          return `<${primaryTag}>${trimmed}</${primaryTag}>`;
+        } else {
+          // Surrounding narrative text
+          const narrativeTag =
+            emotion === 'suspense'
+              ? 'suspenseful'
+              : emotion === 'climax'
+              ? 'dramatic'
+              : 'storyteller';
+          return `<${narrativeTag}>${trimmed}</${narrativeTag}>`;
+        }
+      })
+      .filter(Boolean);
+
+    if (taggedParts.length > 0) {
+      return taggedParts.join(' ');
+    }
+  }
+
+  // Pure single block paragraph
+  return `<${primaryTag}>${clean}</${primaryTag}>`;
+}
+
+/**
  * Generate speech audio from text using Google AI Studio (Gemini Multimodal Audio)
+ * IMPORTANT: No prompt preambles or meta instructions are mixed into the reading text!
+ * Instructions are sent exclusively via system_instruction so the AI model never reads them out loud.
  */
 export async function generateGeminiSpeechAudio(
   text: string,
   modelName: string = 'gemini-3.8-flash-tts',
   voiceName: string = 'Aoede',
-  actingInstruction?: string
+  emotionTag?: {
+    emotion?: string;
+    intensity?: number;
+    speaker?: string;
+    isDialogue?: boolean;
+    actingNotes?: string;
+  }
 ): Promise<{ audioUrl: string; mimeType: string }> {
   const cleanText = text.trim();
   if (!cleanText) {
     throw new Error('Teks naskah kosong.');
   }
 
-  const cacheKey = `gemini_${modelName}_${voiceName}_${actingInstruction || ''}_${hashString(cleanText)}`;
+  const taggedText = formatTextWithEmotionTags(
+    cleanText,
+    emotionTag?.emotion,
+    emotionTag?.intensity,
+    emotionTag?.speaker,
+    emotionTag?.isDialogue
+  );
+
+  const cacheKey = `gemini_${modelName}_${voiceName}_${hashString(taggedText)}`;
   if (audioUrlCache.has(cacheKey)) {
     return {
       audioUrl: audioUrlCache.get(cacheKey)!,
@@ -168,19 +328,22 @@ export async function generateGeminiSpeechAudio(
   for (const model of modelsToTry) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-    const promptText = actingInstruction
-      ? `[Petunjuk Suara & Akting: ${actingInstruction}]\nBacakan kutipan berikut dalam bahasa Indonesia dengan intonasi manusia asli, artikulasi yang jelas, dan penjiwaan emosi:\n\n${cleanText}`
-      : `Bacakan naskah cerita berikut dalam bahasa Indonesia dengan artikulasi yang jernih, jeda nafas yang alami, dan intonasi seorang pencerita (storyteller) profesional:\n\n${cleanText}`;
-
     try {
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          system_instruction: {
+            parts: [
+              {
+                text: 'You are an award-winning theatrical audiobook narrator and voice actor. Read the Indonesian story text naturally, dynamically, and expressively. Strictly interpret and embody inline emotion tags enclosed in angle brackets (such as <angry>, <furious>, <whisper>, <sad>, <sobbing>, <cheerful>, <suspenseful>, <dramatic>, <solemn>, <panicked>, etc.) to modulate vocal intensity, breath, pitch, and pacing. CRITICAL RULE: NEVER speak aloud or spell out the emotion tag names or angle brackets. Only read the story sentences themselves.',
+              },
+            ],
+          },
           contents: [
             {
               role: 'user',
-              parts: [{ text: promptText }],
+              parts: [{ text: taggedText }],
             },
           ],
           generationConfig: {
@@ -235,14 +398,28 @@ export async function generateGeminiSpeechAudio(
 export async function generateGroqSpeechAudio(
   text: string,
   modelName: string = 'canopylabs/orpheus-v1-english',
-  voiceName: string = 'autumn'
+  voiceName: string = 'autumn',
+  emotionTag?: {
+    emotion?: string;
+    intensity?: number;
+    speaker?: string;
+    isDialogue?: boolean;
+  }
 ): Promise<{ audioUrl: string; mimeType: string }> {
   const cleanText = text.trim();
   if (!cleanText) {
     throw new Error('Teks naskah kosong.');
   }
 
-  const cacheKey = `groq_${modelName}_${voiceName}_${hashString(cleanText)}`;
+  const taggedText = formatTextWithEmotionTags(
+    cleanText,
+    emotionTag?.emotion,
+    emotionTag?.intensity,
+    emotionTag?.speaker,
+    emotionTag?.isDialogue
+  );
+
+  const cacheKey = `groq_${modelName}_${voiceName}_${hashString(taggedText)}`;
   if (audioUrlCache.has(cacheKey)) {
     return {
       audioUrl: audioUrlCache.get(cacheKey)!,
@@ -270,7 +447,7 @@ export async function generateGroqSpeechAudio(
     },
     body: JSON.stringify({
       model: modelName,
-      input: cleanText,
+      input: taggedText,
       voice: voiceName,
       response_format: 'wav',
     }),

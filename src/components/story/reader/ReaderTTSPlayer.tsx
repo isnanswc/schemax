@@ -15,7 +15,8 @@ import {
   AlertCircle,
   Bot,
   Zap,
-  Sliders
+  Sliders,
+  Repeat
 } from 'lucide-react';
 import { ParagraphTensionItem, ParagraphEmotionTag } from '../../../types';
 import { getEmotionAcoustics } from '../../../services/dramaDirectorService';
@@ -56,6 +57,7 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [baseRate, setBaseRate] = useState<number>(1.0);
+  const [isContinuous, setIsContinuous] = useState(true);
 
   // Engine selection: 'gemini' | 'groq' | 'browser'
   const [ttsEngine, setTtsEngine] = useState<TTSEngineMode>('gemini');
@@ -82,8 +84,14 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const htmlAudioRef = useRef<HTMLAudioElement | null>(null);
   const isPlayingRef = useRef(false);
+  const isContinuousRef = useRef(true);
+
+  // Gapless audio prefetch cache & in-flight tracker
+  const prefetchedAudiosRef = useRef<Map<number, HTMLAudioElement>>(new Map());
+  const isPrefetchingRef = useRef<Set<number>>(new Set());
 
   isPlayingRef.current = isPlaying;
+  isContinuousRef.current = isContinuous;
 
   // Load browser voices
   useEffect(() => {
@@ -140,8 +148,24 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
+      prefetchedAudiosRef.current.forEach((audio) => {
+        audio.pause();
+        audio.src = '';
+      });
+      prefetchedAudiosRef.current.clear();
+      isPrefetchingRef.current.clear();
     };
   }, []);
+
+  // Invalidate prefetched audio cache when voice/model/engine changes
+  useEffect(() => {
+    prefetchedAudiosRef.current.forEach((audio) => {
+      audio.pause();
+      audio.src = '';
+    });
+    prefetchedAudiosRef.current.clear();
+    isPrefetchingRef.current.clear();
+  }, [ttsEngine, selectedGeminiModel, selectedGeminiVoice, selectedGroqModel, selectedGroqVoice]);
 
   // Compute emotion modulation parameters based on current paragraph's tension score
   const currentTensionItem = tensionItems.find(
@@ -215,6 +239,51 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
       }
     : tensionModulation;
 
+  // Background prefetch function to buffer paragraph audio ahead of time
+  const prefetchParagraph = async (index: number) => {
+    if (index < 0 || index >= paragraphs.length || ttsEngine === 'browser') return;
+    if (prefetchedAudiosRef.current.has(index) || isPrefetchingRef.current.has(index)) return;
+
+    const rawText = paragraphs[index]?.trim();
+    if (!rawText) return;
+
+    isPrefetchingRef.current.add(index);
+    try {
+      const tag = emotionTags.find((t) => t.paragraphIndex === index);
+      let audioUrl = '';
+
+      if (ttsEngine === 'gemini') {
+        const res = await generateGeminiSpeechAudio(
+          rawText,
+          selectedGeminiModel,
+          selectedGeminiVoice,
+          tag
+        );
+        audioUrl = res.audioUrl;
+      } else if (ttsEngine === 'groq') {
+        const res = await generateGroqSpeechAudio(
+          rawText,
+          selectedGroqModel,
+          selectedGroqVoice,
+          tag
+        );
+        audioUrl = res.audioUrl;
+      }
+
+      if (audioUrl) {
+        const audio = new Audio(audioUrl);
+        audio.preload = 'auto';
+        audio.playbackRate = baseRate;
+        audio.load();
+        prefetchedAudiosRef.current.set(index, audio);
+      }
+    } catch (e) {
+      console.warn(`[TTS Prefetch] Background prefetch paragraf ${index}:`, e);
+    } finally {
+      isPrefetchingRef.current.delete(index);
+    }
+  };
+
   // Speak with browser Web Speech Synthesis
   const speakWithBrowser = (index: number) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
@@ -231,7 +300,7 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
 
     const rawText = paragraphs[index]?.trim();
     if (!rawText) {
-      if (index + 1 < paragraphs.length) {
+      if (index + 1 < paragraphs.length && isContinuousRef.current) {
         onParagraphChange(index + 1);
         speakParagraph(index + 1);
       } else {
@@ -260,7 +329,7 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
 
     utterance.onend = () => {
       if (isPlayingRef.current) {
-        if (index + 1 < paragraphs.length) {
+        if (index + 1 < paragraphs.length && isContinuousRef.current) {
           onParagraphChange(index + 1);
           speakParagraph(index + 1);
         } else {
@@ -281,11 +350,11 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
     setIsPaused(false);
   };
 
-  // Speak with Gemini AI Studio Audio
+  // Speak with Gemini AI Studio Audio (with 0.0s gapless prefetching)
   const speakWithGemini = async (index: number) => {
     const rawText = paragraphs[index]?.trim();
     if (!rawText) {
-      if (index + 1 < paragraphs.length) {
+      if (index + 1 < paragraphs.length && isContinuousRef.current) {
         onParagraphChange(index + 1);
         speakParagraph(index + 1);
       } else {
@@ -302,20 +371,59 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
       window.speechSynthesis.cancel();
     }
 
-    setIsLoadingAudio(true);
     setEngineNotice(null);
+
+    // 1. Instant Play if Audio is Already Prefetched in Background
+    if (prefetchedAudiosRef.current.has(index)) {
+      const audio = prefetchedAudiosRef.current.get(index)!;
+      prefetchedAudiosRef.current.delete(index);
+      audio.playbackRate = baseRate;
+      htmlAudioRef.current = audio;
+
+      audio.onended = () => {
+        if (isPlayingRef.current) {
+          if (index + 1 < paragraphs.length && isContinuousRef.current) {
+            onParagraphChange(index + 1);
+            speakParagraph(index + 1);
+          } else {
+            setIsPlaying(false);
+            setIsPaused(false);
+          }
+        }
+      };
+
+      audio.onerror = (e) => {
+        console.warn('Gemini audio error:', e);
+        setEngineNotice('Gagal memutar stream audio Gemini.');
+        setIsPlaying(false);
+      };
+
+      try {
+        await audio.play();
+        setIsPlaying(true);
+        setIsPaused(false);
+        setIsLoadingAudio(false);
+
+        // Preload next paragraph while this one plays
+        if (index + 1 < paragraphs.length) {
+          prefetchParagraph(index + 1);
+        }
+        return;
+      } catch (e) {
+        console.warn('Prefetched audio play failed, falling back to fresh fetch:', e);
+      }
+    }
+
+    // 2. Fresh Network Fetch (with loading indicator)
+    setIsLoadingAudio(true);
 
     try {
       const tag = emotionTags.find((t) => t.paragraphIndex === index);
-      const actingCue = tag
-        ? `${tag.isDialogue ? 'Dialog karakter ' + tag.speaker : 'Narasi pencerita'}. Emosi: ${tag.emotionLabel}. Catatan: ${tag.actingNotes}`
-        : undefined;
-
       const { audioUrl } = await generateGeminiSpeechAudio(
         rawText,
         selectedGeminiModel,
         selectedGeminiVoice,
-        actingCue
+        tag
       );
 
       const audio = new Audio(audioUrl);
@@ -324,7 +432,7 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
 
       audio.onended = () => {
         if (isPlayingRef.current) {
-          if (index + 1 < paragraphs.length) {
+          if (index + 1 < paragraphs.length && isContinuousRef.current) {
             onParagraphChange(index + 1);
             speakParagraph(index + 1);
           } else {
@@ -343,6 +451,11 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
       await audio.play();
       setIsPlaying(true);
       setIsPaused(false);
+
+      // Preload next paragraph immediately in background!
+      if (index + 1 < paragraphs.length) {
+        prefetchParagraph(index + 1);
+      }
     } catch (err: any) {
       console.warn('Gagal memutar audio Gemini AI:', err);
       setEngineNotice(`Gagal Suara AI (Gemini): ${err.message || 'Model AI Studio belum merespon'}`);
@@ -353,11 +466,11 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
     }
   };
 
-  // Speak with Groq Cloud Audio
+  // Speak with Groq Cloud Audio (with 0.0s gapless prefetching)
   const speakWithGroq = async (index: number) => {
     const rawText = paragraphs[index]?.trim();
     if (!rawText) {
-      if (index + 1 < paragraphs.length) {
+      if (index + 1 < paragraphs.length && isContinuousRef.current) {
         onParagraphChange(index + 1);
         speakParagraph(index + 1);
       } else {
@@ -374,14 +487,59 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
       window.speechSynthesis.cancel();
     }
 
-    setIsLoadingAudio(true);
     setEngineNotice(null);
 
+    // 1. Instant Play if Audio is Already Prefetched in Background
+    if (prefetchedAudiosRef.current.has(index)) {
+      const audio = prefetchedAudiosRef.current.get(index)!;
+      prefetchedAudiosRef.current.delete(index);
+      audio.playbackRate = baseRate;
+      htmlAudioRef.current = audio;
+
+      audio.onended = () => {
+        if (isPlayingRef.current) {
+          if (index + 1 < paragraphs.length && isContinuousRef.current) {
+            onParagraphChange(index + 1);
+            speakParagraph(index + 1);
+          } else {
+            setIsPlaying(false);
+            setIsPaused(false);
+          }
+        }
+      };
+
+      audio.onerror = (e) => {
+        console.warn('Groq audio error:', e);
+        setEngineNotice('Gagal memutar stream audio Groq.');
+        setIsPlaying(false);
+      };
+
+      try {
+        await audio.play();
+        setIsPlaying(true);
+        setIsPaused(false);
+        setIsLoadingAudio(false);
+
+        // Preload next paragraph while this one plays
+        if (index + 1 < paragraphs.length) {
+          prefetchParagraph(index + 1);
+        }
+        return;
+      } catch (e) {
+        console.warn('Prefetched Groq audio play failed, falling back to fresh fetch:', e);
+      }
+    }
+
+    // 2. Fresh Network Fetch
+    setIsLoadingAudio(true);
+
     try {
+      const tag = emotionTags.find((t) => t.paragraphIndex === index);
       const { audioUrl } = await generateGroqSpeechAudio(
         rawText,
         selectedGroqModel,
-        selectedGroqVoice
+        selectedGroqVoice,
+        tag
       );
 
       const audio = new Audio(audioUrl);
@@ -390,7 +548,7 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
 
       audio.onended = () => {
         if (isPlayingRef.current) {
-          if (index + 1 < paragraphs.length) {
+          if (index + 1 < paragraphs.length && isContinuousRef.current) {
             onParagraphChange(index + 1);
             speakParagraph(index + 1);
           } else {
@@ -409,6 +567,11 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
       await audio.play();
       setIsPlaying(true);
       setIsPaused(false);
+
+      // Preload next paragraph immediately in background!
+      if (index + 1 < paragraphs.length) {
+        prefetchParagraph(index + 1);
+      }
     } catch (err: any) {
       console.warn('Gagal memutar audio Groq AI:', err);
       setEngineNotice(`Gagal Suara AI (Groq): ${err.message || 'Model Groq TTS belum merespon'}`);
@@ -441,7 +604,22 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
       setIsPlaying(false);
       setIsPaused(true);
     } else {
-      speakParagraph(activeParagraphIndex);
+      if (isPaused && htmlAudioRef.current && htmlAudioRef.current.src) {
+        htmlAudioRef.current
+          .play()
+          .then(() => {
+            setIsPlaying(true);
+            setIsPaused(false);
+            if (activeParagraphIndex + 1 < paragraphs.length) {
+              prefetchParagraph(activeParagraphIndex + 1);
+            }
+          })
+          .catch(() => {
+            speakParagraph(activeParagraphIndex);
+          });
+      } else {
+        speakParagraph(activeParagraphIndex);
+      }
     }
   };
 
@@ -806,15 +984,34 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
 
         {/* Player Controls Bar */}
         <div className="flex items-center justify-between gap-2 bg-slate-50 dark:bg-slate-950/80 p-2 rounded-2xl border border-slate-100 dark:border-slate-800">
-          {/* Left: Speed control */}
-          <button
-            type="button"
-            onClick={handleSpeedToggle}
-            className="py-1 px-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] font-mono font-bold text-slate-700 dark:text-slate-300 active:scale-95 transition"
-            title="Ubah Kecepatan Suara"
-          >
-            {baseRate}x
-          </button>
+          {/* Left: Speed control & Continuous mode toggle */}
+          <div className="flex items-center gap-1 sm:gap-1.5">
+            <button
+              type="button"
+              onClick={handleSpeedToggle}
+              className="py-1 px-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] font-mono font-bold text-slate-700 dark:text-slate-300 active:scale-95 transition"
+              title="Ubah Kecepatan Suara"
+            >
+              {baseRate}x
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsContinuous(!isContinuous)}
+              className={`py-1 px-2 rounded-xl border text-[10px] font-bold flex items-center gap-1 transition active:scale-95 ${
+                isContinuous
+                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-700 dark:text-amber-300 shadow-xs'
+                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-400'
+              }`}
+              title={
+                isContinuous
+                  ? 'Mode Menyambung Aktif: Narasi otomatis berpindah ke paragraf berikutnya tanpa jeda (Gapless Prefetch).'
+                  : 'Mode Per-Paragraf: Berhenti setelah membaca 1 paragraf.'
+              }
+            >
+              <Repeat className={`w-3 h-3 ${isContinuous ? 'text-amber-500' : ''}`} />
+              <span className="hidden sm:inline">{isContinuous ? 'Menyambung' : '1 Paragraf'}</span>
+            </button>
+          </div>
 
           {/* Center Playback Buttons */}
           <div className="flex items-center gap-1 sm:gap-2">
