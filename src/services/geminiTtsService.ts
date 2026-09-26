@@ -85,9 +85,8 @@ export async function generateGeminiSpeechAudio(
 
   const apiKey = geminiSlot.apiKey.trim();
   const modelsToTry = [
-    'gemini-2.5-flash-preview-tts',
-    'gemini-2.0-flash',
-    'gemini-2.5-flash',
+    'gemini-3.8-flash-tts',
+    'gemini-3.8-flash-lite-tts',
   ];
 
   let lastError: Error | null = null;
@@ -127,6 +126,7 @@ export async function generateGeminiSpeechAudio(
       if (!response.ok) {
         const errJson = await response.json().catch(() => ({}));
         const msg = errJson.error?.message || `HTTP ${response.status} ${response.statusText}`;
+        console.warn(`[Gemini TTS] Model ${model} HTTP ${response.status}:`, msg);
         throw new Error(msg);
       }
 
@@ -148,6 +148,7 @@ export async function generateGeminiSpeechAudio(
       throw new Error('Respon Gemini tidak memuat data audio.');
     } catch (err: any) {
       lastError = err;
+      console.warn(`[Gemini TTS] Gagal dengan model ${model}:`, err.message);
       // Continue to next model fallback if available
     }
   }

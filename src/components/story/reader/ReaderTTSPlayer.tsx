@@ -71,12 +71,33 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
   useEffect(() => {
     const updateVoices = () => {
       if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-      const voices = window.speechSynthesis.getVoices();
-      if (voices.length > 0) {
-        setAvailableVoices(voices);
+        // Sort voices to place Indonesian voices at the very top
+        const sorted = [...voices].sort((a, b) => {
+          const aId =
+            a.lang.toLowerCase().startsWith('id') ||
+            a.name.toLowerCase().includes('indonesia') ||
+            a.name.toLowerCase().includes('gadis') ||
+            a.name.toLowerCase().includes('ardi');
+          const bId =
+            b.lang.toLowerCase().startsWith('id') ||
+            b.name.toLowerCase().includes('indonesia') ||
+            b.name.toLowerCase().includes('gadis') ||
+            b.name.toLowerCase().includes('ardi');
+          if (aId && !bId) return -1;
+          if (!aId && bId) return 1;
+          return a.name.localeCompare(b.name);
+        });
+        setAvailableVoices(sorted);
 
-        // Prioritize Indonesian voices (lang starts with 'id')
-        const idVoice = voices.find((v) => v.lang.toLowerCase().startsWith('id'));
+        // Prioritize Indonesian voices
+        const idVoice = sorted.find(
+          (v) =>
+            v.lang.toLowerCase().startsWith('id') ||
+            v.name.toLowerCase().includes('indonesia') ||
+            v.name.toLowerCase().includes('gadis') ||
+            v.name.toLowerCase().includes('ardi') ||
+            v.name.toLowerCase().includes('andika')
+        );
         if (idVoice) {
           setSelectedVoice(idVoice);
         } else {
@@ -84,7 +105,6 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
           const defaultVoice = voices.find((v) => v.default) || voices[0];
           setSelectedVoice(defaultVoice || null);
         }
-      }
     };
 
     updateVoices();
@@ -302,9 +322,10 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
       setIsPlaying(true);
       setIsPaused(false);
     } catch (err: any) {
-      console.warn('Gagal memutar audio Gemini AI, beralih ke suara browser:', err);
-      setEngineNotice(err.message || 'Gagal memuat suara AI Studio. Beralih ke browser.');
-      speakWithBrowser(index);
+      console.warn('Gagal memutar audio Gemini AI:', err);
+      setEngineNotice(err.message || 'Model AI Studio belum merespon.');
+      setIsPlaying(false);
+      setIsPaused(false);
     } finally {
       setIsLoadingAudio(false);
     }
@@ -503,20 +524,36 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
           </div>
         </div>
 
-        {/* Notice Banner (If API key needed or fallback happened) */}
+        {/* Notice Banner (If API key needed or error happened) */}
         {engineNotice && (
-          <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[10px] text-amber-700 dark:text-amber-300 flex items-start gap-1.5">
-            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-            <span className="flex-1 leading-tight">{engineNotice}</span>
+          <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-[11px] text-rose-800 dark:text-rose-200 flex items-start justify-between gap-2">
+            <div className="flex items-start gap-1.5 flex-1 min-w-0">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-rose-500" />
+              <div className="leading-tight">
+                <span className="font-bold block text-[11px]">Pemberitahuan Suara AI:</span>
+                <span className="text-[10px] opacity-90 block">{engineNotice}</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setEngineNotice(null);
+                setTtsEngine('browser');
+                speakWithBrowser(activeParagraphIndex);
+              }}
+              className="px-2 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-[10px] flex-shrink-0 active:scale-95 transition"
+            >
+              Gunakan Browser
+            </button>
           </div>
         )}
 
         {/* Warning if in browser mode and no Indonesian voice is available */}
         {ttsEngine === 'browser' && !isIndonesianBrowserVoice && (
-          <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/25 text-[10px] text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
-            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-            <span className="flex-1 leading-tight">
-              Perangkat belum memiliki suara Bahasa Indonesia. Disarankan gunakan mode <b>AI Studio (Gemini)</b> untuk suara alami!
+          <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-[11px] text-amber-800 dark:text-amber-200 flex items-center gap-1.5">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-500" />
+            <span className="flex-1 leading-tight text-[10px]">
+              Perangkat belum memiliki paket suara Bahasa Indonesia. Jika suara terdengar seperti robot bahasa Inggris, pilih suara Indonesia di Microsoft Edge atau instal paket suara Indonesia di pengaturan sistem.
             </span>
           </div>
         )}
