@@ -17,6 +17,7 @@ interface StoryPlannerViewProps {
   bookId: string;
   chapters: StoryChapter[];
   onOpenEditor: (chapter: StoryChapter) => void;
+  onOpenReader?: (chapter: StoryChapter) => void;
   onRefresh: () => void;
 }
 
@@ -24,6 +25,7 @@ export const StoryPlannerView: React.FC<StoryPlannerViewProps> = ({
   bookId,
   chapters,
   onOpenEditor,
+  onOpenReader,
   onRefresh,
 }) => {
   const [filter, setFilter] = useState<'all' | ChapterStatus>('all');
@@ -213,6 +215,7 @@ export const StoryPlannerView: React.FC<StoryPlannerViewProps> = ({
               chapter={chapter}
               index={idx}
               onOpenEditor={onOpenEditor}
+              onOpenReader={onOpenReader}
               onOpenActionSheet={handleOpenActionSheet}
               onQuickStatusToggle={handleStatusToggle}
             />
@@ -236,6 +239,7 @@ export const StoryPlannerView: React.FC<StoryPlannerViewProps> = ({
         chapterIndex={activeSheetChapter?.index || 0}
         onClose={handleCloseActionSheet}
         onOpenEditor={onOpenEditor}
+        onOpenReader={onOpenReader}
         onStatusChange={handleStatusChange}
         onDelete={handleDelete}
         onMoveUp={(c) => handleMoveChapter(c, 'up')}

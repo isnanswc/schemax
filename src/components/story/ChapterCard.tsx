@@ -9,12 +9,14 @@ import {
   Clock,
   Sparkles,
   CheckCircle2,
+  BookOpen
 } from 'lucide-react';
 
 interface ChapterCardProps {
   chapter: StoryChapter;
   index: number;
   onOpenEditor: (chapter: StoryChapter) => void;
+  onOpenReader?: (chapter: StoryChapter) => void;
   onOpenActionSheet: (chapter: StoryChapter, index: number) => void;
   onQuickStatusToggle: (chapter: StoryChapter, e: React.MouseEvent) => void;
 }
@@ -23,6 +25,7 @@ export const ChapterCard: React.FC<ChapterCardProps> = ({
   chapter,
   index,
   onOpenEditor,
+  onOpenReader,
   onOpenActionSheet,
   onQuickStatusToggle,
 }) => {
@@ -151,9 +154,34 @@ export const ChapterCard: React.FC<ChapterCardProps> = ({
           </span>
         </div>
 
-        <div className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold group-hover:translate-x-0.5 transition-transform text-[11px] sm:text-xs">
-          <span>Tulis</span>
-          <ChevronRight className="w-3.5 h-3.5" />
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {onOpenReader && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenReader(chapter);
+              }}
+              className="py-1 px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-[11px] flex items-center gap-1 active:scale-95 transition"
+              title="Baca Bab Ini (Mode Baca Bebas Distraksi)"
+            >
+              <BookOpen className="w-3 h-3 text-amber-500" />
+              <span>Baca</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenEditor(chapter);
+            }}
+            className="py-1 px-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 font-bold text-[11px] flex items-center gap-1 active:scale-95 transition"
+            title="Edit / Lanjut Menulis di Studio"
+          >
+            <span>Tulis</span>
+            <ChevronRight className="w-3 h-3" />
+          </button>
         </div>
       </div>
     </div>

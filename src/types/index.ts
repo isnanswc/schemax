@@ -92,6 +92,7 @@ export interface StoryChapter {
   chapterEntityStates?: Record<string, ChapterEntityState>;
   chapterRelationships?: EntityRelationship[];
   tensionData?: ChapterTensionData;
+  emotionScript?: ChapterEmotionScript;
   createdAt: number;
   updatedAt: number;
 }
@@ -110,6 +111,35 @@ export interface ChapterTensionData {
   items: ParagraphTensionItem[];
   lastAnalyzedAt: number;
   displayMode: TensionDisplayMode;
+}
+
+export type EmotionType =
+  | 'neutral'
+  | 'whisper'
+  | 'suspense'
+  | 'anger'
+  | 'fear'
+  | 'sadness'
+  | 'joy'
+  | 'climax'
+  | 'solemn';
+
+export interface ParagraphEmotionTag {
+  paragraphIndex: number;
+  textHash: string;
+  speaker?: string; // e.g. "Narator", "Roy", "Maya"
+  isDialogue: boolean;
+  emotion: EmotionType;
+  emotionLabel: string; // e.g. "Berbisik (Takut)", "Membentak (Marah)"
+  intensity: number; // 1 to 5
+  pitchMod: number; // 0.8 to 1.3
+  rateMod: number; // 0.8 to 1.4
+  actingNotes: string; // e.g. "Napas tercekat, intonasi gemetar pelan"
+}
+
+export interface ChapterEmotionScript {
+  tags: ParagraphEmotionTag[];
+  lastTaggedAt: number;
 }
 
 export type WorldCategory = 'character' | 'location' | 'item' | 'lore';

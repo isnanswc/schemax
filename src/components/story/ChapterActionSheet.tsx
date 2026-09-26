@@ -21,6 +21,7 @@ interface ChapterActionSheetProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenEditor: (chapter: StoryChapter) => void;
+  onOpenReader?: (chapter: StoryChapter) => void;
   onStatusChange: (chapter: StoryChapter, newStatus: ChapterStatus) => void;
   onDelete: (chapterId: string, title: string) => void;
   onMoveUp?: (chapter: StoryChapter) => void;
@@ -35,6 +36,7 @@ export const ChapterActionSheet: React.FC<ChapterActionSheetProps> = ({
   isOpen,
   onClose,
   onOpenEditor,
+  onOpenReader,
   onStatusChange,
   onDelete,
   onMoveUp,
@@ -87,18 +89,35 @@ export const ChapterActionSheet: React.FC<ChapterActionSheetProps> = ({
           </button>
         </div>
 
-        {/* Primary Action Button: Open Writer / Studio */}
-        <button
-          onClick={() => {
-            onClose();
-            onOpenEditor(chapter);
-          }}
-          className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm shadow-lg shadow-amber-500/20 active:scale-95 transition flex items-center justify-center gap-2 mb-4"
-        >
-          <BookOpen className="w-4 h-4" />
-          <span>Buka Studio &amp; Naskah Bab Ini</span>
-          <ArrowRight className="w-4 h-4" />
-        </button>
+        {/* Primary Action Buttons: Mode Baca & Studio Editor */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+          {onOpenReader && (
+            <button
+              onClick={() => {
+                onClose();
+                onOpenReader(chapter);
+              }}
+              className="w-full py-3 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-slate-100 font-bold text-xs sm:text-sm active:scale-95 transition flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-700"
+            >
+              <BookOpen className="w-4 h-4 text-amber-500" />
+              <span>Buka Mode Baca 📖</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => {
+              onClose();
+              onOpenEditor(chapter);
+            }}
+            className={`w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs sm:text-sm shadow-md shadow-amber-500/20 active:scale-95 transition flex items-center justify-center gap-2 ${
+              !onOpenReader ? 'sm:col-span-2' : ''
+            }`}
+          >
+            <Edit3 className="w-4 h-4" />
+            <span>Studio &amp; Naskah ✍️</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
 
         {/* Urutan Bab: Geser Naik / Turun */}
         {(onMoveUp || onMoveDown) && (

@@ -10,6 +10,7 @@ import { BookOverviewTab } from './components/books/BookOverviewTab';
 import { StoryPlannerView } from './components/story/StoryPlannerView';
 import { RichTextEditor } from './components/story/RichTextEditor';
 import { ChapterStudioView } from './components/story/ChapterStudioView';
+import { ChapterReaderView } from './components/story/reader/ChapterReaderView';
 import { WorldBuildingView } from './components/world/WorldBuildingView';
 import { MediaGalleryView } from './components/media/MediaGalleryView';
 import { CreateBookModal } from './components/books/CreateBookModal';
@@ -25,6 +26,7 @@ export function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('chapters');
   const [editingChapter, setEditingChapter] = useState<StoryChapter | null>(null);
   const [studioChapter, setStudioChapter] = useState<StoryChapter | null>(null);
+  const [readingChapter, setReadingChapter] = useState<StoryChapter | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createModalInitialStatus, setCreateModalInitialStatus] = useState<BookStatus>('draft');
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
@@ -123,6 +125,22 @@ export function App() {
     setStudioChapter(null);
   };
 
+  const handleOpenReader = (chapter: StoryChapter) => {
+    navStack.push('reader', () => {
+      setReadingChapter(null);
+    });
+    setReadingChapter(chapter);
+  };
+
+  const handleBackFromReader = () => {
+    navStack.pop('reader');
+    setReadingChapter(null);
+  };
+
+  const handleSwitchReadingChapter = (nextChapter: StoryChapter) => {
+    setReadingChapter(nextChapter);
+  };
+
   const handleOpenCreateModal = (defaultStatus: BookStatus = 'draft') => {
     setCreateModalInitialStatus(defaultStatus);
     navStack.push('modal-create', () => setIsCreateModalOpen(false));
@@ -170,8 +188,20 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
-      {/* 1. Fullscreen Chapter Workspace (5 Bottom Tabs with Central Pen) */}
-      {(editingChapter || studioChapter) && currentBook ? (
+      {/* 1. Fullscreen Chapter Reader (Distraction-Free Reading Mode with Natural TTS) */}
+      {readingChapter && currentBook ? (
+        <ChapterReaderView
+          chapter={readingChapter}
+          bookTitle={currentBook.title}
+          allChapters={bookChapters}
+          onBack={handleBackFromReader}
+          onOpenEditor={(ch) => {
+            handleBackFromReader();
+            handleOpenEditor(ch);
+          }}
+          onSwitchChapter={handleSwitchReadingChapter}
+        />
+      ) : (editingChapter || studioChapter) && currentBook ? (
         <RichTextEditor
           chapter={editingChapter || studioChapter!}
           bookTitle={currentBook.title}
@@ -284,6 +314,7 @@ export function App() {
                     bookId={currentBook.id}
                     chapters={bookChapters}
                     onOpenEditor={handleOpenChapterStudio}
+                    onOpenReader={handleOpenReader}
                     onRefresh={triggerRefresh}
                   />
                 )}
