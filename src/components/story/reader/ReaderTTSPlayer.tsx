@@ -17,9 +17,7 @@ import {
   Zap,
   Sliders,
   Repeat,
-  Cloud,
   Key,
-  Cpu,
   ShieldCheck
 } from 'lucide-react';
 import { ParagraphTensionItem, ParagraphEmotionTag } from '../../../types';
@@ -31,10 +29,6 @@ import {
   getModelsForEngine,
   getVoicesForEngine,
   generateUnifiedSpeechAudio,
-  AZURE_VOICES,
-  AZURE_TTS_MODELS,
-  GOOGLE_CLOUD_VOICES,
-  GOOGLE_CLOUD_TTS_MODELS,
   WASM_VOICES,
   WASM_TTS_MODELS,
   GEMINI_VOICES,
@@ -85,7 +79,7 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
 
   // Unified engine model & voice state
   const [selectedModel, setSelectedModel] = useState<string>('auto-pipeline');
-  const [selectedVoice, setSelectedVoice] = useState<string>('id-ID-GadisNeural');
+  const [selectedVoice, setSelectedVoice] = useState<string>('id-free-natural');
 
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [engineNotice, setEngineNotice] = useState<string | null>(null);
@@ -645,10 +639,6 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
     switch (ttsEngine) {
       case 'auto':
         return '✨ Auto-Fallback (Pintar)';
-      case 'azure':
-        return '🔷 Azure Neural AI';
-      case 'google-cloud':
-        return '🔴 Google Cloud TTS';
       case 'wasm':
         return '🛡️ WASM / Mobile Free';
       case 'gemini':
@@ -767,38 +757,10 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
                     ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-xs'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
-                title="Auto-Fallback Pintar: Azure ➔ Google Cloud ➔ Gemini ➔ WASM Mobile Free"
+                title="Auto-Fallback Pintar: Gemini TTS (Kunci Mandiri) ➔ WASM Mobile Free"
               >
                 <Sparkles className="w-3 h-3" />
                 <span>Auto</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleEngineChange('azure')}
-                className={`flex-shrink-0 py-1 px-2 rounded-xl font-bold transition flex items-center justify-center gap-1 ${
-                  ttsEngine === 'azure'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
-                title="Microsoft Azure Speech (Gadis & Ardi Neural)"
-              >
-                <Cloud className="w-3 h-3" />
-                <span>Azure</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleEngineChange('google-cloud')}
-                className={`flex-shrink-0 py-1 px-2 rounded-xl font-bold transition flex items-center justify-center gap-1 ${
-                  ttsEngine === 'google-cloud'
-                    ? 'bg-rose-500 text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
-                title="Google Cloud TTS (Neural2 / WaveNet)"
-              >
-                <Cpu className="w-3 h-3" />
-                <span>Google</span>
               </button>
 
               <button

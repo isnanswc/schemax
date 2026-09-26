@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Key, ShieldCheck, Info, Check, Cloud, Cpu, Sparkles, ExternalLink } from 'lucide-react';
+import { X, Key, ShieldCheck, Info, Check, Sparkles, ExternalLink } from 'lucide-react';
 import {
   TTSExtraConfig,
   loadTTSExtraConfig,
@@ -110,90 +110,12 @@ export const TTSConfigModal: React.FC<TTSConfigModalProps> = ({
             </div>
           </div>
 
-          {/* Section 2: Microsoft Azure Speech (F0 Tier) */}
-          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
-                <Cloud className="w-3.5 h-3.5 text-blue-500" />
-                <span>Microsoft Azure Speech (F0 Free Tier)</span>
-              </div>
-              <span className="text-[9px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 font-bold">
-                Butuh Akun Azure
-              </span>
-            </div>
-
-            <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-              Suara paling alami di dunia: <strong>Gadis &amp; Ardi (Neural)</strong>. <em>Catatan: Azure membutuhkan akun portal.azure.com (memerlukan billing/kartu saat mendaftar).</em>
-            </p>
-
-            <div className="space-y-2">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                  Azure Subscription Key:
-                </label>
-                <input
-                  type="password"
-                  value={config.azureApiKey}
-                  onChange={(e) => setConfig({ ...config, azureApiKey: e.target.value })}
-                  placeholder="Contoh: 8a4b3c2d1e... (Opsional)"
-                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-mono focus:outline-hidden focus:border-amber-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                  Azure Region:
-                </label>
-                <select
-                  value={config.azureRegion}
-                  onChange={(e) => setConfig({ ...config, azureRegion: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs focus:outline-hidden focus:border-amber-500"
-                >
-                  <option value="southeastasia">southeastasia (Singapura - Tercepat)</option>
-                  <option value="eastasia">eastasia (Hong Kong)</option>
-                  <option value="eastus">eastus (US East)</option>
-                  <option value="westeurope">westeurope (Eropa Barat)</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Section 3: Google Cloud Text-to-Speech */}
-          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
-                <Cpu className="w-3.5 h-3.5 text-rose-500" />
-                <span>Google Cloud TTS (Neural2 / WaveNet)</span>
-              </div>
-              <span className="text-[9px] px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold">
-                Butuh Cloud Billing
-              </span>
-            </div>
-
-            <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-              Layanan TTS resmi Google Cloud (console.cloud.google.com). <em>Catatan: Memerlukan penautan billing Google Cloud untuk aktivasi.</em>
-            </p>
-
-            <div>
-              <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                Google Cloud API Key:
-              </label>
-              <input
-                type="password"
-                value={config.googleCloudApiKey}
-                onChange={(e) => setConfig({ ...config, googleCloudApiKey: e.target.value })}
-                placeholder="Contoh: AIzaSy... (Opsional)"
-                className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-mono focus:outline-hidden focus:border-amber-500"
-              />
-            </div>
-          </div>
-
-          {/* Section 4: WASM Mobile Free */}
+          {/* Section 2: WASM Mobile Free (100% Free) */}
           <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-start gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
             <div className="text-[10px] leading-tight text-emerald-800 dark:text-emerald-200">
               <span className="font-bold block text-[11px]">WASM / Mobile Free (Bebas Kuota &amp; Tanpa Kunci):</span>
-              Jika kunci di atas dikosongkan, Schemax menggunakan audio gateway bebas kuota dengan pemecah kalimat cerdas. 100% gratis, aman, dan tanpa limit di HP.
+              Jika kunci di atas dikosongkan, Schemax otomatis menggunakan audio gateway bebas kuota dengan pemecah kalimat cerdas. 100% gratis, aman, dan tanpa limit di HP maupun PC.
             </div>
           </div>
 

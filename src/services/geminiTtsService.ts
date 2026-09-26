@@ -1,7 +1,7 @@
 import { loadAISettings } from './aiService';
 import { hashString } from '../utils/tensionUtils';
 
-export type TTSEngineMode = 'auto' | 'azure' | 'google-cloud' | 'gemini' | 'groq' | 'wasm';
+export type TTSEngineMode = 'auto' | 'gemini' | 'groq' | 'wasm';
 
 export interface AIVoiceOption {
   id: string;
@@ -20,9 +20,6 @@ export interface AITTSModelOption {
 }
 
 export interface TTSExtraConfig {
-  azureApiKey: string;
-  azureRegion: string;
-  googleCloudApiKey: string;
   dedicatedGeminiApiKey: string;
 }
 
@@ -31,18 +28,12 @@ export function loadTTSExtraConfig(): TTSExtraConfig {
     const raw = localStorage.getItem('schemax_tts_extra_config');
     if (raw) {
       return {
-        azureApiKey: '',
-        azureRegion: 'southeastasia',
-        googleCloudApiKey: '',
         dedicatedGeminiApiKey: '',
         ...JSON.parse(raw),
       };
     }
   } catch (e) {}
   return {
-    azureApiKey: '',
-    azureRegion: 'southeastasia',
-    googleCloudApiKey: '',
     dedicatedGeminiApiKey: '',
   };
 }
@@ -57,87 +48,7 @@ export const AUTO_TTS_MODELS: AITTSModelOption[] = [
     id: 'auto-pipeline',
     name: '✨ Auto-Fallback (Pintar)',
     provider: 'auto',
-    description: 'Prioritas: Azure (Gadis/Ardi) ➔ Google Cloud ➔ Gemini ➔ WASM Mobile Free',
-  },
-];
-
-// 2. Available TTS Models for Microsoft Azure Speech
-export const AZURE_TTS_MODELS: AITTSModelOption[] = [
-  {
-    id: 'azure-neural-standard',
-    name: 'Microsoft Azure Neural AI (Rekomendasi)',
-    provider: 'azure',
-    description: 'Suara AI manusia paling alami di dunia untuk Bahasa Indonesia (500k chars/bulan gratis)',
-  },
-];
-
-export const AZURE_VOICES: AIVoiceOption[] = [
-  {
-    id: 'id-ID-GadisNeural',
-    name: 'Gadis (Neural)',
-    gender: 'female',
-    description: 'Wanita • Paling alami, hangat, dan ekspresif untuk novel',
-    avatar: '👩',
-    provider: 'azure',
-  },
-  {
-    id: 'id-ID-ArdiNeural',
-    name: 'Ardi (Neural)',
-    gender: 'male',
-    description: 'Pria • Tenang, berwibawa, dan jernih',
-    avatar: '👨',
-    provider: 'azure',
-  },
-];
-
-// 3. Available TTS Models for Google Cloud TTS
-export const GOOGLE_CLOUD_TTS_MODELS: AITTSModelOption[] = [
-  {
-    id: 'google-neural2',
-    name: 'Google Cloud Neural2 (1 Juta chars/bln gratis)',
-    provider: 'google-cloud',
-    description: 'Model Deep Learning Neural2 Google Cloud',
-  },
-  {
-    id: 'google-wavenet',
-    name: 'Google Cloud WaveNet',
-    provider: 'google-cloud',
-    description: 'Model WaveNet kualitas tinggi Google Cloud',
-  },
-];
-
-export const GOOGLE_CLOUD_VOICES: AIVoiceOption[] = [
-  {
-    id: 'id-ID-Neural2-A',
-    name: 'Neural2-A (Wanita)',
-    gender: 'female',
-    description: 'Wanita • Halus dan artikulasi natural',
-    avatar: '👩',
-    provider: 'google-cloud',
-  },
-  {
-    id: 'id-ID-Neural2-B',
-    name: 'Neural2-B (Pria)',
-    gender: 'male',
-    description: 'Pria • Dalam dan mantap',
-    avatar: '👨',
-    provider: 'google-cloud',
-  },
-  {
-    id: 'id-ID-Wavenet-A',
-    name: 'WaveNet-A (Wanita)',
-    gender: 'female',
-    description: 'Wanita • Jernih dan formal',
-    avatar: '👩‍💼',
-    provider: 'google-cloud',
-  },
-  {
-    id: 'id-ID-Wavenet-B',
-    name: 'WaveNet-B (Pria)',
-    gender: 'male',
-    description: 'Pria • Bersahabat',
-    avatar: '👨‍💼',
-    provider: 'google-cloud',
+    description: 'Prioritas: Gemini TTS (Kunci Mandiri) ➔ WASM Mobile Free (100% Gratis Bebas Kuota)',
   },
 ];
 
@@ -573,119 +484,7 @@ export async function generateGeminiSpeechAudio(
   throw lastError || new Error('Gagal menghasilkan audio suara AI dari Google AI Studio.');
 }
 
-/**
- * Generate speech audio using Microsoft Azure Speech API (Free F0 / Paid)
- */
-export async function generateAzureSpeechAudio(
-  text: string,
-  voiceName: string = 'id-ID-GadisNeural',
-  customApiKey?: string,
-  customRegion?: string
-): Promise<{ audioUrl: string; mimeType: string }> {
-  const cleanText = text.trim();
-  if (!cleanText) throw new Error('Teks naskah kosong.');
 
-  const extraConfig = loadTTSExtraConfig();
-  const apiKey = (customApiKey || extraConfig.azureApiKey || '').trim();
-  const region = (customRegion || extraConfig.azureRegion || 'southeastasia').trim();
-
-  if (!apiKey) {
-    throw new Error('API Key Microsoft Azure Speech belum dikonfigurasi.');
-  }
-
-  const cacheKey = `azure_${voiceName}_${hashString(cleanText)}`;
-  if (audioUrlCache.has(cacheKey)) {
-    return { audioUrl: audioUrlCache.get(cacheKey)!, mimeType: 'audio/mp3' };
-  }
-
-  const escapedText = cleanText
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-
-  const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="id-ID"><voice name="${voiceName}">${escapedText}</voice></speak>`;
-  const url = `https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`;
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Ocp-Apim-Subscription-Key': apiKey,
-      'Content-Type': 'application/ssml+xml',
-      'X-Microsoft-OutputFormat': 'audio-24khz-48kbitrate-mono-mp3',
-      'User-Agent': 'SchemaxStoryStudio',
-    },
-    body: ssml,
-  });
-
-  if (!response.ok) {
-    const errText = await response.text().catch(() => '');
-    throw new Error(`Azure Speech HTTP ${response.status}: ${errText || response.statusText}`);
-  }
-
-  const blob = await response.blob();
-  const audioUrl = URL.createObjectURL(blob);
-  audioUrlCache.set(cacheKey, audioUrl);
-  return { audioUrl, mimeType: 'audio/mp3' };
-}
-
-/**
- * Generate speech audio using Google Cloud Text-to-Speech API (Neural2 / WaveNet)
- */
-export async function generateGoogleCloudSpeechAudio(
-  text: string,
-  voiceName: string = 'id-ID-Neural2-A',
-  customApiKey?: string
-): Promise<{ audioUrl: string; mimeType: string }> {
-  const cleanText = text.trim();
-  if (!cleanText) throw new Error('Teks naskah kosong.');
-
-  const extraConfig = loadTTSExtraConfig();
-  const apiKey = (customApiKey || extraConfig.googleCloudApiKey || '').trim();
-
-  if (!apiKey) {
-    throw new Error('API Key Google Cloud Text-to-Speech belum dikonfigurasi.');
-  }
-
-  const cacheKey = `gcloud_${voiceName}_${hashString(cleanText)}`;
-  if (audioUrlCache.has(cacheKey)) {
-    return { audioUrl: audioUrlCache.get(cacheKey)!, mimeType: 'audio/mp3' };
-  }
-
-  const gender = voiceName.endsWith('-B') || voiceName.endsWith('-D') ? 'MALE' : 'FEMALE';
-  const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      input: { text: cleanText },
-      voice: {
-        languageCode: 'id-ID',
-        name: voiceName,
-        ssmlGender: gender,
-      },
-      audioConfig: {
-        audioEncoding: 'MP3',
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    const errJson = await response.json().catch(() => ({}));
-    throw new Error(errJson.error?.message || `Google Cloud TTS HTTP ${response.status}`);
-  }
-
-  const data = await response.json();
-  if (!data.audioContent) {
-    throw new Error('Google Cloud TTS tidak memuat audioContent.');
-  }
-
-  const audioUrl = `data:audio/mp3;base64,${data.audioContent}`;
-  audioUrlCache.set(cacheKey, audioUrl);
-  return { audioUrl, mimeType: 'audio/mp3' };
-}
 
 /**
  * Break text down into small, natural phrase chunks (max 100-110 chars)
@@ -835,77 +634,49 @@ export async function generateUnifiedSpeechAudio(
     actingNotes?: string;
   }
 ): Promise<{ audioUrl: string; audioUrls?: string[]; mimeType: string; usedEngine: TTSEngineMode }> {
-  // If a specific engine is chosen by the user:
-  if (engine === 'azure') {
-    const res = await generateAzureSpeechAudio(text, voiceName || 'id-ID-GadisNeural');
-    return { ...res, usedEngine: 'azure' };
-  }
-
-  if (engine === 'google-cloud') {
-    const res = await generateGoogleCloudSpeechAudio(text, voiceName || 'id-ID-Neural2-A');
-    return { ...res, usedEngine: 'google-cloud' };
-  }
-
+  // If user selected Gemini directly:
   if (engine === 'gemini') {
     const res = await generateGeminiSpeechAudio(text, modelName, voiceName, emotionTag);
     return { ...res, usedEngine: 'gemini' };
   }
 
+  // If user selected Groq directly:
   if (engine === 'groq') {
     const res = await generateGroqSpeechAudio(text, modelName, voiceName, emotionTag);
     return { ...res, usedEngine: 'groq' };
   }
 
+  // If user selected WASM directly:
   if (engine === 'wasm') {
     const res = await generateWasmSpeechAudio(text);
     return { ...res, usedEngine: 'wasm' };
   }
 
-  // --- AUTO-FALLBACK PIPELINE (Azure ➔ Google Cloud ➔ Dedicated Gemini ➔ WASM Mobile Free) ---
+  // --- AUTO-FALLBACK PIPELINE (Gemini ➔ WASM Mobile Free) ---
   const extraConfig = loadTTSExtraConfig();
+  const aiConfig = loadAISettings();
 
-  // 1. Try Azure Speech if configured
-  if (extraConfig.azureApiKey && extraConfig.azureApiKey.trim().length > 0) {
-    try {
-      const res = await generateAzureSpeechAudio(
-        text,
-        voiceName?.startsWith('id-ID-') ? voiceName : 'id-ID-GadisNeural'
-      );
-      return { ...res, usedEngine: 'azure' };
-    } catch (e: any) {
-      console.warn('[Auto-Fallback] Azure Speech gagal, beralih ke Google Cloud:', e.message);
-    }
-  }
+  // 1. Try Gemini (if dedicated key or active gemini slot configured)
+  const hasGeminiKey = Boolean(
+    (extraConfig.dedicatedGeminiApiKey && extraConfig.dedicatedGeminiApiKey.trim()) ||
+    aiConfig.slots.some((s) => s.provider === 'gemini' && s.isActive && s.apiKey && s.apiKey.trim())
+  );
 
-  // 2. Try Google Cloud TTS if configured
-  if (extraConfig.googleCloudApiKey && extraConfig.googleCloudApiKey.trim().length > 0) {
-    try {
-      const res = await generateGoogleCloudSpeechAudio(
-        text,
-        voiceName?.startsWith('id-ID-') ? voiceName : 'id-ID-Neural2-A'
-      );
-      return { ...res, usedEngine: 'google-cloud' };
-    } catch (e: any) {
-      console.warn('[Auto-Fallback] Google Cloud TTS gagal, beralih ke Gemini:', e.message);
-    }
-  }
-
-  // 3. Try Gemini Studio (ONLY if a dedicated Gemini TTS key is configured, protecting main writing slots)
-  if (extraConfig.dedicatedGeminiApiKey && extraConfig.dedicatedGeminiApiKey.trim().length > 0) {
+  if (hasGeminiKey) {
     try {
       const res = await generateGeminiSpeechAudio(
         text,
-        'gemini-2.0-flash',
+        modelName || 'gemini-2.0-flash',
         voiceName || 'Aoede',
         emotionTag
       );
       return { ...res, usedEngine: 'gemini' };
     } catch (e: any) {
-      console.warn('[Auto-Fallback] Dedicated Gemini gagal atau limit, beralih ke WASM Mobile Free:', e.message);
+      console.warn('[Auto-Fallback] Gemini gagal atau limit, beralih ke WASM Mobile Free:', e.message);
     }
   }
 
-  // 4. Guaranteed Ultimate Fallback: WASM / Mobile Free Natural Stream (100% Free, 0 Limits)
+  // 2. Guaranteed Ultimate Fallback: WASM Mobile Free Natural Stream (100% Free, 0 Limits)
   const res = await generateWasmSpeechAudio(text);
   return { ...res, usedEngine: 'wasm' };
 }
@@ -915,10 +686,6 @@ export function getModelsForEngine(engine: TTSEngineMode): AITTSModelOption[] {
   switch (engine) {
     case 'auto':
       return AUTO_TTS_MODELS;
-    case 'azure':
-      return AZURE_TTS_MODELS;
-    case 'google-cloud':
-      return GOOGLE_CLOUD_TTS_MODELS;
     case 'wasm':
       return WASM_TTS_MODELS;
     case 'gemini': {
@@ -1020,11 +787,7 @@ export function getModelsForEngine(engine: TTSEngineMode): AITTSModelOption[] {
 export function getVoicesForEngine(engine: TTSEngineMode): AIVoiceOption[] {
   switch (engine) {
     case 'auto':
-      return [...AZURE_VOICES, ...GOOGLE_CLOUD_VOICES, ...WASM_VOICES];
-    case 'azure':
-      return AZURE_VOICES;
-    case 'google-cloud':
-      return GOOGLE_CLOUD_VOICES;
+      return [...WASM_VOICES, ...GEMINI_VOICES];
     case 'wasm':
       return WASM_VOICES;
     case 'gemini':
@@ -1032,6 +795,6 @@ export function getVoicesForEngine(engine: TTSEngineMode): AIVoiceOption[] {
     case 'groq':
       return GROQ_VOICES;
     default:
-      return AZURE_VOICES;
+      return WASM_VOICES;
   }
 }
