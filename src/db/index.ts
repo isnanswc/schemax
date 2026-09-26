@@ -25,7 +25,8 @@ export async function saveMediaItem(
   bookId: string,
   blob: Blob,
   name: string,
-  entityId?: string
+  entityId?: string,
+  extra?: Partial<MediaItem>
 ): Promise<string> {
   const id = 'med_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
   const mediaItem: MediaItem = {
@@ -36,7 +37,8 @@ export async function saveMediaItem(
     mimeType: blob.type || 'image/jpeg',
     blob,
     size: blob.size,
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    ...extra,
   };
   await db.media.add(mediaItem);
   return id;

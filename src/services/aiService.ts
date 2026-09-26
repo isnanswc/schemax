@@ -1078,3 +1078,154 @@ Instruksi:
   return res.text.trim();
 }
 
+// 8. AI Vision Multimodal Analysis Engine
+async function executeGeminiVisionRequest(
+  apiKey: string,
+  model: string,
+  base64Data: string,
+  mimeType: string,
+  prompt: string,
+  systemPrompt?: string
+): Promise<string> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`;
+
+  const cleanBase64 = base64Data.replace(/^data:[^;]+;base64,/, '');
+
+  const combinedPrompt = systemPrompt
+    ? `${systemPrompt}\n\n[Instruksi Penulis]:\n${prompt}`
+    : prompt;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              inlineData: {
+                mimeType: mimeType || 'image/jpeg',
+                data: cleanBase64,
+              },
+            },
+            {
+              text: combinedPrompt,
+            },
+          ],
+        },
+      ],
+      generationConfig: {
+        temperature: 0.4,
+        maxOutputTokens: 2048,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = errorData.error?.message || `HTTP ${response.status} ${response.statusText}`;
+    throw new Error(message);
+  }
+
+  const data = await response.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) {
+    throw new Error('Respon Gemini Vision kosong.');
+  }
+
+  return text.trim();
+}
+
+export interface ImageVisionAnalysis {
+  shortDescription: string;
+  detectedTags: string[];
+  narrativeSentenceBefore: string;
+  narrativeSentenceAfter: string;
+  recommendedCategory: 'character' | 'location' | 'item' | 'lore' | 'scene' | 'general';
+}
+
+export async function analyzeImageWithVision(
+  base64Image: string,
+  mimeType: string,
+  context: {
+    bookTitle: string;
+    chapterTitle?: string;
+    existingEntities?: Array<{ id: string; name: string; category: string }>;
+  }
+): Promise<ImageVisionAnalysis> {
+  const config = getAISettings();
+  const geminiSlot = config.slots.find((s) => s.provider === 'gemini' && s.apiKey && s.apiKey.trim().length > 0);
+
+  if (!geminiSlot) {
+    throw new Error('AI Vision memerlukan API Key Gemini. Buka Pengaturan AI dan tambahkan slot API Key Gemini.');
+  }
+
+  const visionModels = [
+    ...(geminiSlot.models && geminiSlot.models.length > 0 ? geminiSlot.models : config.geminiConfig.fallbackModels),
+    'gemini-3.1-flash',
+    'gemini-3.0-flash',
+    'gemini-2.5-flash',
+  ].filter((v, i, a) => a.indexOf(v) === i);
+
+  const existingEntitiesList = context.existingEntities && context.existingEntities.length > 0
+    ? context.existingEntities.map((e) => `- [${e.category.toUpperCase()}] ${e.name}`).join('\n')
+    : '(Belum ada entitas di glosarium)';
+
+  const prompt = `Analisis gambar ini secara mendalam untuk novel/buku berjudul "${context.bookTitle}" (Bab: "${context.chapterTitle || 'Bab Terkait'}").
+
+Daftar Entitas Glosarium Buku yang ada:
+${existingEntitiesList}
+
+Tugas Anda:
+1. "shortDescription": Deskripsi singkat visual gambar (1-2 kalimat deskriptif untuk alt/caption gambar).
+2. "detectedTags": Deteksi apakah gambar ini menampilkan entitas yang cocok dengan Glosarium di atas ATAU usulkan tag nama tokoh, nama senjata, lokasi, atau item baru yang terlihat di gambar.
+3. "narrativeSentenceBefore": Buat 1-2 kalimat sastra fiksi yang indah dan mengalir untuk diletakkan di naskah TEPAT SEBELUM gambar (membangun atmosfer dan mengarahkan perhatian pembaca ke visual).
+4. "narrativeSentenceAfter": Buat 1-2 kalimat sastra fiksi yang indah dan berdaya pikat untuk diletakkan di naskah TEPAT SESUDAH gambar (menyambung aksi tokoh atau emosi adegan).
+5. "recommendedCategory": Pilih salah satu: "character", "location", "item", "lore", "scene", atau "general".
+
+Berikan output HANYA berupa JSON valid persis format ini:
+{
+  "shortDescription": "...",
+  "detectedTags": ["..."],
+  "narrativeSentenceBefore": "...",
+  "narrativeSentenceAfter": "...",
+  "recommendedCategory": "character"
+}`;
+
+  const systemPrompt = 'Anda adalah novelis masterclass dan AI Vision literary expert. Hasilkan HANYA JSON object murni tanpa markdown wrapper berlebih.';
+
+  let lastError: any = null;
+  for (const model of visionModels) {
+    try {
+      const rawText = await executeGeminiVisionRequest(
+        geminiSlot.apiKey,
+        model,
+        base64Image,
+        mimeType,
+        prompt,
+        systemPrompt
+      );
+
+      const parsed = resilientParseJsonObject<ImageVisionAnalysis>(rawText);
+      if (parsed) {
+        return {
+          shortDescription: parsed.shortDescription || 'Ilustrasi adegan cerita.',
+          detectedTags: Array.isArray(parsed.detectedTags) ? parsed.detectedTags : [],
+          narrativeSentenceBefore: parsed.narrativeSentenceBefore || '',
+          narrativeSentenceAfter: parsed.narrativeSentenceAfter || '',
+          recommendedCategory: ['character', 'location', 'item', 'lore', 'scene', 'general'].includes(parsed.recommendedCategory)
+            ? parsed.recommendedCategory
+            : 'scene',
+        };
+      }
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`Vision attempt with model ${model} failed:`, err);
+    }
+  }
+
+  throw new Error(lastError?.message || 'Gagal menganalisis gambar dengan AI Vision.');
+}
+
+

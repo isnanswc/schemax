@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Compass,
   User,
@@ -21,11 +21,29 @@ import {
   Link2,
   Trash2,
   X,
-  Check
+  Check,
+  Upload,
+  BookOpen,
+  Layers,
+  Search,
+  BookMarked
 } from 'lucide-react';
-import { StoryChapter, WorldEntity, WorldCategory, ChapterSceneItem, DetectedEntityCandidate } from '../../../types';
-import { db } from '../../../db';
-import { generateChapterAutoScenes, detectWorldEntitiesInChapter } from '../../../services/aiService';
+import {
+  StoryChapter,
+  WorldEntity,
+  WorldCategory,
+  ChapterSceneItem,
+  DetectedEntityCandidate,
+  MediaItem,
+  MediaCategory
+} from '../../../types';
+import { db, saveMediaItem } from '../../../db';
+import {
+  generateChapterAutoScenes,
+  detectWorldEntitiesInChapter,
+  analyzeImageWithVision,
+  ImageVisionAnalysis
+} from '../../../services/aiService';
 import { WorldEntityHologramModal } from '../../world/WorldEntityHologramModal';
 import { VerticalSceneTimeline } from './VerticalSceneTimeline';
 
@@ -46,7 +64,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
   onUpdateChapter,
   onInsertTextToManuscript,
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'all' | 'detected' | WorldCategory | 'scenes' | 'visuals'>('all');
+  const [activeSubTab, setActiveSubTab] = useState<'all' | 'detected' | WorldCategory | 'images' | 'scenes' | 'visuals'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [hologramEntity, setHologramEntity] = useState<WorldEntity | null>(null);
   const [isAnalyzingScenes, setIsAnalyzingScenes] = useState(false);
@@ -58,6 +76,52 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
   // Track candidate registrations locally
   const [registeredEntityIds, setRegisteredEntityIds] = useState<Record<string, boolean>>({});
   const [registeredAliasIds, setRegisteredAliasIds] = useState<Record<string, boolean>>({});
+
+  // 🖼️ Media Images State
+  const [bookMediaList, setBookMediaList] = useState<Array<MediaItem & { url: string }>>([]);
+  const [imageScope, setImageScope] = useState<'chapter' | 'category' | 'global'>('chapter');
+  const [imageCategoryFilter, setImageCategoryFilter] = useState<'all' | MediaCategory>('all');
+  const [imageSearchQuery, setImageSearchQuery] = useState('');
+  const [isUploadImageModalOpen, setIsUploadImageModalOpen] = useState(false);
+  const [mediaActionToast, setMediaActionToast] = useState<string | null>(null);
+  const [previewImageModal, setPreviewImageModal] = useState<{ url: string; name: string; caption?: string } | null>(null);
+
+  // Upload Form State
+  const [uploadFileBlob, setUploadFileBlob] = useState<Blob | null>(null);
+  const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string>('');
+  const [uploadTitle, setUploadTitle] = useState('');
+  const [uploadCategory, setUploadCategory] = useState<MediaCategory>('scene');
+  const [uploadScopeChapter, setUploadScopeChapter] = useState(true);
+  const [uploadSelectedTags, setUploadSelectedTags] = useState<string[]>([]);
+  const [isAnalyzingVisionUpload, setIsAnalyzingVisionUpload] = useState(false);
+  const [uploadVisionResult, setUploadVisionResult] = useState<ImageVisionAnalysis | null>(null);
+
+  // Load Book Media Items from Dexie
+  const loadMedia = () => {
+    db.media
+      .where('bookId')
+      .equals(chapter.bookId)
+      .toArray()
+      .then((items) => {
+        const imageItems = items
+          .filter((m) => m.mimeType.startsWith('image/'))
+          .map((m) => ({
+            ...m,
+            url: URL.createObjectURL(m.blob),
+          }));
+        setBookMediaList(imageItems);
+      })
+      .catch((err) => console.warn('Gagal memuat media buku:', err));
+  };
+
+  useEffect(() => {
+    loadMedia();
+  }, [chapter.bookId]);
+
+  const showToast = (msg: string) => {
+    setMediaActionToast(msg);
+    setTimeout(() => setMediaActionToast(null), 2500);
+  };
 
   const detectedEntities: DetectedEntityCandidate[] = chapter.aiDetectedEntities || [];
   const pendingNewCount = detectedEntities.filter(
@@ -73,7 +137,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
   });
 
   const displayEntities = entities.filter((ent) => {
-    if (activeSubTab === 'scenes' || activeSubTab === 'visuals' || activeSubTab === 'detected') return false;
+    if (activeSubTab === 'scenes' || activeSubTab === 'visuals' || activeSubTab === 'detected' || activeSubTab === 'images') return false;
     const matchCategory = activeSubTab === 'all' || ent.category === activeSubTab;
     const matchSearch =
       searchQuery.trim() === '' ||
@@ -161,7 +225,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
     }
   };
 
-  // Register single new entity to Dexie db.worldEntities
+  // Register single new entity to Dexie db.worldEntities and PRUNE from candidate list
   const handleRegisterEntity = async (candidate: DetectedEntityCandidate) => {
     try {
       const newEntity: WorldEntity = {
@@ -180,13 +244,18 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
       };
       await db.worldEntities.add(newEntity);
       setRegisteredEntityIds((prev) => ({ ...prev, [candidate.id]: true }));
+
+      // Automatically prune added candidate so it disappears from the list
+      const remaining = detectedEntities.filter((c) => c.id !== candidate.id);
+      onUpdateChapter({ aiDetectedEntities: remaining });
+      showToast(`Entitas "${candidate.name}" berhasil ditambahkan ke Glosarium Dunia!`);
     } catch (err: any) {
       console.error('Gagal menambahkan ke glosarium:', err);
       alert('Gagal mendaftarkan entitas: ' + (err.message || 'Error'));
     }
   };
 
-  // Add alias to existing entity in Dexie db.worldEntities
+  // Add alias to existing entity in Dexie db.worldEntities and PRUNE from candidate list
   const handleSaveAlias = async (candidate: DetectedEntityCandidate) => {
     try {
       const existingEntities = await db.worldEntities.where('bookId').equals(chapter.bookId).toArray();
@@ -203,6 +272,11 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
           updatedAt: Date.now(),
         });
         setRegisteredAliasIds((prev) => ({ ...prev, [candidate.id]: true }));
+
+        // Automatically prune added candidate so it disappears from the list
+        const remaining = detectedEntities.filter((c) => c.id !== candidate.id);
+        onUpdateChapter({ aiDetectedEntities: remaining });
+        showToast(`Alias "${candidate.name}" berhasil disimpan untuk ${target.name}!`);
       } else {
         alert(`Entitas target "${candidate.detectedAliasOf || 'asli'}" tidak ditemukan di database.`);
       }
@@ -218,7 +292,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
     onUpdateChapter({ aiDetectedEntities: updated });
   };
 
-  // Batch register all new candidates to Glosarium
+  // Batch register all new candidates to Glosarium and PRUNE them
   const handleRegisterAllNew = async () => {
     const newCandidates = detectedEntities.filter(
       (c) => c.suggestedAction === 'register_new' && !registeredEntityIds[c.id]
@@ -244,11 +318,11 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
       }));
 
       await db.worldEntities.bulkAdd(newEntities);
-      const newlyRegisteredMap: Record<string, boolean> = {};
-      newCandidates.forEach((c) => {
-        newlyRegisteredMap[c.id] = true;
-      });
-      setRegisteredEntityIds((prev) => ({ ...prev, ...newlyRegisteredMap }));
+
+      // Prune all registered candidates so they don't remain in candidate list
+      const remaining = detectedEntities.filter((c) => c.suggestedAction !== 'register_new');
+      onUpdateChapter({ aiDetectedEntities: remaining });
+      showToast(`Berhasil mendaftarkan ${newEntities.length} entitas baru ke Glosarium!`);
     } catch (err: any) {
       console.error('Gagal batch register:', err);
       alert('Gagal mendaftarkan entitas sekaligus: ' + err.message);
@@ -263,6 +337,193 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
       onUpdateChapter({ aiDetectedEntities: [] });
     }
   };
+
+  // =========================================================================
+  // 🖼️ Image Gallery Handlers
+  // =========================================================================
+
+  const handleUploadFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Format file harus gambar (PNG, JPG, WebP).');
+      return;
+    }
+
+    setUploadFileBlob(file);
+    const objectUrl = URL.createObjectURL(file);
+    setUploadPreviewUrl(objectUrl);
+    if (!uploadTitle) {
+      setUploadTitle(file.name.replace(/\.[^/.]+$/, ''));
+    }
+  };
+
+  const handleScanUploadVision = async () => {
+    if (!uploadPreviewUrl || !uploadFileBlob) {
+      alert('Pilih file gambar terlebih dahulu.');
+      return;
+    }
+
+    setIsAnalyzingVisionUpload(true);
+    try {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(uploadFileBlob);
+      });
+
+      const res = await analyzeImageWithVision(base64, uploadFileBlob.type || 'image/jpeg', {
+        bookTitle,
+        chapterTitle: chapter.title,
+        existingEntities: entities.map((e) => ({ id: e.id, name: e.name, category: e.category })),
+      });
+
+      setUploadVisionResult(res);
+      if (res.shortDescription && !uploadTitle) {
+        setUploadTitle(res.shortDescription);
+      }
+      if (res.detectedTags && res.detectedTags.length > 0) {
+        setUploadSelectedTags((prev) => Array.from(new Set([...prev, ...res.detectedTags])));
+      }
+      if (res.recommendedCategory) {
+        setUploadCategory(res.recommendedCategory);
+      }
+      showToast('AI Vision berhasil menganalisis gambar!');
+    } catch (err: any) {
+      alert('Gagal analisis AI Vision: ' + (err.message || 'Periksa API Key Gemini'));
+    } finally {
+      setIsAnalyzingVisionUpload(false);
+    }
+  };
+
+  const handleSaveUploadImage = async () => {
+    if (!uploadFileBlob) {
+      alert('Pilih file gambar terlebih dahulu.');
+      return;
+    }
+
+    try {
+      const id = await saveMediaItem(
+        chapter.bookId,
+        uploadFileBlob,
+        uploadTitle.trim() || 'Gambar Cerita',
+        undefined,
+        {
+          chapterId: uploadScopeChapter ? chapter.id : undefined,
+          category: uploadCategory,
+          tags: uploadSelectedTags,
+          caption: uploadTitle.trim(),
+          aiDescription: uploadVisionResult?.shortDescription,
+          aiNarrativeIntro: uploadVisionResult?.narrativeSentenceBefore,
+        }
+      );
+
+      // Reset form & close
+      setUploadFileBlob(null);
+      setUploadPreviewUrl('');
+      setUploadTitle('');
+      setUploadSelectedTags([]);
+      setUploadVisionResult(null);
+      setIsUploadImageModalOpen(false);
+      loadMedia();
+      showToast('Gambar berhasil disimpan ke Galeri Buku!');
+    } catch (err: any) {
+      console.error('Gagal upload gambar:', err);
+      alert('Gagal menyimpan gambar: ' + err.message);
+    }
+  };
+
+  const handleInsertImageToEditor = (img: MediaItem & { url: string }) => {
+    const captionText = img.caption || img.name || '';
+    const tagsHtml =
+      img.tags && img.tags.length > 0
+        ? `<div class="mt-2 flex flex-wrap items-center justify-center gap-1.5">${img.tags
+            .map(
+              (t) =>
+                `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30">🏷️ ${t}</span>`
+            )
+            .join(' ')}</div>`
+        : '';
+
+    const imageHtml = `
+<figure class="story-image-block my-5 p-3 rounded-2xl bg-slate-100/90 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center select-none" contenteditable="false">
+  <img src="${img.url}" alt="${captionText}" class="w-full max-h-[460px] object-cover rounded-xl shadow-md mx-auto block" />
+  ${captionText ? `<figcaption class="mt-2 text-xs font-semibold text-slate-700 dark:text-slate-300 italic">${captionText}</figcaption>` : ''}
+  ${tagsHtml}
+</figure>
+<p><br></p>`;
+
+    onInsertTextToManuscript(imageHtml);
+    showToast('Gambar disisipkan ke naskah bab!');
+  };
+
+  const handleSetAsChapterCover = async (img: MediaItem & { url: string }) => {
+    try {
+      await db.chapters.update(chapter.id, {
+        coverMediaId: img.id,
+        coverImageUrl: img.url,
+        updatedAt: Date.now(),
+      });
+      onUpdateChapter({
+        coverMediaId: img.id,
+        coverImageUrl: img.url,
+      });
+      showToast('Berhasil dijadikan Sampul Bab ini!');
+    } catch (err) {
+      alert('Gagal mengubah sampul bab.');
+    }
+  };
+
+  const handleSetAsBookCover = async (img: MediaItem) => {
+    try {
+      await db.books.update(chapter.bookId, {
+        coverMediaId: img.id,
+        updatedAt: Date.now(),
+      });
+      showToast('Berhasil dijadikan Sampul Utama Buku!');
+    } catch (err) {
+      alert('Gagal mengubah sampul buku.');
+    }
+  };
+
+  const handleDeleteMedia = async (mediaId: string) => {
+    if (!window.confirm('Hapus gambar ini dari galeri buku?')) return;
+    try {
+      await db.media.delete(mediaId);
+      loadMedia();
+      showToast('Gambar berhasil dihapus.');
+    } catch (err) {
+      alert('Gagal menghapus gambar.');
+    }
+  };
+
+  // Filtered Image list
+  const filteredImages = bookMediaList.filter((img) => {
+    // 1. Scope filter
+    if (imageScope === 'chapter') {
+      const matchChapterId = img.chapterId === chapter.id;
+      const matchTaggedEntity =
+        img.tags && img.tags.some((t) => relevantEntities.some((r) => r.name.toLowerCase() === t.toLowerCase()));
+      if (!matchChapterId && !matchTaggedEntity) return false;
+    } else if (imageScope === 'category') {
+      if (imageCategoryFilter !== 'all' && img.category !== imageCategoryFilter) {
+        return false;
+      }
+    }
+
+    // 2. Search query filter
+    if (imageSearchQuery.trim()) {
+      const q = imageSearchQuery.toLowerCase();
+      const matchName = img.name.toLowerCase().includes(q);
+      const matchCaption = img.caption?.toLowerCase().includes(q);
+      const matchTags = img.tags?.some((t) => t.toLowerCase().includes(q));
+      if (!matchName && !matchCaption && !matchTags) return false;
+    }
+
+    return true;
+  });
 
   const getCategoryMeta = (cat: WorldCategory) => {
     switch (cat) {
@@ -279,6 +540,14 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
 
   return (
     <div className="space-y-4 pb-28 max-w-3xl mx-auto animate-fade-in-up px-1 sm:px-2">
+      {/* Toast Feedback */}
+      {mediaActionToast && (
+        <div className="fixed top-16 right-4 z-50 bg-slate-900/95 text-white border border-amber-500/30 px-3.5 py-2 rounded-2xl shadow-xl text-xs font-bold flex items-center gap-2 animate-bounce">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <span>{mediaActionToast}</span>
+        </div>
+      )}
+
       {/* 1. Top Header Card */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
         <div className="flex items-center justify-between gap-2">
@@ -288,33 +557,35 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
             </span>
             <div>
               <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-                Glosarium & Referensi Bab Ini
+                Glosarium &amp; Galeri Cerita Bab Ini
               </h2>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Karakter, lokasi, relik, serta adegan dan visual yang relevan dengan bab ini
+                Karakter, lokasi, galeri visual, dan adegan yang relevan dengan bab ini
               </p>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={handleDetectEntities}
-            disabled={isDetectingEntities || !getEffectiveText()}
-            className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-gradient-to-r from-amber-500/15 to-indigo-500/15 hover:from-amber-500/25 hover:to-indigo-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-xs font-bold transition active:scale-95 disabled:opacity-50 flex-shrink-0"
-            title="Scan naskah untuk mendeteksi tokoh atau istilah baru"
-          >
-            {isDetectingEntities ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />
-                <span>Memindai...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                <span>Pindai Naskah</span>
-              </>
-            )}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleDetectEntities}
+              disabled={isDetectingEntities || !getEffectiveText()}
+              className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-gradient-to-r from-amber-500/15 to-indigo-500/15 hover:from-amber-500/25 hover:to-indigo-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-xs font-bold transition active:scale-95 disabled:opacity-50 flex-shrink-0"
+              title="Scan naskah untuk mendeteksi tokoh atau istilah baru"
+            >
+              {isDetectingEntities ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />
+                  <span>Memindai...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Pindai Naskah</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Sub-Tab Navigation Bar */}
@@ -354,6 +625,20 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
             )}
           </button>
 
+          {/* 🖼️ NEW SUBTAB: IMAGE GALLERY */}
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('images')}
+            className={`py-1.5 px-3 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 flex items-center gap-1.5 ${
+              activeSubTab === 'images'
+                ? 'bg-purple-600 text-white shadow-sm'
+                : 'bg-purple-500/10 text-purple-700 dark:text-purple-300 hover:bg-purple-500/20 border border-purple-500/30'
+            }`}
+          >
+            <ImageIcon className="w-3.5 h-3.5" />
+            <span>Galeri Gambar ({bookMediaList.length})</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setActiveSubTab('character')}
@@ -390,7 +675,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
             }`}
           >
             <Shield className="w-3.5 h-3.5" />
-            <span>Item & Lore</span>
+            <span>Item &amp; Lore</span>
           </button>
 
           <button
@@ -416,12 +701,275 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
             }`}
           >
             <ImageIcon className="w-3.5 h-3.5" />
-            <span>Visual & Prompt</span>
+            <span>Visual &amp; Prompt</span>
           </button>
         </div>
       </div>
 
-      {/* 2. CANDIDATES / DETECTED ENTITIES VIEW */}
+      {/* ========================================================================= */}
+      {/* 2. 🖼️ IMAGE GALLERY SUBTAB WORKSPACE                                      */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'images' && (
+        <div className="space-y-3 animate-in fade-in">
+          {/* Gallery Controls Header */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-purple-500/15 text-purple-600 dark:text-purple-400">
+                  <ImageIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>Arsip Visual &amp; Galeri Cerita</span>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                      {filteredImages.length} dari {bookMediaList.length} gambar
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Koleksi gambar bab, karakter, lokasi, dan sampul cerita
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsUploadImageModalOpen(true)}
+                className="py-2 px-3.5 rounded-xl bg-purple-600 hover:bg-purple-500 active:scale-95 text-white font-bold text-xs shadow-md shadow-purple-500/20 transition flex items-center justify-center gap-1.5 flex-shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Upload Gambar Baru</span>
+              </button>
+            </div>
+
+            {/* Scope Tabs: Per Chapter vs Per Kategori vs Global */}
+            <div className="flex items-center gap-1.5 border-t border-slate-100 dark:border-slate-800 pt-3 flex-wrap">
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mr-1">Tampilan:</span>
+              <button
+                type="button"
+                onClick={() => setImageScope('chapter')}
+                className={`py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                  imageScope === 'chapter'
+                    ? 'bg-purple-600 text-white shadow-sm'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <BookMarked className="w-3.5 h-3.5" />
+                <span>Bab Ini (Bab {chapter.order})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setImageScope('category')}
+                className={`py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                  imageScope === 'category'
+                    ? 'bg-purple-600 text-white shadow-sm'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>Per Kategori Tertentu</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setImageScope('global')}
+                className={`py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                  imageScope === 'global'
+                    ? 'bg-purple-600 text-white shadow-sm'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>Global (Semua Bab &amp; Sampul)</span>
+              </button>
+            </div>
+
+            {/* Sub-Filter when in 'category' mode */}
+            {imageScope === 'category' && (
+              <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-1">
+                {[
+                  { id: 'all', label: 'Semua Kategori' },
+                  { id: 'character', label: 'Karakter' },
+                  { id: 'location', label: 'Lokasi' },
+                  { id: 'item', label: 'Item/Relik' },
+                  { id: 'scene', label: 'Adegan Bab' },
+                  { id: 'cover_chapter', label: 'Sampul Bab' },
+                  { id: 'cover_book', label: 'Sampul Buku' },
+                ].map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setImageCategoryFilter(c.id as any)}
+                    className={`py-1 px-2.5 rounded-lg text-[10px] font-bold transition whitespace-nowrap ${
+                      imageCategoryFilter === c.id
+                        ? 'bg-amber-500 text-slate-950 shadow-sm'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Search filter for images */}
+            <div className="relative pt-1">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={imageSearchQuery}
+                onChange={(e) => setImageSearchQuery(e.target.value)}
+                placeholder="Cari gambar berdasarkan judul, caption, atau tag tokoh..."
+                className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500"
+              />
+            </div>
+          </div>
+
+          {/* Image Grid Display */}
+          {filteredImages.length === 0 ? (
+            <div className="text-center py-12 px-4 bg-white dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800 rounded-3xl space-y-2">
+              <ImageIcon className="w-10 h-10 text-slate-400 mx-auto mb-1" />
+              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                Belum Ada Gambar yang Cocok
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-3">
+                {imageScope === 'chapter'
+                  ? `Belum ada gambar yang diunggah khusus untuk Bab ${chapter.order}. Anda dapat mengunggah gambar baru atau beralih ke tampilan Global.`
+                  : 'Belum ada gambar dalam kategori ini. Unggah ilustrasi baru dan berikan tag tokoh atau latarnya.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsUploadImageModalOpen(true)}
+                className="py-2 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm active:scale-95"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Upload Gambar ke Bab Ini</span>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {filteredImages.map((img) => {
+                const isChapterCover = chapter.coverMediaId === img.id;
+                return (
+                  <div
+                    key={img.id}
+                    className={`bg-white dark:bg-slate-900 border rounded-2xl overflow-hidden shadow-sm hover:border-purple-400 transition flex flex-col justify-between ${
+                      isChapterCover
+                        ? 'border-amber-500/50 ring-2 ring-amber-500/20'
+                        : 'border-slate-200 dark:border-slate-800'
+                    }`}
+                  >
+                    <div>
+                      {/* Image Thumbnail with Overlay Badges */}
+                      <div
+                        className="relative h-44 bg-slate-950 flex items-center justify-center overflow-hidden cursor-pointer group"
+                        onClick={() => setPreviewImageModal({ url: img.url, name: img.name, caption: img.caption })}
+                      >
+                        <img
+                          src={img.url}
+                          alt={img.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30" />
+
+                        {/* Top Badges */}
+                        <div className="absolute top-2 left-2 right-2 flex items-center justify-between gap-1">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-black/60 text-white backdrop-blur-sm border border-white/20">
+                            {img.category || 'scene'}
+                          </span>
+
+                          {isChapterCover && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-slate-950 shadow-sm flex items-center gap-1">
+                              <Check className="w-3 h-3" />
+                              <span>Sampul Bab</span>
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Bottom Scope Badge */}
+                        <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white text-[11px]">
+                          <span className="font-bold truncate drop-shadow">{img.caption || img.name}</span>
+                          <span className="text-[10px] opacity-80 flex-shrink-0">
+                            {img.chapterId === chapter.id ? `Bab ${chapter.order}` : 'Global'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Tags & Caption Info */}
+                      <div className="p-3 space-y-2">
+                        {img.tags && img.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {img.tags.map((t, tIdx) => (
+                              <span
+                                key={tIdx}
+                                className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20"
+                              >
+                                🏷️ {t}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {img.aiDescription && (
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed italic">
+                            "{img.aiDescription}"
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Image Action Buttons */}
+                    <div className="p-3 pt-1 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-1.5 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => handleInsertImageToEditor(img)}
+                        className="py-1 px-2.5 rounded-xl bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-600 hover:text-white border border-purple-200 dark:border-purple-700 text-xs font-bold transition active:scale-95 flex items-center gap-1"
+                        title="Sisipkan gambar ini ke kursor naskah bab"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Sisip ke Naskah</span>
+                      </button>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleSetAsChapterCover(img)}
+                          className="py-1 px-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-slate-600 dark:text-slate-300 text-[11px] font-semibold transition active:scale-95"
+                          title="Jadikan sebagai gambar sampul bab ini"
+                        >
+                          Sampul Bab
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleSetAsBookCover(img)}
+                          className="py-1 px-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-slate-600 dark:text-slate-300 text-[11px] font-semibold transition active:scale-95"
+                          title="Jadikan sebagai gambar sampul utama buku"
+                        >
+                          Sampul Buku
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteMedia(img.id)}
+                          className="p-1 rounded-lg text-slate-400 hover:text-rose-500 transition"
+                          title="Hapus gambar dari galeri"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 3. CANDIDATES / DETECTED ENTITIES VIEW                                    */}
+      {/* ========================================================================= */}
       {activeSubTab === 'detected' && (
         <div className="space-y-3">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
@@ -432,7 +980,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
                 </div>
                 <div>
                   <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <span>Entitas & Alias Hasil Pindai Naskah</span>
+                    <span>Entitas &amp; Alias Hasil Pindai Naskah</span>
                     {detectedEntities.length > 0 && (
                       <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                         {detectedEntities.length} item
@@ -612,7 +1160,9 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
         </div>
       )}
 
-      {/* 3. AUTO SCENE VIEW */}
+      {/* ========================================================================= */}
+      {/* 4. AUTO SCENE VIEW                                                        */}
+      {/* ========================================================================= */}
       {activeSubTab === 'scenes' && (
         <div className="space-y-3">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -666,14 +1216,16 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
         </div>
       )}
 
-      {/* 4. VISUAL & IMAGE PROMPTS VIEW */}
+      {/* ========================================================================= */}
+      {/* 5. VISUAL & IMAGE PROMPTS VIEW                                            */}
+      {/* ========================================================================= */}
       {activeSubTab === 'visuals' && (
         <div className="space-y-3">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                 <ImageIcon className="w-4 h-4 text-purple-500" />
-                <span>Visual & Image Prompts</span>
+                <span>Visual &amp; Image Prompts</span>
               </h3>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 Prompt gambar siap pakai untuk di-copy ke AI generator gambar (Midjourney, DALL-E, SD)
@@ -749,8 +1301,10 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
         </div>
       )}
 
-      {/* 5. ENTITIES LIST VIEW (Registered Worldbuilding Entities) */}
-      {activeSubTab !== 'scenes' && activeSubTab !== 'visuals' && activeSubTab !== 'detected' && (
+      {/* ========================================================================= */}
+      {/* 6. ENTITIES LIST VIEW (Registered Worldbuilding Entities)                 */}
+      {/* ========================================================================= */}
+      {activeSubTab !== 'scenes' && activeSubTab !== 'visuals' && activeSubTab !== 'detected' && activeSubTab !== 'images' && (
         <div className="space-y-3">
           {/* Detected Candidates Notification Banner */}
           {detectedEntities.length > 0 && activeSubTab === 'all' && (
@@ -867,6 +1421,244 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 🖼️ MODAL UPLOAD GAMBAR BARU KE GALERI GLOSARIUM                           */}
+      {/* ========================================================================= */}
+      {isUploadImageModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-fade-in"
+          onClick={() => setIsUploadImageModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-lg max-h-[90vh] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4 overflow-y-auto animate-scale-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="p-2 rounded-xl bg-purple-500/15 text-purple-600 dark:text-purple-400 font-bold">
+                  <Upload className="w-5 h-5" />
+                </span>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                    Upload Gambar ke Galeri Buku
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Unggah visual dan beri tag Worldbuilding berdasarkan tokoh atau lokasi
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsUploadImageModalOpen(false)}
+                className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* File Picker */}
+            <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-4 text-center hover:border-purple-500 transition cursor-pointer relative bg-slate-50 dark:bg-slate-800/40">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleUploadFileChange}
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+              />
+              <Upload className="w-7 h-7 mx-auto text-slate-400 mb-1" />
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                {uploadFileBlob ? uploadFileBlob.name : 'Pilih file gambar (PNG, JPG, WebP)'}
+              </p>
+              <p className="text-[10px] text-slate-400 mt-0.5">Klik untuk memilih gambar</p>
+            </div>
+
+            {/* Preview & AI Vision trigger */}
+            {uploadPreviewUrl && (
+              <div className="space-y-2">
+                <div className="relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 max-h-40 bg-slate-950 flex items-center justify-center">
+                  <img src={uploadPreviewUrl} alt="Pratinjau" className="max-h-40 object-contain mx-auto" />
+                </div>
+
+                <div className="flex items-center justify-between bg-purple-500/10 p-2.5 rounded-xl border border-purple-500/20">
+                  <span className="text-[11px] font-bold text-purple-700 dark:text-purple-300 flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Analisis AI Vision untuk auto-tagging</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleScanUploadVision}
+                    disabled={isAnalyzingVisionUpload}
+                    className="py-1 px-2.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition disabled:opacity-50 flex items-center gap-1"
+                  >
+                    {isAnalyzingVisionUpload ? (
+                      <>
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        <span>Menganalisis...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3 h-3 text-amber-300" />
+                        <span>Pindai AI Vision</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Title / Caption */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                Nama / Keterangan Gambar
+              </label>
+              <input
+                type="text"
+                placeholder="Contoh: Sosok Ahmad mengenakan jubah hitam..."
+                value={uploadTitle}
+                onChange={(e) => setUploadTitle(e.target.value)}
+                className="w-full py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40"
+              />
+            </div>
+
+            {/* Category Selector */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                Kategori Gambar
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                {[
+                  { id: 'scene', label: 'Adegan Bab' },
+                  { id: 'character', label: 'Karakter' },
+                  { id: 'location', label: 'Lokasi' },
+                  { id: 'item', label: 'Item/Relik' },
+                  { id: 'cover_chapter', label: 'Sampul Bab' },
+                  { id: 'cover_book', label: 'Sampul Buku' },
+                  { id: 'lore', label: 'Lore/Faksi' },
+                  { id: 'general', label: 'Umum' },
+                ].map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setUploadCategory(c.id as any)}
+                    className={`py-1.5 px-2 rounded-xl text-[11px] font-bold border transition ${
+                      uploadCategory === c.id
+                        ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                        : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                    }`}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Scope Toggle: Associate with Chapter */}
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={uploadScopeChapter}
+                  onChange={(e) => setUploadScopeChapter(e.target.checked)}
+                  className="rounded text-purple-600 focus:ring-purple-500"
+                />
+                <span>Kaitkan gambar ini dengan Bab {chapter.order} ({chapter.title})</span>
+              </label>
+            </div>
+
+            {/* Worldbuilding Tags */}
+            <div className="space-y-2 pt-1">
+              <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Tag Entitas Worldbuilding</span>
+                </span>
+                <span className="text-[10px] text-slate-400">{uploadSelectedTags.length} dipilih</span>
+              </label>
+
+              {entities.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">Belum ada entitas di glosarium.</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-1">
+                  {entities.map((ent) => {
+                    const isSelected = uploadSelectedTags.includes(ent.name);
+                    return (
+                      <button
+                        key={ent.id}
+                        type="button"
+                        onClick={() => {
+                          setUploadSelectedTags((prev) =>
+                            prev.includes(ent.name) ? prev.filter((t) => t !== ent.name) : [...prev, ent.name]
+                          );
+                        }}
+                        className={`py-1 px-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 ${
+                          isSelected
+                            ? 'bg-purple-600 text-white shadow-sm ring-1 ring-purple-400'
+                            : 'bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-400'
+                        }`}
+                      >
+                        <span>{ent.name}</span>
+                        {isSelected && <Check className="w-3 h-3" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsUploadImageModalOpen(false)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-bold text-xs hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveUploadImage}
+                disabled={!uploadFileBlob}
+                className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition active:scale-95 disabled:opacity-50 shadow-md shadow-purple-500/20"
+              >
+                Simpan ke Galeri
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 🔍 FULLSIZE IMAGE PREVIEW MODAL                                           */}
+      {/* ========================================================================= */}
+      {previewImageModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 animate-fade-in"
+          onClick={() => setPreviewImageModal(null)}
+        >
+          <div
+            className="max-w-2xl w-full bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl space-y-3 p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between text-white pb-2 border-b border-slate-800">
+              <h4 className="text-sm font-bold truncate">{previewImageModal.caption || previewImageModal.name}</h4>
+              <button
+                type="button"
+                onClick={() => setPreviewImageModal(null)}
+                className="p-1 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="max-h-[70vh] flex items-center justify-center overflow-hidden rounded-2xl bg-black">
+              <img
+                src={previewImageModal.url}
+                alt={previewImageModal.name}
+                className="max-h-[70vh] w-auto object-contain mx-auto"
+              />
+            </div>
+          </div>
         </div>
       )}
 

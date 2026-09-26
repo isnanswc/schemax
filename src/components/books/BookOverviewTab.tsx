@@ -15,7 +15,8 @@ import {
   Sparkles,
   TrendingUp,
   Tag,
-  Edit3
+  Edit3,
+  X
 } from 'lucide-react';
 
 interface BookOverviewTabProps {
@@ -39,6 +40,7 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
   const [isEditingSynopsis, setIsEditingSynopsis] = useState(false);
   const [targetWordCount, setTargetWordCount] = useState(book.wordCountTarget || 50000);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isSelectCoverModalOpen, setIsSelectCoverModalOpen] = useState(false);
 
   const totalWords = chapters.reduce((sum, c) => sum + (c.wordCount || 0), 0);
   const completedChapters = chapters.filter((c) => c.status === 'completed').length;
@@ -65,6 +67,13 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
     const updated = { ...book, coverMediaId, updatedAt: Date.now() };
     await db.books.update(book.id, { coverMediaId, updatedAt: Date.now() });
     onBookUpdated(updated);
+  };
+
+  const handleSelectCover = async (mediaId: string) => {
+    const updated = { ...book, coverMediaId: mediaId, updatedAt: Date.now() };
+    await db.books.update(book.id, { coverMediaId: mediaId, updatedAt: Date.now() });
+    onBookUpdated(updated);
+    setIsSelectCoverModalOpen(false);
   };
 
   // Export full book project as JSON
@@ -98,11 +107,22 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
             aspectRatio="book"
             className="rounded-2xl shadow-xl ring-1 ring-slate-900/10 dark:ring-white/10"
           />
-          <label className="text-[11px] text-amber-700 dark:text-amber-400 hover:underline font-semibold cursor-pointer flex items-center gap-1">
-            <ImageIcon className="w-3 h-3" />
-            <span>Ganti Sampul</span>
-            <input type="file" accept="image/*" onChange={handleCoverUpload} className="hidden" />
-          </label>
+          <div className="flex items-center gap-2 pt-0.5">
+            <label className="text-[11px] text-amber-700 dark:text-amber-400 hover:underline font-semibold cursor-pointer flex items-center gap-1">
+              <Upload className="w-3 h-3" />
+              <span>Upload</span>
+              <input type="file" accept="image/*" onChange={handleCoverUpload} className="hidden" />
+            </label>
+            <span className="text-slate-300 dark:text-slate-700 text-xs">•</span>
+            <button
+              type="button"
+              onClick={() => setIsSelectCoverModalOpen(true)}
+              className="text-[11px] text-purple-600 dark:text-purple-400 hover:underline font-semibold flex items-center gap-1"
+            >
+              <ImageIcon className="w-3 h-3" />
+              <span>Galeri ({mediaList.length})</span>
+            </button>
+          </div>
         </div>
 
         {/* Info & Status Switch */}
@@ -276,6 +296,82 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
           setTargetWordCount(updated.wordCountTarget || 50000);
         }}
       />
+
+      {/* Select Cover from Gallery Modal */}
+      {isSelectCoverModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-fade-in"
+          onClick={() => setIsSelectCoverModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto animate-scale-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-xl bg-purple-500/15 text-purple-600 dark:text-purple-400">
+                  <ImageIcon className="w-4 h-4" />
+                </span>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Pilih Sampul Buku dari Galeri</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSelectCoverModalOpen(false)}
+                className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {mediaList.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-8 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                Belum ada gambar yang diunggah di buku ini.
+              </p>
+            ) : (
+              <div className="grid grid-cols-3 gap-2.5 p-1 max-h-72 overflow-y-auto">
+                {mediaList.map((m) => {
+                  const url = URL.createObjectURL(m.blob);
+                  const isCurrent = book.coverMediaId === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => handleSelectCover(m.id)}
+                      className={`relative rounded-2xl overflow-hidden border-2 transition active:scale-95 group ${
+                        isCurrent
+                          ? 'border-amber-500 ring-2 ring-amber-500/30'
+                          : 'border-slate-200 dark:border-slate-700 hover:border-amber-400'
+                      }`}
+                    >
+                      <img src={url} alt={m.name} className="w-full h-28 object-cover" />
+                      {isCurrent && (
+                        <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-amber-500 text-slate-950 font-bold text-[9px]">
+                          Aktif
+                        </span>
+                      )}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                        <span className="text-[10px] font-bold text-white bg-black/60 px-2 py-0.5 rounded-full">
+                          Pilih Ini
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsSelectCoverModalOpen(false)}
+                className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

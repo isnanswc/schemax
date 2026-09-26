@@ -87,6 +87,8 @@ export interface StoryChapter {
   aiPlot?: ChapterPlotBreakdown;
   aiScenes?: ChapterSceneItem[];
   aiDetectedEntities?: DetectedEntityCandidate[];
+  coverMediaId?: string;
+  coverImageUrl?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -115,10 +117,18 @@ export interface WorldEntity {
   updatedAt: number;
 }
 
+export type MediaCategory = WorldCategory | 'cover_book' | 'cover_chapter' | 'scene' | 'general';
+
 export interface MediaItem {
   id: string;
   bookId: string;
+  chapterId?: string;
   entityId?: string;
+  category?: MediaCategory;
+  tags?: string[];
+  caption?: string;
+  aiDescription?: string;
+  aiNarrativeIntro?: string;
   name: string;
   mimeType: string;
   blob: Blob;

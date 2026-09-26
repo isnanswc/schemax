@@ -268,10 +268,13 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   };
 
   // 🖼️ Insert Story Image with Worldbuilding Tags
+  // 🖼️ Insert Story Image with Worldbuilding Tags and Narrative Sentences
   const handleInsertImage = (
     imageUrl: string,
     caption: string,
-    taggedEntities: Array<{ id: string; name: string; category: WorldCategory }>
+    taggedEntities: Array<{ id: string; name: string; category: WorldCategory }>,
+    narrativeSentenceBefore?: string,
+    narrativeSentenceAfter?: string
   ) => {
     if (!editorRef.current) return;
     editorRef.current.focus();
@@ -285,12 +288,21 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
       )
       .join(' ');
 
+    const beforeHtml = narrativeSentenceBefore?.trim()
+      ? `<p class="story-narrative-lead my-2 italic text-slate-700 dark:text-slate-300 leading-relaxed font-serif">${narrativeSentenceBefore.trim()}</p>`
+      : '';
+    const afterHtml = narrativeSentenceAfter?.trim()
+      ? `<p class="story-narrative-follow my-2 italic text-slate-700 dark:text-slate-300 leading-relaxed font-serif">${narrativeSentenceAfter.trim()}</p>`
+      : '';
+
     const imageBlockHtml = `
+${beforeHtml}
 <figure class="story-image-block my-5 p-3 rounded-2xl bg-slate-100/90 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center select-none" contenteditable="false">
   <img src="${imageUrl}" alt="${caption}" class="w-full max-h-[460px] object-cover rounded-xl shadow-md mx-auto block" />
   ${caption ? `<figcaption class="mt-2 text-xs font-semibold text-slate-700 dark:text-slate-300 italic">${caption}</figcaption>` : ''}
   ${taggedEntities.length > 0 ? `<div class="mt-2 flex flex-wrap items-center justify-center gap-1.5">${tagBadgesHtml}</div>` : ''}
 </figure>
+${afterHtml}
 <p><br></p>`;
 
     document.execCommand('insertHTML', false, imageBlockHtml);
@@ -548,11 +560,14 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
         targetWordCount={currentChapter.targetWordCount || 1500}
       />
 
-      {/* Insert Story Image Modal with Worldbuilding Tagging */}
+      {/* Insert Story Image Modal with Worldbuilding Tagging & AI Vision */}
       <InsertStoryImageModal
         isOpen={isInsertImageOpen}
         onClose={() => setIsInsertImageOpen(false)}
         bookId={chapter.bookId}
+        bookTitle={bookTitle}
+        chapterTitle={currentChapter.title}
+        chapterId={currentChapter.id}
         entities={entities}
         onInsertImage={handleInsertImage}
       />
