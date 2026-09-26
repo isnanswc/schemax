@@ -26,7 +26,8 @@ import {
   BookOpen,
   Layers,
   Search,
-  BookMarked
+  BookMarked,
+  SlidersHorizontal
 } from 'lucide-react';
 import {
   StoryChapter,
@@ -45,6 +46,7 @@ import {
   ImageVisionAnalysis
 } from '../../../services/aiService';
 import { WorldEntityHologramModal } from '../../world/WorldEntityHologramModal';
+import { AddWorldEntityModal } from '../../world/AddWorldEntityModal';
 import { VerticalSceneTimeline } from './VerticalSceneTimeline';
 
 interface ChapterGlossaryTabProps {
@@ -64,12 +66,21 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
   onUpdateChapter,
   onInsertTextToManuscript,
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'all' | 'detected' | WorldCategory | 'images' | 'scenes' | 'visuals'>('all');
+  // Navigation Subtabs: 5 unified primary tabs
+  const [activeSubTab, setActiveSubTab] = useState<'entities' | 'detected' | 'images' | 'scenes' | 'visuals'>('entities');
+  
+  // 📚 Unified Entities State (Filter, Sort, Search)
   const [searchQuery, setSearchQuery] = useState('');
+  const [entityCategoryFilter, setEntityCategoryFilter] = useState<'all' | WorldCategory | 'relevant'>('all');
+  const [entitySortBy, setEntitySortBy] = useState<'chapter_first' | 'name_asc' | 'name_desc' | 'newest' | 'category'>('chapter_first');
+  const [isAddEntityModalOpen, setIsAddEntityModalOpen] = useState(false);
   const [hologramEntity, setHologramEntity] = useState<WorldEntity | null>(null);
+
+  // AI & Processing States
   const [isAnalyzingScenes, setIsAnalyzingScenes] = useState(false);
   const [isDetectingEntities, setIsDetectingEntities] = useState(false);
   const [isBatchRegistering, setIsBatchRegistering] = useState(false);
+  const [registeringCandidateId, setRegisteringCandidateId] = useState<string | null>(null);
   const [copiedPromptId, setCopiedPromptId] = useState<string | null>(null);
   const [insertedName, setInsertedName] = useState<string | null>(null);
 
@@ -136,15 +147,52 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
     return false;
   });
 
-  const displayEntities = entities.filter((ent) => {
-    if (activeSubTab === 'scenes' || activeSubTab === 'visuals' || activeSubTab === 'detected' || activeSubTab === 'images') return false;
-    const matchCategory = activeSubTab === 'all' || ent.category === activeSubTab;
-    const matchSearch =
-      searchQuery.trim() === '' ||
-      ent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ent.shortDescription.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchCategory && matchSearch;
-  });
+  // Filtered & Sorted Entities List for Unified "Entitas" Tab
+  const displayEntities = entities
+    .filter((ent) => {
+      // 1. Category / Relevant filter
+      if (entityCategoryFilter === 'relevant') {
+        const isPresent =
+          lowerContent.includes(ent.name.toLowerCase()) ||
+          (ent.aliases && ent.aliases.some((a) => lowerContent.includes(a.toLowerCase())));
+        if (!isPresent) return false;
+      } else if (entityCategoryFilter !== 'all') {
+        if (ent.category !== entityCategoryFilter) return false;
+      }
+
+      // 2. Search query filter
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchName = ent.name.toLowerCase().includes(q);
+        const matchDesc = (ent.shortDescription || '').toLowerCase().includes(q);
+        const matchAliases = ent.aliases && ent.aliases.some((a) => a.toLowerCase().includes(q));
+        if (!matchName && !matchDesc && !matchAliases) return false;
+      }
+
+      return true;
+    })
+    .sort((a, b) => {
+      if (entitySortBy === 'name_asc') {
+        return a.name.localeCompare(b.name);
+      }
+      if (entitySortBy === 'name_desc') {
+        return b.name.localeCompare(a.name);
+      }
+      if (entitySortBy === 'chapter_first') {
+        const aPresent = lowerContent.includes(a.name.toLowerCase());
+        const bPresent = lowerContent.includes(b.name.toLowerCase());
+        if (aPresent && !bPresent) return -1;
+        if (!aPresent && bPresent) return 1;
+        return a.name.localeCompare(b.name);
+      }
+      if (entitySortBy === 'newest') {
+        return (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0);
+      }
+      if (entitySortBy === 'category') {
+        return a.category.localeCompare(b.category);
+      }
+      return 0;
+    });
 
   const scenes = chapter.aiScenes || [];
 
@@ -225,14 +273,27 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
     }
   };
 
-  // Register single new entity to Dexie db.worldEntities and PRUNE from candidate list
+  // Register single new entity to Dexie db.worldEntities with DUPLICATE PREVENTION & CANDIDATE PRUNING
   const handleRegisterEntity = async (candidate: DetectedEntityCandidate) => {
+    if (registeringCandidateId === candidate.id) return;
+    setRegisteringCandidateId(candidate.id);
+
     try {
+      const normName = candidate.name.trim().toLowerCase();
+      // 1. Strict Duplicate Check against existing entities
+      const alreadyExists = entities.some((e) => e.name.trim().toLowerCase() === normName);
+      if (alreadyExists) {
+        const remaining = detectedEntities.filter((c) => c.id !== candidate.id);
+        onUpdateChapter({ aiDetectedEntities: remaining });
+        showToast(`Entitas "${candidate.name}" sudah ada di Glosarium.`);
+        return;
+      }
+
       const newEntity: WorldEntity = {
         id: 'ent_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36),
         bookId: chapter.bookId,
         category: candidate.category,
-        name: candidate.name,
+        name: candidate.name.trim(),
         aliases: [],
         shortDescription: candidate.shortDescription,
         detailedNotes: `Dideteksi otomatis dari Bab ${chapter.order}: ${chapter.title}.`,
@@ -245,13 +306,15 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
       await db.worldEntities.add(newEntity);
       setRegisteredEntityIds((prev) => ({ ...prev, [candidate.id]: true }));
 
-      // Automatically prune added candidate so it disappears from the list
+      // Automatically prune added candidate so it disappears from the candidate list
       const remaining = detectedEntities.filter((c) => c.id !== candidate.id);
       onUpdateChapter({ aiDetectedEntities: remaining });
-      showToast(`Entitas "${candidate.name}" berhasil ditambahkan ke Glosarium Dunia!`);
+      showToast(`Entitas "${candidate.name}" berhasil didaftarkan ke Glosarium!`);
     } catch (err: any) {
       console.error('Gagal menambahkan ke glosarium:', err);
       alert('Gagal mendaftarkan entitas: ' + (err.message || 'Error'));
+    } finally {
+      setRegisteringCandidateId(null);
     }
   };
 
@@ -266,7 +329,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
       );
       if (target) {
         const currentAliases = target.aliases || [];
-        const updatedAliases = Array.from(new Set([...currentAliases, candidate.name]));
+        const updatedAliases = Array.from(new Set([...currentAliases, candidate.name.trim()]));
         await db.worldEntities.update(target.id, {
           aliases: updatedAliases,
           updatedAt: Date.now(),
@@ -292,12 +355,23 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
     onUpdateChapter({ aiDetectedEntities: updated });
   };
 
-  // Batch register all new candidates to Glosarium and PRUNE them
+  // Batch register all new candidates to Glosarium with DUPLICATE FILTERING & PRUNING
   const handleRegisterAllNew = async () => {
+    const existingNames = new Set(entities.map((e) => e.name.trim().toLowerCase()));
     const newCandidates = detectedEntities.filter(
-      (c) => c.suggestedAction === 'register_new' && !registeredEntityIds[c.id]
+      (c) =>
+        c.suggestedAction === 'register_new' &&
+        !registeredEntityIds[c.id] &&
+        !existingNames.has(c.name.trim().toLowerCase())
     );
-    if (newCandidates.length === 0) return;
+
+    if (newCandidates.length === 0) {
+      // If candidates exist but were already in glossary, prune them
+      const remaining = detectedEntities.filter((c) => c.suggestedAction !== 'register_new');
+      onUpdateChapter({ aiDetectedEntities: remaining });
+      showToast('Semua entitas baru sudah terdaftar sebelumnya.');
+      return;
+    }
 
     setIsBatchRegistering(true);
     try {
@@ -306,7 +380,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
         id: 'ent_' + Math.random().toString(36).substring(2, 9) + (now + i).toString(36),
         bookId: chapter.bookId,
         category: c.category,
-        name: c.name,
+        name: c.name.trim(),
         aliases: [],
         shortDescription: c.shortDescription,
         detailedNotes: `Dideteksi otomatis dari Bab ${chapter.order}: ${chapter.title}.`,
@@ -335,6 +409,17 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
   const handleClearAllCandidates = () => {
     if (window.confirm('Hapus daftar hasil pemindaian entitas ini?')) {
       onUpdateChapter({ aiDetectedEntities: [] });
+    }
+  };
+
+  // Delete entity from Glosarium
+  const handleDeleteEntity = async (entId: string, entName: string) => {
+    if (!window.confirm(`Hapus "${entName}" dari Glosarium Dunia?`)) return;
+    try {
+      await db.worldEntities.delete(entId);
+      showToast(`Entitas "${entName}" berhasil dihapus.`);
+    } catch (err) {
+      alert('Gagal menghapus entitas.');
     }
   };
 
@@ -405,7 +490,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
     }
 
     try {
-      const id = await saveMediaItem(
+      await saveMediaItem(
         chapter.bookId,
         uploadFileBlob,
         uploadTitle.trim() || 'Gambar Cerita',
@@ -538,6 +623,12 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
     }
   };
 
+  // Counts for Category Pills in Entitas Tab
+  const charCount = entities.filter((e) => e.category === 'character').length;
+  const locCount = entities.filter((e) => e.category === 'location').length;
+  const itemCount = entities.filter((e) => e.category === 'item').length;
+  const loreCount = entities.filter((e) => e.category === 'lore').length;
+
   return (
     <div className="space-y-4 pb-28 max-w-3xl mx-auto animate-fade-in-up px-1 sm:px-2">
       {/* Toast Feedback */}
@@ -557,10 +648,10 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
             </span>
             <div>
               <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-                Glosarium &amp; Galeri Cerita Bab Ini
+                Glosarium &amp; Galeri Bab Ini
               </h2>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Karakter, lokasi, galeri visual, dan adegan yang relevan dengan bab ini
+                Pusat referensi entitas, visual cerita, dan pembagian adegan
               </p>
             </div>
           </div>
@@ -588,21 +679,23 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
           </div>
         </div>
 
-        {/* Sub-Tab Navigation Bar */}
+        {/* 📑 Clean 5-Tab Navigation Bar: Merged Menu */}
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1">
+          {/* TAB 1: GABUNGAN ENTITAS (Karakter, Item, Lokasi, Lore) */}
           <button
             type="button"
-            onClick={() => setActiveSubTab('all')}
-            className={`py-1.5 px-3 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 ${
-              activeSubTab === 'all'
+            onClick={() => setActiveSubTab('entities')}
+            className={`py-1.5 px-3.5 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 flex items-center gap-1.5 ${
+              activeSubTab === 'entities'
                 ? 'bg-amber-500 text-slate-950 shadow-sm'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            Semua Entitas ({entities.length})
+            <Compass className="w-3.5 h-3.5" />
+            <span>Entitas ({entities.length})</span>
           </button>
 
-          {/* AI Detected Entities Sub-Tab */}
+          {/* TAB 2: KANDIDAT AI */}
           <button
             type="button"
             onClick={() => setActiveSubTab('detected')}
@@ -625,7 +718,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
             )}
           </button>
 
-          {/* 🖼️ NEW SUBTAB: IMAGE GALLERY */}
+          {/* TAB 3: IMAGE GALLERY */}
           <button
             type="button"
             onClick={() => setActiveSubTab('images')}
@@ -639,45 +732,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
             <span>Galeri Gambar ({bookMediaList.length})</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('character')}
-            className={`py-1.5 px-3 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 flex items-center gap-1 ${
-              activeSubTab === 'character'
-                ? 'bg-pink-500 text-white shadow-sm'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <User className="w-3.5 h-3.5" />
-            <span>Karakter</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('location')}
-            className={`py-1.5 px-3 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 flex items-center gap-1 ${
-              activeSubTab === 'location'
-                ? 'bg-cyan-500 text-white shadow-sm'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <MapPin className="w-3.5 h-3.5" />
-            <span>Lokasi/Latar</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('item')}
-            className={`py-1.5 px-3 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 flex items-center gap-1 ${
-              activeSubTab === 'item'
-                ? 'bg-yellow-500 text-slate-950 shadow-sm'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <Shield className="w-3.5 h-3.5" />
-            <span>Item &amp; Lore</span>
-          </button>
-
+          {/* TAB 4: AUTO SCENE */}
           <button
             type="button"
             onClick={() => setActiveSubTab('scenes')}
@@ -691,12 +746,13 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
             <span>Auto Scene ({scenes.length})</span>
           </button>
 
+          {/* TAB 5: VISUAL PROMPTS */}
           <button
             type="button"
             onClick={() => setActiveSubTab('visuals')}
             className={`py-1.5 px-3 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 flex items-center gap-1 ${
               activeSubTab === 'visuals'
-                ? 'bg-purple-600 text-white shadow-sm'
+                ? 'bg-pink-600 text-white shadow-sm'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -705,6 +761,237 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
           </button>
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* 1. 📚 UNIFIED ENTITAS WORKSPACE (Search, Filter, Sort)                    */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'entities' && (
+        <div className="space-y-3 animate-in fade-in">
+          {/* Detected Candidates Notification Banner */}
+          {detectedEntities.length > 0 && (
+            <div className="bg-gradient-to-r from-emerald-500/15 via-teal-500/10 to-emerald-500/15 border border-emerald-500/30 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-sm">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
+                    {detectedEntities.length} Entitas / Alias Terdeteksi dari Naskah
+                  </h4>
+                  <p className="text-[11px] text-emerald-700 dark:text-emerald-300/80">
+                    Ada karakter atau sebutan baru yang siap Anda tambahkan ke glosarium.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveSubTab('detected')}
+                className="py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1 flex-shrink-0 shadow-sm active:scale-95"
+              >
+                <span>Tinjau ({detectedEntities.length})</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Unified Controls Card: Search, Filter, Sort & Add */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
+            {/* Top row: Search Bar & Add Button */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Cari karakter, lokasi, item, atau lore..."
+                  className="w-full pl-8 pr-8 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsAddEntityModalOpen(true)}
+                className="py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 text-xs font-bold transition flex items-center gap-1.5 shadow-sm flex-shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Entitas</span>
+              </button>
+            </div>
+
+            {/* Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-0.5">
+              {[
+                { id: 'all', label: `Semua (${entities.length})` },
+                { id: 'relevant', label: `Di Bab Ini (${relevantEntities.length})`, icon: Sparkles },
+                { id: 'character', label: `Karakter (${charCount})`, icon: User },
+                { id: 'location', label: `Lokasi (${locCount})`, icon: MapPin },
+                { id: 'item', label: `Item (${itemCount})`, icon: Shield },
+                { id: 'lore', label: `Lore (${loreCount})`, icon: Scroll },
+              ].map((f) => {
+                const isActive = entityCategoryFilter === f.id;
+                const Icon = f.icon;
+                return (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setEntityCategoryFilter(f.id as any)}
+                    className={`py-1 px-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap flex items-center gap-1 ${
+                      isActive
+                        ? f.id === 'relevant'
+                          ? 'bg-amber-500 text-slate-950 shadow-sm'
+                          : 'bg-slate-900 dark:bg-white text-white dark:text-slate-950 shadow-sm'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {Icon && <Icon className="w-3 h-3" />}
+                    <span>{f.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Sort & Quick Summary Bar */}
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500">
+              <span className="text-[11px] font-medium">
+                Menampilkan <strong>{displayEntities.length}</strong> entitas
+              </span>
+
+              <div className="flex items-center gap-1.5">
+                <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
+                <select
+                  value={entitySortBy}
+                  onChange={(e) => setEntitySortBy(e.target.value as any)}
+                  className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                >
+                  <option value="chapter_first">Hadir di Bab Ini Dulu</option>
+                  <option value="name_asc">Nama (A - Z)</option>
+                  <option value="name_desc">Nama (Z - A)</option>
+                  <option value="newest">Terbaru Ditambahkan</option>
+                  <option value="category">Berdasarkan Kategori</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Entities Grid */}
+          {displayEntities.length === 0 ? (
+            <div className="text-center py-10 px-4 bg-white dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800 rounded-3xl space-y-2">
+              <Compass className="w-8 h-8 text-slate-400 mx-auto mb-1" />
+              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                Tidak Ada Entitas yang Ditemukan
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                {searchQuery
+                  ? `Tidak ada entitas dengan kata kunci "${searchQuery}". Coba bersihkan pencarian.`
+                  : 'Belum ada entitas dalam kategori ini. Buat entitas baru atau gunakan tombol Pindai Naskah.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsAddEntityModalOpen(true)}
+                className="py-2 px-3.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs inline-flex items-center gap-1 mt-2"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Buat Entitas Baru</span>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {displayEntities.map((ent) => {
+                const meta = getCategoryMeta(ent.category);
+                const Icon = meta.icon;
+                const isPresent =
+                  lowerContent.includes(ent.name.toLowerCase()) ||
+                  (ent.aliases && ent.aliases.some((a) => lowerContent.includes(a.toLowerCase())));
+
+                return (
+                  <div
+                    key={ent.id}
+                    className={`bg-white dark:bg-slate-900 border rounded-2xl p-3.5 shadow-sm transition hover:border-amber-400 flex flex-col justify-between gap-2.5 ${
+                      isPresent
+                        ? 'border-amber-500/40 ring-1 ring-amber-500/20'
+                        : 'border-slate-200 dark:border-slate-800'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                        <span
+                          className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${meta.badge} flex items-center gap-1`}
+                        >
+                          <Icon className="w-2.5 h-2.5" />
+                          <span>{meta.label}</span>
+                        </span>
+
+                        <div className="flex items-center gap-1">
+                          {isPresent && (
+                            <span className="text-[9px] font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                              Di Bab Ini
+                            </span>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteEntity(ent.id, ent.name)}
+                            className="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition"
+                            title="Hapus entitas"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                        {ent.name}
+                      </h4>
+
+                      {ent.aliases && ent.aliases.length > 0 && (
+                        <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 font-medium flex items-center gap-1 truncate">
+                          <Link2 className="w-2.5 h-2.5 flex-shrink-0" />
+                          <span className="truncate">Alias: {ent.aliases.join(', ')}</span>
+                        </p>
+                      )}
+
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 mt-1 leading-snug">
+                        {ent.shortDescription || 'Belum ada deskripsi singkat.'}
+                      </p>
+                    </div>
+
+                    {/* Quick Insert & Hologram Buttons */}
+                    <div className="flex items-center gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => handleInsert(ent.name)}
+                        className="flex-1 py-1 px-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-slate-700 dark:text-slate-300 text-[10px] font-bold transition active:scale-95 text-center truncate"
+                        title="Sisipkan nama tokoh/latar ke kursor naskah"
+                      >
+                        {insertedName === ent.name ? 'Tersisip!' : '+ Sisip ke Naskah'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setHologramEntity(ent)}
+                        className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-white hover:bg-slate-700 transition active:scale-95"
+                        title="Lihat Hologram Lengkap"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* 2. 🖼️ IMAGE GALLERY SUBTAB WORKSPACE                                      */}
@@ -1129,9 +1416,14 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
                             <button
                               type="button"
                               onClick={() => handleRegisterEntity(item)}
-                              className="py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 active:scale-95 transition shadow-sm"
+                              disabled={registeringCandidateId === item.id}
+                              className="py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 active:scale-95 transition shadow-sm"
                             >
-                              <PlusCircle className="w-3.5 h-3.5" />
+                              {registeringCandidateId === item.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <PlusCircle className="w-3.5 h-3.5" />
+                              )}
                               <span>Daftarkan ke Glosarium (+)</span>
                             </button>
                           )
@@ -1302,129 +1594,6 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* 6. ENTITIES LIST VIEW (Registered Worldbuilding Entities)                 */}
-      {/* ========================================================================= */}
-      {activeSubTab !== 'scenes' && activeSubTab !== 'visuals' && activeSubTab !== 'detected' && activeSubTab !== 'images' && (
-        <div className="space-y-3">
-          {/* Detected Candidates Notification Banner */}
-          {detectedEntities.length > 0 && activeSubTab === 'all' && (
-            <div className="bg-gradient-to-r from-emerald-500/15 via-teal-500/10 to-emerald-500/15 border border-emerald-500/30 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-sm">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
-                    {detectedEntities.length} Entitas / Alias Terdeteksi dari Naskah
-                  </h4>
-                  <p className="text-[11px] text-emerald-700 dark:text-emerald-300/80">
-                    Ada karakter atau sebutan baru yang siap Anda tambahkan ke glosarium.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveSubTab('detected')}
-                className="py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1 flex-shrink-0 shadow-sm active:scale-95"
-              >
-                <span>Tinjau ({detectedEntities.length})</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
-
-          {/* Quick Notice of relevant entities in this chapter */}
-          {relevantEntities.length > 0 && activeSubTab === 'all' && (
-            <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-3 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-500 flex-shrink-0" />
-              <p className="text-xs text-amber-800 dark:text-amber-300 font-medium leading-snug">
-                <strong>{relevantEntities.length} entitas terdaftar hadir</strong> di bab ini:{' '}
-                {relevantEntities.map((e) => e.name).slice(0, 4).join(', ')}
-                {relevantEntities.length > 4 ? '...' : ''}
-              </p>
-            </div>
-          )}
-
-          {displayEntities.length === 0 ? (
-            <div className="text-center py-10 px-4 bg-white dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800 rounded-3xl">
-              <Compass className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-1">
-                Belum Ada Entitas Terdaftar di Kategori Ini
-              </h4>
-              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-                Buka tab Worldbuilding di buku atau gunakan tombol "Pindai Naskah" di atas untuk mendaftarkan tokoh, latar tempat, dan relik cerita.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {displayEntities.map((ent) => {
-                const meta = getCategoryMeta(ent.category);
-                const Icon = meta.icon;
-                const isPresent = lowerContent.includes(ent.name.toLowerCase());
-
-                return (
-                  <div
-                    key={ent.id}
-                    className={`bg-white dark:bg-slate-900 border rounded-2xl p-3 shadow-sm transition hover:border-amber-400 flex flex-col justify-between gap-2 ${
-                      isPresent
-                        ? 'border-amber-500/40 ring-1 ring-amber-500/20'
-                        : 'border-slate-200 dark:border-slate-800'
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center justify-between gap-1.5 mb-1">
-                        <span
-                          className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${meta.badge} flex items-center gap-1`}
-                        >
-                          <Icon className="w-2.5 h-2.5" />
-                          <span>{meta.label}</span>
-                        </span>
-
-                        {isPresent && (
-                          <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-md border border-amber-500/20">
-                            Di Bab Ini
-                          </span>
-                        )}
-                      </div>
-
-                      <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
-                        {ent.name}
-                      </h4>
-
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5 leading-snug">
-                        {ent.shortDescription || 'Belum ada deskripsi singkat.'}
-                      </p>
-                    </div>
-
-                    {/* Quick Insert & Hologram Buttons */}
-                    <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100 dark:border-slate-800">
-                      <button
-                        type="button"
-                        onClick={() => handleInsert(ent.name)}
-                        className="flex-1 py-1 px-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-slate-700 dark:text-slate-300 text-[10px] font-bold transition active:scale-95 text-center truncate"
-                        title="Sisipkan nama tokoh/latar ke kursor naskah"
-                      >
-                        {insertedName === ent.name ? 'Tersisip!' : '+ Sisip ke Naskah'}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setHologramEntity(ent)}
-                        className="p-1 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition active:scale-95"
-                        title="Lihat Hologram Lengkap"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ========================================================================= */}
       {/* 🖼️ MODAL UPLOAD GAMBAR BARU KE GALERI GLOSARIUM                           */}
       {/* ========================================================================= */}
       {isUploadImageModalOpen && (
@@ -1494,12 +1663,12 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
                   >
                     {isAnalyzingVisionUpload ? (
                       <>
-                        <Loader2 className="w-3 h-3 animate-spin" />
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         <span>Menganalisis...</span>
                       </>
                     ) : (
                       <>
-                        <Sparkles className="w-3 h-3 text-amber-300" />
+                        <Sparkles className="w-3.5 h-3.5 text-amber-300" />
                         <span>Pindai AI Vision</span>
                       </>
                     )}
@@ -1662,7 +1831,18 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
         </div>
       )}
 
-      {/* Hologram Modal preview if requested */}
+      {/* Add World Entity Modal */}
+      <AddWorldEntityModal
+        isOpen={isAddEntityModalOpen}
+        bookId={chapter.bookId}
+        onClose={() => setIsAddEntityModalOpen(false)}
+        onSuccess={(newEnt) => {
+          setIsAddEntityModalOpen(false);
+          showToast(`Entitas "${newEnt.name}" berhasil dibuat!`);
+        }}
+      />
+
+      {/* Hologram Modal preview */}
       <WorldEntityHologramModal
         entity={hologramEntity}
         isOpen={!!hologramEntity}

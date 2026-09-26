@@ -38,6 +38,7 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
   const [premise, setPremise] = useState(chapter.premise || '');
   const [notes, setNotes] = useState(chapter.notes || '');
   const [targetWordCount, setTargetWordCount] = useState(chapter.targetWordCount || 1500);
+  const [targetInput, setTargetInput] = useState(String(chapter.targetWordCount || 1500));
   const [status, setStatus] = useState<ChapterStatus>(chapter.status);
   const [isGeneratingPremise, setIsGeneratingPremise] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
@@ -96,8 +97,28 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
     showSavedIndicator();
   };
 
-  const handleTargetChange = (newTarget: number) => {
-    const val = Math.max(100, newTarget);
+  const handleTargetInputChange = (val: string) => {
+    setTargetInput(val);
+    const parsed = parseInt(val, 10);
+    if (!isNaN(parsed) && parsed > 0) {
+      setTargetWordCount(parsed);
+      onUpdateChapter({ targetWordCount: parsed });
+    }
+  };
+
+  const handleTargetInputBlur = () => {
+    let parsed = parseInt(targetInput, 10);
+    if (isNaN(parsed) || parsed <= 0) {
+      parsed = 1500;
+    }
+    setTargetInput(String(parsed));
+    setTargetWordCount(parsed);
+    onUpdateChapter({ targetWordCount: parsed });
+    showSavedIndicator();
+  };
+
+  const handleSetTargetPreset = (val: number) => {
+    setTargetInput(String(val));
     setTargetWordCount(val);
     onUpdateChapter({ targetWordCount: val });
     showSavedIndicator();
@@ -358,16 +379,35 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
             <span className="text-[10px] text-slate-400 block">Status Naskah</span>
             <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{words > 0 ? 'Ada Naskah' : 'Kosong'}</span>
           </div>
-          <div className="bg-slate-50 dark:bg-slate-950 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5">
-            <span className="text-[10px] text-slate-400">Target:</span>
-            <input
-              type="number"
-              step="100"
-              value={targetWordCount}
-              onChange={(e) => handleTargetChange(parseInt(e.target.value) || 1000)}
-              className="w-16 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-1.5 py-0.5 text-xs font-bold text-center focus:outline-none focus:ring-1 focus:ring-amber-500"
-            />
-            <span className="text-[10px] text-slate-400">kata</span>
+          <div className="bg-slate-50 dark:bg-slate-950 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 col-span-2 sm:col-span-1 flex flex-col items-center justify-center gap-1.5">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-slate-400">Target:</span>
+              <input
+                type="number"
+                value={targetInput}
+                onChange={(e) => handleTargetInputChange(e.target.value)}
+                onBlur={handleTargetInputBlur}
+                className="w-20 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-xs font-bold text-center focus:outline-none focus:ring-1 focus:ring-amber-500"
+              />
+              <span className="text-[10px] text-slate-400">kata</span>
+            </div>
+            {/* Quick Presets */}
+            <div className="flex items-center gap-1 pt-0.5 flex-wrap justify-center">
+              {[1000, 1500, 2500, 4000].map((num) => (
+                <button
+                  key={num}
+                  type="button"
+                  onClick={() => handleSetTargetPreset(num)}
+                  className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition active:scale-95 ${
+                    targetWordCount === num
+                      ? 'bg-amber-500 text-slate-950'
+                      : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  {num >= 1000 ? `${num / 1000}k` : num}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>

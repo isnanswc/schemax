@@ -63,6 +63,13 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
 
     setIsSubmitting(true);
     try {
+      const existing = await db.worldEntities.where('bookId').equals(bookId).toArray();
+      if (existing.some((e) => e.name.trim().toLowerCase() === name.trim().toLowerCase())) {
+        alert(`Entitas dengan nama "${name.trim()}" sudah ada di buku ini. Gunakan nama lain.`);
+        setIsSubmitting(false);
+        return;
+      }
+
       const entityId = 'ent_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
       let avatarMediaId: string | undefined;
 
