@@ -859,6 +859,8 @@ Aturan:
   return [];
 }
 
+export const detectWorldEntitiesInChapter = detectEntitiesAndAliases;
+
 // 6. Next Chapter Branching Recommendations Engine
 export interface ChapterBranchOption {
   id: string;
