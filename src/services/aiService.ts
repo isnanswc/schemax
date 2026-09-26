@@ -859,3 +859,117 @@ Aturan:
   return [];
 }
 
+// 6. Next Chapter Branching Recommendations Engine
+export interface ChapterBranchOption {
+  id: string;
+  title: string;
+  premise: string;
+  hook: string;
+  intensity: 'Tinggi (Aksi/Konflik)' | 'Misteri (Plot Twist)' | 'Emosional (Drama)' | 'Eksplorasi (Lore)';
+  rationale: string;
+}
+
+export async function generateNextChapterBranches(
+  chapterTitle: string,
+  bookTitle: string,
+  contentText: string,
+  premise?: string
+): Promise<ChapterBranchOption[]> {
+  const prompt = `Analisis bab ini dan hasilkan 3 rekomendasi cabang alur cerita (branching plot options) untuk bab berikutnya:
+Judul Buku: "${bookTitle}"
+Bab Saat Ini: "${chapterTitle}"
+Premis Bab Ini: ${premise || 'Belum ada premis tertulis'}
+
+Naskah Bab Ini:
+${contentText ? contentText.slice(0, 6000) : (premise || 'Bab ini sedang ditulis')}
+
+Tugas:
+Rancang 3 arah alur bab selanjutnya yang sangat menarik dan berbeda:
+1. Cabang Intensitas Tinggi (Aksi langsung, eskalasi konflik, konfrontasi berbahaya)
+2. Cabang Plot Twist / Misteri (Pengungkapan rahasia mengejutkan, penemuan artefak, atau pengkhianatan)
+3. Cabang Emosional / Karakter (Perkembangan hubungan tokoh, dilema moral batin, atau penyelaman lore mendalam)
+
+Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
+[
+  {
+    "title": "Judul Bab Berikutnya yang Menarik",
+    "premise": "Sinopsis/premis 2-3 kalimat mengenai apa yang akan terjadi di bab baru ini...",
+    "hook": "Adegan pembuka yang memikat pembaca di paragraf pertama bab baru...",
+    "intensity": "Tinggi (Aksi/Konflik)",
+    "rationale": "Mengapa cabang ini seru untuk kelanjutan cerita..."
+  }
+]`;
+
+  const systemPrompt = 'Anda adalah konsultan plot dan story architect novel profesional. Hasilkan hanya JSON array valid.';
+  const res = await generateWithSmartFallback(prompt, systemPrompt);
+
+  try {
+    const cleanJson = res.text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(cleanJson);
+    if (Array.isArray(parsed)) {
+      return parsed.map((item, idx) => ({
+        id: 'branch_' + (idx + 1) + '_' + Date.now().toString(36),
+        title: item.title || `Bab Selanjutnya: Opsi ${idx + 1}`,
+        premise: item.premise || '',
+        hook: item.hook || '',
+        intensity: item.intensity || 'Tinggi (Aksi/Konflik)',
+        rationale: item.rationale || '',
+      }));
+    }
+  } catch (err) {
+    console.warn('Gagal parse JSON cabang bab:', err);
+  }
+
+  // Graceful fallback if JSON parse fails
+  return [
+    {
+      id: 'branch_fallback_1',
+      title: 'Konsekuensi yang Tak Terelakkan',
+      premise: 'Dampak dari keputusan di bab sebelumnya mulai terasa nyata ketika ancaman baru tiba tanpa peringatan.',
+      hook: 'Langkah kaki tergesa di lorong memecah keheningan dini hari sebelum kabar buruk itu tiba.',
+      intensity: 'Tinggi (Aksi/Konflik)',
+      rationale: 'Menjaga tempo ketegangan agar pembaca tidak kehilangan antusiasme.',
+    },
+    {
+      id: 'branch_fallback_2',
+      title: 'Rahasia di Balik Tabir',
+      premise: 'Petunjuk tersembunyi yang tertinggal membongkar kebohongan salah satu pihak terdekat.',
+      hook: 'Sebuah dokumen usang dengan cap segel merah tergeletak di tempat yang tak semestinya.',
+      intensity: 'Misteri (Plot Twist)',
+      rationale: 'Memicu rasa ingin tahu pembaca dengan teka-teki baru.',
+    },
+    {
+      id: 'branch_fallback_3',
+      title: 'Di Persimpangan Jalan',
+      premise: 'Dilema moral memaksa tokoh utama merenungi kembali tujuan awalnya sebelum terlambat.',
+      hook: 'Bayangan masa lalu kembali menghantui saat tatapan mata itu menuntut kepastian.',
+      intensity: 'Emosional (Drama)',
+      rationale: 'Memberi ruang bernapas untuk memperdalam kedalaman emosional karakter.',
+    },
+  ];
+}
+
+// 7. Premise Generator & Refiner Engine
+export async function generateRefinedPremise(
+  chapterTitle: string,
+  bookTitle: string,
+  contentText: string,
+  currentPremise?: string
+): Promise<string> {
+  const prompt = `Buat atau perbaiki premis singkat (2-3 kalimat kuat dan memikat) untuk bab cerita berikut:
+Judul Buku: "${bookTitle}"
+Judul Bab: "${chapterTitle}"
+Premis Saat Ini: ${currentPremise || 'Belum ada'}
+
+Isi Naskah Bab:
+${contentText ? contentText.slice(0, 5000) : (currentPremise || 'Gunakan judul bab')}
+
+Instruksi:
+- Tulis langsung teks premisnya dalam Bahasa Indonesia yang dramatis dan menarik.
+- Hindari kata pengantar seperti "Berikut adalah premisnya:".`;
+
+  const systemPrompt = 'Anda adalah editor sinopsis profesional. Tulis langsung premis yang ringkas dan memikat.';
+  const res = await generateWithSmartFallback(prompt, systemPrompt);
+  return res.text.trim();
+}
+
