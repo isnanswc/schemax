@@ -29,7 +29,8 @@ import {
   BookMarked,
   SlidersHorizontal,
   Camera,
-  GitFork
+  GitFork,
+  RefreshCw
 } from 'lucide-react';
 import {
   StoryChapter,
@@ -118,13 +119,16 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
   const [isAnalyzingScenes, setIsAnalyzingScenes] = useState(false);
   const [isDetectingEntities, setIsDetectingEntities] = useState(false);
   const [isBatchRegistering, setIsBatchRegistering] = useState(false);
+  const [isBatchUpdating, setIsBatchUpdating] = useState(false);
   const [registeringCandidateId, setRegisteringCandidateId] = useState<string | null>(null);
+  const [updatingCandidateId, setUpdatingCandidateId] = useState<string | null>(null);
   const [copiedPromptId, setCopiedPromptId] = useState<string | null>(null);
   const [insertedName, setInsertedName] = useState<string | null>(null);
 
-  // Track candidate registrations locally
+  // Track candidate registrations & updates locally
   const [registeredEntityIds, setRegisteredEntityIds] = useState<Record<string, boolean>>({});
   const [registeredAliasIds, setRegisteredAliasIds] = useState<Record<string, boolean>>({});
+  const [updatedEntityIds, setUpdatedEntityIds] = useState<Record<string, boolean>>({});
 
   // 🖼️ Media Images State
   const [bookMediaList, setBookMediaList] = useState<Array<MediaItem & { url: string }>>([]);
@@ -175,6 +179,9 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
   const detectedEntities: DetectedEntityCandidate[] = chapter.aiDetectedEntities || [];
   const pendingNewCount = detectedEntities.filter(
     (c) => c.suggestedAction === 'register_new' && !registeredEntityIds[c.id]
+  ).length;
+  const pendingUpdateCount = detectedEntities.filter(
+    (c) => c.suggestedAction === 'update_existing' && !updatedEntityIds[c.id]
   ).length;
 
   // Check which entities are mentioned in this chapter's text
@@ -295,14 +302,27 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
       const detected = await detectWorldEntitiesInChapter(
         textToAnalyze,
         bookTitle,
-        entities.map((e) => ({ id: e.id, name: e.name, category: e.category }))
+        entities.map((e) => ({
+          id: e.id,
+          name: e.name,
+          category: e.category,
+          aliases: e.aliases,
+          initialTraits: e.initialTraits,
+          currentTraits: e.currentTraits,
+          condition: typeof e.condition === 'string' ? e.condition : undefined,
+          evolutionSummary: e.evolutionSummary,
+        }))
       );
 
       if (detected && detected.length > 0) {
         onUpdateChapter({ aiDetectedEntities: detected });
-        setActiveSubTab('detected'); // Automatically switch to the detected candidates tab!
+        setActiveSubTab('entities');
+        const newCount = detected.filter((d) => d.suggestedAction === 'register_new').length;
+        const updateCount = detected.filter((d) => d.suggestedAction === 'update_existing').length;
+        const aliasCount = detected.filter((d) => d.suggestedAction === 'add_alias').length;
+        showToast(`Deteksi selesai: ${newCount} baru, ${updateCount} pembaruan sifat/kondisi, ${aliasCount} alias.`);
       } else {
-        alert('Tidak ditemukan entitas baru di naskah bab ini.');
+        alert('Tidak ditemukan entitas baru atau perubahan di naskah bab ini.');
       }
     } catch (err: any) {
       alert('Gagal mendeteksi entitas: ' + (err.message || 'Periksa API Key'));
@@ -334,6 +354,13 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
         name: candidate.name.trim(),
         aliases: [],
         shortDescription: candidate.shortDescription,
+        initialDescription: candidate.initialDescription || candidate.shortDescription,
+        initialTraits: candidate.initialTraits || '',
+        currentDescription: candidate.currentDescription || candidate.shortDescription,
+        currentTraits: candidate.currentTraits || candidate.initialTraits || '',
+        evolutionSummary: candidate.evolutionSummary || '',
+        condition: candidate.condition || 'aktif',
+        conditionDetails: candidate.conditionDetails || '',
         detailedNotes: `Dideteksi otomatis dari Bab ${chapter.order}: ${chapter.title}.`,
         tags: [candidate.category],
         galleryMediaIds: [],
@@ -353,6 +380,153 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
       alert('Gagal mendaftarkan entitas: ' + (err.message || 'Error'));
     } finally {
       setRegisteringCandidateId(null);
+    }
+  };
+
+  // Update existing entity with latest scan traits & conditions
+  const handleUpdateExistingEntity = async (candidate: DetectedEntityCandidate) => {
+    if (updatingCandidateId === candidate.id) return;
+    setUpdatingCandidateId(candidate.id);
+
+    try {
+      const existingEntities = await db.worldEntities.where('bookId').equals(chapter.bookId).toArray();
+      const target = existingEntities.find(
+        (e) =>
+          (candidate.existingEntityId && e.id === candidate.existingEntityId) ||
+          e.name.toLowerCase() === candidate.name.trim().toLowerCase() ||
+          (e.aliases && e.aliases.some((a) => a.toLowerCase() === candidate.name.trim().toLowerCase()))
+      );
+
+      if (target) {
+        const updatedFields: Partial<WorldEntity> = {
+          updatedAt: Date.now(),
+        };
+
+        // If target doesn't have initial traits/desc yet, fill them in from candidate
+        if (candidate.initialTraits && !target.initialTraits) {
+          updatedFields.initialTraits = candidate.initialTraits;
+        }
+        if (candidate.initialDescription && !target.initialDescription) {
+          updatedFields.initialDescription = candidate.initialDescription;
+        }
+
+        // Always update current traits, description, condition, and evolution summary
+        if (candidate.currentTraits) {
+          updatedFields.currentTraits = candidate.currentTraits;
+        }
+        if (candidate.currentDescription) {
+          updatedFields.currentDescription = candidate.currentDescription;
+        }
+        if (candidate.evolutionSummary) {
+          updatedFields.evolutionSummary = candidate.evolutionSummary;
+        }
+        if (candidate.condition) {
+          updatedFields.condition = candidate.condition;
+        }
+        if (candidate.conditionDetails) {
+          updatedFields.conditionDetails = candidate.conditionDetails;
+        }
+
+        await db.worldEntities.update(target.id, updatedFields);
+        setUpdatedEntityIds((prev) => ({ ...prev, [candidate.id]: true }));
+
+        // Record in chapterEntityStates for this chapter
+        const nextStates = { ...(chapter.chapterEntityStates || {}) };
+        nextStates[target.id] = {
+          entityId: target.id,
+          entityName: target.name,
+          condition: candidate.condition || target.condition || 'aktif',
+          conditionDetails: candidate.conditionDetails || candidate.evolutionSummary || target.conditionDetails || '',
+        };
+        onUpdateChapter({
+          chapterEntityStates: nextStates,
+        });
+
+        // Prune updated candidate from detected list
+        const remaining = detectedEntities.filter((c) => c.id !== candidate.id);
+        onUpdateChapter({ aiDetectedEntities: remaining });
+        showToast(`Kondisi & sifat "${target.name}" berhasil diperbarui!`);
+      } else {
+        alert(`Entitas target "${candidate.name}" tidak ditemukan di database.`);
+      }
+    } catch (err: any) {
+      console.error('Gagal memperbarui entitas:', err);
+      alert('Gagal memperbarui entitas: ' + (err.message || 'Error'));
+    } finally {
+      setUpdatingCandidateId(null);
+    }
+  };
+
+  // Batch update all detected entity updates
+  const handleUpdateAllExisting = async () => {
+    const updateCandidates = detectedEntities.filter(
+      (c) => c.suggestedAction === 'update_existing' && !updatedEntityIds[c.id]
+    );
+
+    if (updateCandidates.length === 0) {
+      showToast('Tidak ada pembaruan entitas yang tertunda.');
+      return;
+    }
+
+    setIsBatchUpdating(true);
+    try {
+      const existingEntities = await db.worldEntities.where('bookId').equals(chapter.bookId).toArray();
+      const nextStates = { ...(chapter.chapterEntityStates || {}) };
+      let updatedCount = 0;
+
+      for (const candidate of updateCandidates) {
+        const target = existingEntities.find(
+          (e) =>
+            (candidate.existingEntityId && e.id === candidate.existingEntityId) ||
+            e.name.toLowerCase() === candidate.name.trim().toLowerCase()
+        );
+        if (target) {
+          const updatedFields: Partial<WorldEntity> = {
+            updatedAt: Date.now(),
+          };
+          if (candidate.initialTraits && !target.initialTraits) {
+            updatedFields.initialTraits = candidate.initialTraits;
+          }
+          if (candidate.initialDescription && !target.initialDescription) {
+            updatedFields.initialDescription = candidate.initialDescription;
+          }
+          if (candidate.currentTraits) {
+            updatedFields.currentTraits = candidate.currentTraits;
+          }
+          if (candidate.currentDescription) {
+            updatedFields.currentDescription = candidate.currentDescription;
+          }
+          if (candidate.evolutionSummary) {
+            updatedFields.evolutionSummary = candidate.evolutionSummary;
+          }
+          if (candidate.condition) {
+            updatedFields.condition = candidate.condition;
+          }
+          if (candidate.conditionDetails) {
+            updatedFields.conditionDetails = candidate.conditionDetails;
+          }
+          await db.worldEntities.update(target.id, updatedFields);
+
+          nextStates[target.id] = {
+            entityId: target.id,
+            entityName: target.name,
+            condition: candidate.condition || target.condition || 'aktif',
+            conditionDetails: candidate.conditionDetails || candidate.evolutionSummary || target.conditionDetails || '',
+          };
+          updatedCount++;
+        }
+      }
+
+      onUpdateChapter({
+        chapterEntityStates: nextStates,
+        aiDetectedEntities: detectedEntities.filter((c) => c.suggestedAction !== 'update_existing'),
+      });
+      showToast(`Berhasil memperbarui ${updatedCount} entitas di Glosarium!`);
+    } catch (err: any) {
+      console.error('Gagal batch update entitas:', err);
+      alert('Gagal memperbarui semua entitas: ' + err.message);
+    } finally {
+      setIsBatchUpdating(false);
     }
   };
 
@@ -421,6 +595,13 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
         name: c.name.trim(),
         aliases: [],
         shortDescription: c.shortDescription,
+        initialDescription: c.initialDescription || c.shortDescription,
+        initialTraits: c.initialTraits || '',
+        currentDescription: c.currentDescription || c.shortDescription,
+        currentTraits: c.currentTraits || c.initialTraits || '',
+        evolutionSummary: c.evolutionSummary || '',
+        condition: c.condition || 'aktif',
+        conditionDetails: c.conditionDetails || '',
         detailedNotes: `Dideteksi otomatis dari Bab ${chapter.order}: ${chapter.title}.`,
         tags: [c.category],
         galleryMediaIds: [],
@@ -914,44 +1095,67 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
 
           {/* AI CANDIDATES SECTION (Embedded directly inside Entitas) */}
           {detectedEntities.length > 0 && (
-            <div className="bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-emerald-500/10 border border-emerald-500/30 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3.5">
+            <div className="bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-indigo-500/10 border border-emerald-500/30 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3.5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-emerald-500/20">
                 <div className="flex items-center gap-2.5">
                   <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
                     <Sparkles className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                      <span>Kandidat Entitas &amp; Alias Baru</span>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
+                      <span>Hasil Pindaian Entitas &amp; Kondisi</span>
                       <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500 text-white shadow-sm">
-                        {detectedEntities.length} ditemukan
+                        {detectedEntities.length} item
                       </span>
                     </h3>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Entitas yang terdeteksi dari naskah bab ini. Daftarkan langsung ke ensiklopedia glosarium.
+                      Entitas baru &amp; pembaruan kondisi karakter hasil pemindaian bab ini.
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                  <button
-                    type="button"
-                    onClick={handleRegisterAllNew}
-                    disabled={isBatchRegistering || pendingNewCount === 0}
-                    className="py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm active:scale-95 flex-shrink-0"
-                  >
-                    {isBatchRegistering ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Mendaftarkan...</span>
-                      </>
-                    ) : (
-                      <>
-                        <PlusCircle className="w-3.5 h-3.5" />
-                        <span>Daftarkan Semua ({pendingNewCount})</span>
-                      </>
-                    )}
-                  </button>
+                  {pendingUpdateCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleUpdateAllExisting}
+                      disabled={isBatchUpdating}
+                      className="py-1.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm active:scale-95 flex-shrink-0"
+                    >
+                      {isBatchUpdating ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Memperbarui...</span>
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          <span>Perbarui Semua ({pendingUpdateCount})</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  {pendingNewCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleRegisterAllNew}
+                      disabled={isBatchRegistering}
+                      className="py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm active:scale-95 flex-shrink-0"
+                    >
+                      {isBatchRegistering ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Mendaftarkan...</span>
+                        </>
+                      ) : (
+                        <>
+                          <PlusCircle className="w-3.5 h-3.5" />
+                          <span>Daftarkan Semua ({pendingNewCount})</span>
+                        </>
+                      )}
+                    </button>
+                  )}
 
                   <button
                     type="button"
@@ -969,27 +1173,47 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {detectedEntities.map((item) => {
                   const isNew = item.suggestedAction === 'register_new';
+                  const isUpdate = item.suggestedAction === 'update_existing';
                   const isRegistered = registeredEntityIds[item.id];
+                  const isUpdated = updatedEntityIds[item.id];
                   const isAliasSaved = registeredAliasIds[item.id];
                   const meta = getCategoryMeta(item.category);
                   const CatIcon = meta.icon;
+                  const condMeta = item.condition ? getConditionMeta(item.condition) : null;
 
                   return (
                     <div
                       key={item.id}
-                      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 shadow-sm hover:border-slate-300 dark:hover:border-slate-700 transition flex flex-col justify-between gap-2.5"
+                      className={`bg-white dark:bg-slate-900 border rounded-2xl p-3.5 shadow-sm transition flex flex-col justify-between gap-2.5 ${
+                        isUpdate
+                          ? 'border-indigo-500/40 ring-1 ring-indigo-500/20'
+                          : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                      }`}
                     >
-                      <div className="space-y-1">
+                      <div className="space-y-2">
                         <div className="flex items-center justify-between gap-1 flex-wrap">
-                          <span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${meta.badge} flex items-center gap-1`}>
-                            <CatIcon className="w-2.5 h-2.5" />
-                            <span>{meta.label}</span>
-                          </span>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${meta.badge} flex items-center gap-1`}>
+                              <CatIcon className="w-2.5 h-2.5" />
+                              <span>{meta.label}</span>
+                            </span>
+
+                            {condMeta && (
+                              <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full border ${condMeta.badgeClass}`}>
+                                {condMeta.emoji} {condMeta.shortLabel}
+                              </span>
+                            )}
+                          </div>
 
                           <div className="flex items-center gap-1">
                             {isNew ? (
                               <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.2 rounded-full">
                                 🆕 Entitas Baru
+                              </span>
+                            ) : isUpdate ? (
+                              <span className="text-[9px] font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-500/10 border border-indigo-500/30 px-1.5 py-0.2 rounded-full flex items-center gap-0.5">
+                                <RefreshCw className="w-2.5 h-2.5" />
+                                <span>Pembaruan Kondisi</span>
                               </span>
                             ) : (
                               <span className="text-[9px] font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.2 rounded-full flex items-center gap-1">
@@ -1021,8 +1245,31 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
                           )}
                         </div>
 
+                        {/* Sifat & Deskripsi Awal vs Saat Ini Comparison Box */}
+                        {(item.initialTraits || item.currentTraits || item.evolutionSummary) && (
+                          <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-[11px] space-y-1">
+                            {item.initialTraits && (
+                              <div className="flex items-start gap-1 text-slate-600 dark:text-slate-400">
+                                <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5 flex-shrink-0">🌱 Sifat Awal:</span>
+                                <span>{item.initialTraits}</span>
+                              </div>
+                            )}
+                            {item.currentTraits && (
+                              <div className="flex items-start gap-1 text-slate-800 dark:text-slate-200">
+                                <span className="font-bold text-amber-600 dark:text-amber-400 flex items-center gap-0.5 flex-shrink-0">⚡ Sifat Terkini:</span>
+                                <span className="font-medium">{item.currentTraits}</span>
+                              </div>
+                            )}
+                            {item.evolutionSummary && (
+                              <div className="pt-1 border-t border-slate-200 dark:border-slate-800 text-[10px] text-amber-700 dark:text-amber-300 italic">
+                                <span className="font-bold">Titik Balik / Perubahan:</span> {item.evolutionSummary}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-2">
-                          {item.shortDescription || 'Tidak ada deskripsi singkat.'}
+                          {item.shortDescription || item.currentDescription || 'Tidak ada deskripsi singkat.'}
                         </p>
                       </div>
 
@@ -1056,6 +1303,27 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
                                   <PlusCircle className="w-3 h-3" />
                                 )}
                                 <span>+ Daftarkan</span>
+                              </button>
+                            )
+                          ) : isUpdate ? (
+                            isUpdated ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-xl border border-indigo-500/20">
+                                <CheckCheck className="w-3.5 h-3.5" />
+                                <span>Diperbarui</span>
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateExistingEntity(item)}
+                                disabled={updatingCandidateId === item.id}
+                                className="py-1 px-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-[11px] flex items-center gap-1 active:scale-95 transition shadow-sm"
+                              >
+                                {updatingCandidateId === item.id ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="w-3 h-3" />
+                                )}
+                                <span>🔄 Perbarui Entitas</span>
                               </button>
                             )
                           ) : isAliasSaved ? (
@@ -1208,8 +1476,31 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
                         </p>
                       )}
 
+                      {/* Sifat Awal vs Sifat Terkini Snippet */}
+                      {(ent.initialTraits || ent.currentTraits) && (
+                        <div className="mt-1.5 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 text-[11px] space-y-1">
+                          {ent.initialTraits && (
+                            <div className="flex items-start gap-1 text-slate-600 dark:text-slate-400">
+                              <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5 flex-shrink-0">🌱 Awal:</span>
+                              <span className="line-clamp-1">{ent.initialTraits}</span>
+                            </div>
+                          )}
+                          {ent.currentTraits && (
+                            <div className="flex items-start gap-1 text-slate-800 dark:text-slate-200">
+                              <span className="font-bold text-amber-600 dark:text-amber-400 flex items-center gap-0.5 flex-shrink-0">⚡ Saat Ini:</span>
+                              <span className="line-clamp-1 font-medium">{ent.currentTraits}</span>
+                            </div>
+                          )}
+                          {ent.evolutionSummary && (
+                            <div className="pt-1 border-t border-slate-200 dark:border-slate-700/60 text-[10px] text-amber-600 dark:text-amber-400/90 italic line-clamp-1">
+                              <span className="font-semibold">Titik Balik:</span> {ent.evolutionSummary}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 mt-1 leading-snug">
-                        {ent.shortDescription || 'Belum ada deskripsi singkat.'}
+                        {ent.shortDescription || ent.currentDescription || 'Belum ada deskripsi singkat.'}
                       </p>
                     </div>
 

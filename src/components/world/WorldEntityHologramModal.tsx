@@ -157,6 +157,68 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
           </div>
         )}
 
+        {/* Karakteristik & Dinamika Evolusi Sifat */}
+        {(activeEntity.initialTraits || activeEntity.currentTraits || activeEntity.initialDescription || activeEntity.currentDescription || activeEntity.evolutionSummary) && (
+          <div className="mb-3.5 p-3.5 rounded-2xl bg-gradient-to-br from-slate-50 via-slate-100/50 to-amber-500/5 dark:from-slate-950/80 dark:via-slate-900/60 dark:to-amber-500/10 border border-slate-200 dark:border-slate-800 space-y-3">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-slate-200">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              <span>Dinamika Sifat &amp; Perkembangan Entitas</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {/* Kolom Sifat Awal */}
+              <div className="p-3 rounded-xl bg-white dark:bg-slate-900/90 border border-emerald-500/20 shadow-xs space-y-1.5">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                  🌱 Sifat &amp; Latar Awal
+                </span>
+                {activeEntity.initialTraits && (
+                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-snug">
+                    {activeEntity.initialTraits}
+                  </p>
+                )}
+                {activeEntity.initialDescription && (
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed italic">
+                    {activeEntity.initialDescription}
+                  </p>
+                )}
+                {!activeEntity.initialTraits && !activeEntity.initialDescription && (
+                  <p className="text-[11px] text-slate-400 italic">Belum ada catatan sifat awal.</p>
+                )}
+              </div>
+
+              {/* Kolom Sifat Saat Ini */}
+              <div className="p-3 rounded-xl bg-white dark:bg-slate-900/90 border border-amber-500/20 shadow-xs space-y-1.5">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                  ⚡ Sifat &amp; Kondisi Terkini
+                </span>
+                {activeEntity.currentTraits && (
+                  <p className="text-xs font-bold text-slate-900 dark:text-white leading-snug">
+                    {activeEntity.currentTraits}
+                  </p>
+                )}
+                {activeEntity.currentDescription && (
+                  <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                    {activeEntity.currentDescription}
+                  </p>
+                )}
+                {!activeEntity.currentTraits && !activeEntity.currentDescription && (
+                  <p className="text-[11px] text-slate-400 italic">Belum ada catatan sifat terkini.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Titik Balik Perubahan */}
+            {activeEntity.evolutionSummary && (
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-800 dark:text-amber-200">
+                <span className="font-bold flex items-center gap-1 mb-0.5">
+                  🔄 Titik Balik / Peristiwa Perubahan:
+                </span>
+                <p className="text-[11px] leading-relaxed italic">{activeEntity.evolutionSummary}</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Short Description */}
         {activeEntity.shortDescription && (
           <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-950/60 p-3 rounded-2xl border border-slate-200 dark:border-slate-800/80 mb-3.5">

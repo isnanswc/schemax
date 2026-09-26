@@ -64,10 +64,17 @@ export interface DetectedEntityCandidate {
   name: string;
   category: WorldCategory;
   shortDescription: string;
+  initialDescription?: string;
+  initialTraits?: string;
+  currentDescription?: string;
+  currentTraits?: string;
+  evolutionSummary?: string;
+  condition?: EntityCondition | string;
+  conditionDetails?: string;
   isExisting: boolean;
   existingEntityId?: string;
   detectedAliasOf?: string;
-  suggestedAction: 'register_new' | 'add_alias';
+  suggestedAction: 'register_new' | 'update_existing' | 'add_alias';
 }
 
 export interface StoryChapter {
@@ -232,6 +239,12 @@ export interface WorldEntity {
   // Faksi & Kelompok
   faction?: string;
   factionColor?: string;
+  // Sifat & Deskripsi Awal vs Saat Ini (Karakteristik & Dinamika)
+  initialDescription?: string;
+  initialTraits?: string;
+  currentDescription?: string;
+  currentTraits?: string;
+  evolutionSummary?: string;
   // Kondisi Status Terkini
   condition?: EntityCondition | string;
   conditionDetails?: string;

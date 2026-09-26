@@ -11,6 +11,7 @@ import {
   SceneGlosariumItem,
   ImagePromptSettings,
   WorldEntity,
+  DetectedEntityCandidate,
   EntityRelationship,
   EntityCondition,
   RelationshipType,
@@ -894,30 +895,32 @@ Instruksi:
 export async function detectEntitiesAndAliases(
   chapterText: string,
   bookTitle: string,
-  existingEntities: Array<{ id: string; name: string; category: string; aliases?: string[] }>
-): Promise<Array<{
-  id: string;
-  name: string;
-  category: 'character' | 'location' | 'item' | 'lore';
-  shortDescription: string;
-  isExisting: boolean;
-  existingEntityId?: string;
-  detectedAliasOf?: string;
-  suggestedAction: 'register_new' | 'add_alias';
-}>> {
+  existingEntities: Array<{
+    id: string;
+    name: string;
+    category: string;
+    aliases?: string[];
+    initialTraits?: string;
+    currentTraits?: string;
+    condition?: string;
+    evolutionSummary?: string;
+  }>
+): Promise<DetectedEntityCandidate[]> {
   const existingListStr =
     existingEntities.length > 0
       ? existingEntities
           .map(
             (e) =>
               `- [ID: ${e.id}] [${e.category.toUpperCase()}] ${e.name}${
-                e.aliases && e.aliases.length > 0 ? ` (Alias yang sudah ada: ${e.aliases.join(', ')})` : ''
-              }`
+                e.aliases && e.aliases.length > 0 ? ` (Alias: ${e.aliases.join(', ')})` : ''
+              }${e.initialTraits ? ` | Sifat Awal: ${e.initialTraits}` : ''}${
+                e.currentTraits ? ` | Sifat Terkini: ${e.currentTraits}` : ''
+              }${e.condition ? ` | Status: ${e.condition}` : ''}`
           )
           .join('\n')
       : '(Belum ada entitas di Glosarium buku ini)';
 
-  const prompt = `Anda adalah asisten kontinuitas cerita (story continuity expert) dan pengelola lore worldbuilding.
+  const prompt = `Anda adalah asisten kontinuitas cerita (story continuity expert) dan pengelola lore worldbuilding tingkat tinggi.
 
 Analisis naskah bab berikut terhadap daftar Glosarium yang sudah ada di buku ini:
 
@@ -929,18 +932,51 @@ ${existingListStr}
 Isi Naskah Bab:
 ${chapterText.slice(0, 60000)}
 
-Tugas Analisis:
-1. DETEKSI ENTITAS BARU:
-   Cari karakter, lokasi, item/senjata, atau istilah lore penting yang muncul di bab ini TAPI BELUM ADA di daftar entitas buku di atas.
-2. DETEKSI ALIAS / SEBUTAN LAIN:
-   Cari sebutan lain, julukan, gelar, atau istilah pengganti dari entitas yang SUDAH ADA. Contoh: Jika di naskah ada julukan "Sang Pendekar Jubah Hitam" dan konteksnya merujuk pada Karakter "Ahmad", deteksi bahwa itu adalah ALIAS dari Ahmad!
+Tugas Analisis Mendalam:
+1. DETEKSI ENTITAS BARU (suggestedAction: "register_new"):
+   - Cari karakter, lokasi, item/senjata/relik, atau istilah lore penting yang muncul di naskah bab ini TAPI BELUM ADA di daftar entitas buku di atas.
+   - PENTING UNTUK KARAKTER (Contoh: Putri Shinta, putri bangsawan Asura, awalnya penyayang & penurut, namun setelah dirasuki jin pantai utara menjadi kasar & manipulatif):
+     * initialDescription: Latar belakang asal-usul atau peran awalnya (misal: "Putri bangsawan di Kerajaan Asura").
+     * initialTraits: Sifat & watak kepribadian dasar/awalnya (misal: "Penyayang, baik hati, penurut, santun").
+     * currentDescription: Gambaran kondisi fisik/sosial/situasi saat ini di bab ini.
+     * currentTraits: Sifat & watak kepribadian saat ini di bab ini. Jika belum berubah, samakan dengan sifat awal. Jika telah berubah karena suatu peristiwa traumatis/kerasukan/pengkhianatan, tulis sifat terkininya (misal: "Kasar, manipulatif, dingin, penuh kebencian").
+     * evolutionSummary: Ringkasan titik balik atau penyebab perubahannya (misal: "Dirasuki oleh jin dari pantai utara").
+     * condition: Status kondisi saat ini ("aktif", "luka", "gugur", "hilang", "berkhianat", "terkutuk", "ditawan", "pelarian", "koma", atau "spesial").
+     * conditionDetails: Detail singkat kondisinya jika ada.
+
+2. PEMBARUAN ENTITAS YANG SUDAH ADA (suggestedAction: "update_existing"):
+   - Jika entitas SUDAH ADA di daftar Glosarium di atas, lalu di naskah bab ini (baik karena cerita berlanjut atau naskah ditulis ulang/direvisi) mengalami:
+     * Perubahan sifat/watak/kepribadian baru dibanding data sebelumnya.
+     * Perubahan kondisi fisik/mental/status (misal: dirasuki, terluka parah, berkhianat, dikutuk, menjadi buronan, koma, dsb.).
+     * Peristiwa penting/titik balik yang mengubah arah karakter.
+   - Maka sertakan entitas tersebut dengan:
+     * suggestedAction: "update_existing"
+     * isExisting: true
+     * existingEntityId: ID entitas dari daftar di atas
+     * name: Nama entitas asli
+     * initialTraits: Pertahankan sifat awal yang sudah tercatat (atau perjelas jika dulu kosong)
+     * currentTraits: Sifat & kepribadian terkini di bab ini yang mengalami perubahan
+     * currentDescription: Deskripsi kondisi terkini di bab ini
+     * evolutionSummary: Penjelasan mengapa sifat/kondisi berubah di bab ini (contoh: "Setelah dirasuki oleh jin dari pantai utara, sifatnya berubah drastis menjadi...")
+     * condition: Status kondisi terkini
+     * conditionDetails: Rincian kondisi terkini
+
+3. DETEKSI ALIAS / SEBUTAN LAIN (suggestedAction: "add_alias"):
+   - Cari julukan, sebutan lain, gelar, atau istilah pengganti dari entitas yang SUDAH ADA. Contoh: Jika ada julukan "Sang Pendekar Jubah Hitam" merujuk ke Ahmad, deteksi sebagai ALIAS Ahmad!
 
 Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
 [
   {
     "name": "Nama entitas atau sebutan alias yang ditemukan",
     "category": "character",
-    "shortDescription": "Penjelasan singkat siapa/apa ini di bab ini",
+    "shortDescription": "Penjelasan ringkas siapa/apa ini di bab ini",
+    "initialDescription": "Deskripsi atau latar belakang awal",
+    "initialTraits": "Sifat & kepribadian awal (misal: penyayang, baik hati, penurut)",
+    "currentDescription": "Deskripsi kondisi saat ini",
+    "currentTraits": "Sifat & kepribadian saat ini (misal: kasar, manipulatif, penuh kebencian)",
+    "evolutionSummary": "Titik balik / penyebab perubahan sifat (misal: dirasuki oleh jin pantai utara)",
+    "condition": "aktif",
+    "conditionDetails": "",
     "isExisting": false,
     "existingEntityId": "",
     "detectedAliasOf": "",
@@ -950,28 +986,45 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
 
 Aturan:
 - category HANYA boleh salah satu dari: "character", "location", "item", "lore"
-- suggestedAction HANYA boleh: "register_new" (untuk entitas baru) atau "add_alias" (untuk julukan/alias entitas yang sudah ada)
-- Jika alias, sertakan existingEntityId dari daftar di atas dan isi detectedAliasOf dengan nama entitas asli.`;
+- suggestedAction HANYA boleh: "register_new", "update_existing", atau "add_alias"
+- condition HANYA boleh: "aktif", "luka", "gugur", "hilang", "berkhianat", "terkutuk", "ditawan", "pelarian", "koma", "spesial"
+- Jika update_existing atau add_alias, sertakan existingEntityId dari daftar di atas.`;
 
   const systemPrompt =
-    'Anda adalah editor kontinuitas sastra profesional. Hasilkan HANYA JSON array valid.';
+    'Anda adalah editor kontinuitas sastra profesional dan konsistensi worldbuilding. Hasilkan HANYA JSON array valid.';
   const res = await generateWithSmartFallback(prompt, systemPrompt);
 
   try {
     const parsed = resilientParseJsonArray<any>(res.text);
     if (parsed.length > 0) {
-      return parsed.map((item) => ({
-        id: 'det_' + Math.random().toString(36).substring(2, 9),
-        name: item.name || '',
-        category: ['character', 'location', 'item', 'lore'].includes(item.category)
-          ? item.category
-          : 'character',
-        shortDescription: item.shortDescription || '',
-        isExisting: Boolean(item.isExisting),
-        existingEntityId: item.existingEntityId || undefined,
-        detectedAliasOf: item.detectedAliasOf || undefined,
-        suggestedAction: item.suggestedAction === 'add_alias' ? 'add_alias' : 'register_new',
-      }));
+      return parsed.map((item) => {
+        const action: 'register_new' | 'update_existing' | 'add_alias' =
+          item.suggestedAction === 'add_alias'
+            ? 'add_alias'
+            : item.suggestedAction === 'update_existing'
+            ? 'update_existing'
+            : 'register_new';
+
+        return {
+          id: 'det_' + Math.random().toString(36).substring(2, 9),
+          name: item.name || '',
+          category: ['character', 'location', 'item', 'lore'].includes(item.category)
+            ? item.category
+            : 'character',
+          shortDescription: item.shortDescription || '',
+          initialDescription: item.initialDescription || undefined,
+          initialTraits: item.initialTraits || undefined,
+          currentDescription: item.currentDescription || undefined,
+          currentTraits: item.currentTraits || undefined,
+          evolutionSummary: item.evolutionSummary || undefined,
+          condition: item.condition || undefined,
+          conditionDetails: item.conditionDetails || undefined,
+          isExisting: Boolean(item.isExisting) || action === 'update_existing' || action === 'add_alias',
+          existingEntityId: item.existingEntityId || undefined,
+          detectedAliasOf: item.detectedAliasOf || undefined,
+          suggestedAction: action,
+        };
+      });
     }
   } catch (err) {
     console.warn('Gagal parse JSON deteksi entitas:', err);

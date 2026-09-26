@@ -178,6 +178,29 @@ const EntityCard: React.FC<{
               Status: {entity.conditionDetails}
             </p>
           )}
+
+          {/* Sifat Awal vs Sifat Terkini */}
+          {(entity.initialTraits || entity.currentTraits) && (
+            <div className="mt-1.5 p-2 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-[11px] space-y-1">
+              {entity.initialTraits && (
+                <div className="flex items-start gap-1 text-slate-600 dark:text-slate-400">
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5 flex-shrink-0">🌱 Awal:</span>
+                  <span className="line-clamp-1">{entity.initialTraits}</span>
+                </div>
+              )}
+              {entity.currentTraits && (
+                <div className="flex items-start gap-1 text-slate-800 dark:text-slate-200">
+                  <span className="font-bold text-amber-600 dark:text-amber-400 flex items-center gap-0.5 flex-shrink-0">⚡ Saat Ini:</span>
+                  <span className="line-clamp-1 font-medium">{entity.currentTraits}</span>
+                </div>
+              )}
+              {entity.evolutionSummary && isExpanded && (
+                <div className="pt-1 border-t border-slate-200 dark:border-slate-800 text-[10px] text-amber-600 dark:text-amber-400/90 italic">
+                  <strong>Perubahan:</strong> {entity.evolutionSummary}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
