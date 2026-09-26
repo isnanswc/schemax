@@ -333,13 +333,6 @@ export async function generateGeminiSpeechAudio(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          system_instruction: {
-            parts: [
-              {
-                text: 'You are an award-winning theatrical audiobook narrator and voice actor. Read the Indonesian story text naturally, dynamically, and expressively. Strictly interpret and embody inline emotion tags enclosed in angle brackets (such as <angry>, <furious>, <whisper>, <sad>, <sobbing>, <cheerful>, <suspenseful>, <dramatic>, <solemn>, <panicked>, etc.) to modulate vocal intensity, breath, pitch, and pacing. CRITICAL RULE: NEVER speak aloud or spell out the emotion tag names or angle brackets. Only read the story sentences themselves.',
-              },
-            ],
-          },
           contents: [
             {
               role: 'user',
