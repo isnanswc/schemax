@@ -15,9 +15,13 @@ import {
   Image as ImageIcon,
   FileText,
   Bookmark,
-  Scroll
+  Scroll,
+  Lock,
+  KeyRound
 } from 'lucide-react';
 import { usePrivacy } from '../../contexts/PrivacyContext';
+import { useSecurity } from '../../contexts/SecurityContext';
+import { PinSetupModal } from '../security/PinSetupModal';
 
 interface AppCornerMenuModalProps {
   isOpen: boolean;
@@ -33,7 +37,9 @@ export const AppCornerMenuModal: React.FC<AppCornerMenuModalProps> = ({
   onOpenSyncModal,
 }) => {
   const { settings, updateSettings, togglePrivacyMode } = usePrivacy();
+  const { settings: secSettings, lockApp } = useSecurity();
   const [showPrivacyDetails, setShowPrivacyDetails] = useState(false);
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
 
   // Read current theme from html class
   const isDark = document.documentElement.classList.contains('dark');
@@ -218,7 +224,50 @@ export const AppCornerMenuModal: React.FC<AppCornerMenuModalProps> = ({
           )}
         </div>
 
-        {/* 2. Tema Tampilan (Light, Dark, Auto) */}
+        {/* 2. Keamanan Kunci PIN & Auto-Lock */}
+        <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className={`p-1.5 rounded-xl ${secSettings.isPinEnabled ? 'bg-amber-500/15 text-amber-500' : 'bg-slate-200 dark:bg-slate-800 text-slate-400'}`}>
+                <Lock className="w-4 h-4" />
+              </span>
+              <div>
+                <span className="text-xs font-bold block leading-tight">
+                  Kunci PIN &amp; Auto-Lock
+                </span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                  {secSettings.isPinEnabled
+                    ? `Aktif (Auto-Lock ${secSettings.autoLockSeconds > 0 ? `${secSettings.autoLockSeconds}d` : 'Segera'})`
+                    : 'Nonaktif'}
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsPinModalOpen(true)}
+              className="py-1 px-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] transition shadow-xs active:scale-95"
+            >
+              {secSettings.isPinEnabled ? 'Atur' : 'Aktifkan'}
+            </button>
+          </div>
+
+          {secSettings.isPinEnabled && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                lockApp();
+              }}
+              className="w-full py-1.5 px-3 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 font-bold text-[11px] flex items-center justify-center gap-1.5 transition active:scale-95"
+            >
+              <KeyRound className="w-3.5 h-3.5 text-amber-500" />
+              <span>Kunci Aplikasi Sekarang</span>
+            </button>
+          )}
+        </div>
+
+        {/* 3. Tema Tampilan (Light, Dark, Auto) */}
         <div className="space-y-1.5">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
             Tema Tampilan:
@@ -287,6 +336,12 @@ export const AppCornerMenuModal: React.FC<AppCornerMenuModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* PIN Setup & Configuration Modal */}
+      <PinSetupModal
+        isOpen={isPinModalOpen}
+        onClose={() => setIsPinModalOpen(false)}
+      />
     </div>
   );
 };

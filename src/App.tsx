@@ -20,6 +20,7 @@ import { AIStoryArchitectModal } from './components/story/AIStoryArchitectModal'
 import { navStack } from './services/backNavigationService';
 import { LayoutDashboard, BookOpen } from 'lucide-react';
 import { usePrivacy } from './contexts/PrivacyContext';
+import { AppLockScreen } from './components/security/AppLockScreen';
 
 export function App() {
   const { bindEmptyAreaLongPress } = usePrivacy();
@@ -402,6 +403,9 @@ export function App() {
           )}
         </>
       )}
+
+      {/* 🔒 Fullscreen App PIN Lock Vault Screen */}
+      <AppLockScreen />
     </div>
   );
 }
