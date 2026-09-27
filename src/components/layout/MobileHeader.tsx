@@ -1,23 +1,19 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { ArrowLeft, BookOpen, MoreVertical, Shield } from 'lucide-react';
 import { Book } from '../../types';
-import { AppCornerMenuModal } from './AppCornerMenuModal';
 import { usePrivacy } from '../../contexts/PrivacyContext';
 
 interface MobileHeaderProps {
   currentBook?: Book | null;
   onBack?: () => void;
-  onOpenSyncModal: () => void;
-  onOpenAISettings: () => void;
+  onOpenCornerMenu: () => void;
 }
 
 export const MobileHeader: React.FC<MobileHeaderProps> = ({
   currentBook,
   onBack,
-  onOpenSyncModal,
-  onOpenAISettings,
+  onOpenCornerMenu,
 }) => {
-  const [showMenu, setShowMenu] = useState(false);
   const { settings, getBlurTitleClass } = usePrivacy();
 
   return (
@@ -78,7 +74,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
         <div className="flex items-center gap-1.5 sm:gap-2">
           <button
             type="button"
-            onClick={() => setShowMenu(true)}
+            onClick={onOpenCornerMenu}
             className="flex items-center gap-1.5 py-1.5 px-2.5 sm:px-3 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-900/90 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold active:scale-95 transition shadow-sm"
             title="Menu Pojok (Privasi, Multi-AI, Tema & Penyimpanan)"
           >
@@ -93,14 +89,6 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
           </button>
         </div>
       </div>
-
-      {/* App Corner Menu Modal */}
-      <AppCornerMenuModal
-        isOpen={showMenu}
-        onClose={() => setShowMenu(false)}
-        onOpenAISettings={onOpenAISettings}
-        onOpenSyncModal={onOpenSyncModal}
-      />
     </header>
   );
 };

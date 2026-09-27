@@ -21,6 +21,8 @@ import { navStack } from './services/backNavigationService';
 import { LayoutDashboard, BookOpen } from 'lucide-react';
 import { usePrivacy } from './contexts/PrivacyContext';
 import { AppLockScreen } from './components/security/AppLockScreen';
+import { PinSetupModal } from './components/security/PinSetupModal';
+import { AppCornerMenuModal } from './components/layout/AppCornerMenuModal';
 
 export function App() {
   const { bindEmptyAreaLongPress } = usePrivacy();
@@ -35,6 +37,8 @@ export function App() {
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [isAISettingsOpen, setIsAISettingsOpen] = useState(false);
   const [isArchitectModalOpen, setIsArchitectModalOpen] = useState(false);
+  const [isCornerMenuOpen, setIsCornerMenuOpen] = useState(false);
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -180,9 +184,24 @@ export function App() {
     setIsArchitectModalOpen(true);
   };
 
-  const handleCloseArchitect = () => {
-    navStack.pop('modal-architect');
-    setIsArchitectModalOpen(false);
+  const handleOpenCornerMenu = () => {
+    navStack.push('modal-corner-menu', () => setIsCornerMenuOpen(false));
+    setIsCornerMenuOpen(true);
+  };
+
+  const handleCloseCornerMenu = () => {
+    navStack.pop('modal-corner-menu');
+    setIsCornerMenuOpen(false);
+  };
+
+  const handleOpenPinSetup = () => {
+    navStack.push('modal-pin-setup', () => setIsPinModalOpen(false));
+    setIsPinModalOpen(true);
+  };
+
+  const handleClosePinSetup = () => {
+    navStack.pop('modal-pin-setup');
+    setIsPinModalOpen(false);
   };
 
   const triggerRefresh = () => {
@@ -230,8 +249,7 @@ export function App() {
           <MobileHeader
             currentBook={currentBook}
             onBack={currentBook ? handleBackToHome : undefined}
-            onOpenSyncModal={handleOpenSyncModal}
-            onOpenAISettings={handleOpenAISettings}
+            onOpenCornerMenu={handleOpenCornerMenu}
           />
 
           {/* 3. Main Body Container - Compact & Edge-to-Edge on Mobile */}
@@ -401,6 +419,21 @@ export function App() {
               <span>{toastMessage}</span>
             </div>
           )}
+
+          {/* 9. Top-Right Corner Menu Modal */}
+          <AppCornerMenuModal
+            isOpen={isCornerMenuOpen}
+            onClose={handleCloseCornerMenu}
+            onOpenAISettings={handleOpenAISettings}
+            onOpenSyncModal={handleOpenSyncModal}
+            onOpenPinSetup={handleOpenPinSetup}
+          />
+
+          {/* 10. Dedicated PIN Setup & Security Configuration Modal */}
+          <PinSetupModal
+            isOpen={isPinModalOpen}
+            onClose={handleClosePinSetup}
+          />
         </>
       )}
 

@@ -21,13 +21,13 @@ import {
 } from 'lucide-react';
 import { usePrivacy } from '../../contexts/PrivacyContext';
 import { useSecurity } from '../../contexts/SecurityContext';
-import { PinSetupModal } from '../security/PinSetupModal';
 
 interface AppCornerMenuModalProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenAISettings: () => void;
   onOpenSyncModal: () => void;
+  onOpenPinSetup: () => void;
 }
 
 export const AppCornerMenuModal: React.FC<AppCornerMenuModalProps> = ({
@@ -35,11 +35,11 @@ export const AppCornerMenuModal: React.FC<AppCornerMenuModalProps> = ({
   onClose,
   onOpenAISettings,
   onOpenSyncModal,
+  onOpenPinSetup,
 }) => {
   const { settings, updateSettings, togglePrivacyMode } = usePrivacy();
   const { settings: secSettings, lockApp } = useSecurity();
   const [showPrivacyDetails, setShowPrivacyDetails] = useState(false);
-  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
 
   // Read current theme from html class
   const isDark = document.documentElement.classList.contains('dark');
@@ -69,11 +69,11 @@ export const AppCornerMenuModal: React.FC<AppCornerMenuModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-end p-3 sm:p-5 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-start justify-end p-3 sm:p-5 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-xs mt-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200 text-slate-900 dark:text-white"
+        className="w-full max-w-xs mt-12 max-h-[calc(100vh-4rem)] overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200 text-slate-900 dark:text-white"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -245,7 +245,10 @@ export const AppCornerMenuModal: React.FC<AppCornerMenuModalProps> = ({
 
             <button
               type="button"
-              onClick={() => setIsPinModalOpen(true)}
+              onClick={() => {
+                onClose();
+                onOpenPinSetup();
+              }}
               className="py-1 px-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] transition shadow-xs active:scale-95"
             >
               {secSettings.isPinEnabled ? 'Atur' : 'Aktifkan'}
@@ -336,12 +339,6 @@ export const AppCornerMenuModal: React.FC<AppCornerMenuModalProps> = ({
           </button>
         </div>
       </div>
-
-      {/* PIN Setup & Configuration Modal */}
-      <PinSetupModal
-        isOpen={isPinModalOpen}
-        onClose={() => setIsPinModalOpen(false)}
-      />
     </div>
   );
 };
