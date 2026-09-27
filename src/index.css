@@ -13,7 +13,21 @@
     background-color: #f8fafc;
     color: #0f172a;
     -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none; /* Disable iOS callout menu on long-press */
+    user-select: none; /* Disable text selection when holding */
+    -webkit-user-select: none;
     transition: background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1), color 0.25s ease;
+  }
+
+  /* Allow text selection specifically in inputs, textareas, contenteditable, and designated selectable text */
+  input,
+  textarea,
+  [contenteditable="true"],
+  [contenteditable],
+  .selectable-text,
+  .select-text {
+    user-select: text !important;
+    -webkit-user-select: text !important;
   }
 
   html.dark body {
