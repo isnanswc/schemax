@@ -22,6 +22,16 @@ interface PrivacyContextType {
   settings: PrivacySettings;
   updateSettings: (newSettings: Partial<PrivacySettings>) => void;
   togglePrivacyMode: () => void;
+  isTemporaryUnblurred: boolean;
+  setIsTemporaryUnblurred: (val: boolean) => void;
+  bindEmptyAreaLongPress: () => {
+    onTouchStart: (e: React.TouchEvent) => void;
+    onTouchEnd: () => void;
+    onTouchCancel: () => void;
+    onMouseDown: (e: React.MouseEvent) => void;
+    onMouseUp: () => void;
+    onMouseLeave: () => void;
+  };
   getBlurImageClass: (extraClasses?: string) => string;
   getBlurTextClass: (extraClasses?: string) => string;
   getBlurTitleClass: (extraClasses?: string) => string;
@@ -43,6 +53,10 @@ export const PrivacyProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return DEFAULT_PRIVACY_SETTINGS;
   });
 
+  // Global temporary unblur triggered by pressing and holding empty areas
+  const [isTemporaryUnblurred, setIsTemporaryUnblurred] = useState(false);
+  const holdTimerRef = React.useRef<any>(null);
+
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
@@ -59,24 +73,55 @@ export const PrivacyProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setSettings((prev) => ({ ...prev, privacyMode: !prev.privacyMode }));
   };
 
+  const startHold = (target: HTMLElement | null) => {
+    if (!settings.privacyMode) return;
+    // Don't trigger if user long-pressed on interactive items (button, input, select, textarea, etc.)
+    if (target && target.closest('button, input, textarea, a, select, [data-interactive]')) {
+      return;
+    }
+    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+    holdTimerRef.current = setTimeout(() => {
+      setIsTemporaryUnblurred(true);
+    }, 400); // 400ms threshold for intentional press & hold
+  };
+
+  const endHold = () => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    setIsTemporaryUnblurred(false);
+  };
+
+  const bindEmptyAreaLongPress = () => ({
+    onTouchStart: (e: React.TouchEvent) => startHold(e.target as HTMLElement),
+    onTouchEnd: () => endHold(),
+    onTouchCancel: () => endHold(),
+    onMouseDown: (e: React.MouseEvent) => {
+      if (e.button === 0) startHold(e.target as HTMLElement);
+    },
+    onMouseUp: () => endHold(),
+    onMouseLeave: () => endHold(),
+  });
+
   const getBlurImageClass = (extraClasses = '') => {
-    if (!settings.privacyMode || !settings.blurImages) return extraClasses;
-    return `filter blur-md hover:blur-none transition-all duration-300 select-none ${extraClasses}`;
+    if (!settings.privacyMode || !settings.blurImages || isTemporaryUnblurred) return extraClasses;
+    return `filter blur-md transition-all duration-300 select-none ${extraClasses}`;
   };
 
   const getBlurTextClass = (extraClasses = '') => {
-    if (!settings.privacyMode || !settings.blurText) return extraClasses;
-    return `filter blur-sm hover:blur-none transition-all duration-300 select-none ${extraClasses}`;
+    if (!settings.privacyMode || !settings.blurText || isTemporaryUnblurred) return extraClasses;
+    return `filter blur-sm transition-all duration-300 select-none ${extraClasses}`;
   };
 
   const getBlurTitleClass = (extraClasses = '') => {
-    if (!settings.privacyMode || !settings.blurTitles) return extraClasses;
-    return `filter blur-sm hover:blur-none transition-all duration-300 select-none ${extraClasses}`;
+    if (!settings.privacyMode || !settings.blurTitles || isTemporaryUnblurred) return extraClasses;
+    return `filter blur-sm transition-all duration-300 select-none ${extraClasses}`;
   };
 
   const getBlurGlossaryClass = (extraClasses = '') => {
-    if (!settings.privacyMode || !settings.blurGlossary) return extraClasses;
-    return `filter blur-sm hover:blur-none transition-all duration-300 select-none ${extraClasses}`;
+    if (!settings.privacyMode || !settings.blurGlossary || isTemporaryUnblurred) return extraClasses;
+    return `filter blur-sm transition-all duration-300 select-none ${extraClasses}`;
   };
 
   return (
@@ -85,6 +130,9 @@ export const PrivacyProvider: React.FC<{ children: React.ReactNode }> = ({ child
         settings,
         updateSettings,
         togglePrivacyMode,
+        isTemporaryUnblurred,
+        setIsTemporaryUnblurred,
+        bindEmptyAreaLongPress,
         getBlurImageClass,
         getBlurTextClass,
         getBlurTitleClass,

@@ -19,8 +19,10 @@ import { AISettingsModal } from './components/settings/AISettingsModal';
 import { AIStoryArchitectModal } from './components/story/AIStoryArchitectModal';
 import { navStack } from './services/backNavigationService';
 import { LayoutDashboard, BookOpen } from 'lucide-react';
+import { usePrivacy } from './contexts/PrivacyContext';
 
 export function App() {
+  const { bindEmptyAreaLongPress } = usePrivacy();
   const [mainMenu, setMainMenu] = useState<'dashboard' | 'works'>('dashboard');
   const [currentBook, setCurrentBook] = useState<Book | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('chapters');
@@ -187,7 +189,10 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
+    <div
+      {...bindEmptyAreaLongPress()}
+      className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200"
+    >
       {/* 1. Fullscreen Chapter Reader (Distraction-Free Reading Mode with Natural TTS) */}
       {readingChapter && currentBook ? (
         <ChapterReaderView

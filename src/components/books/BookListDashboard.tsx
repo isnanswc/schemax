@@ -94,30 +94,30 @@ export const BookListDashboard: React.FC<BookListDashboardProps> = ({
       {recentChapter && recentBook && onResumeChapter && (
         <div
           onClick={() => onResumeChapter(recentBook, recentChapter)}
-          className="group relative bg-gradient-to-r from-amber-500/10 via-slate-900 to-indigo-500/10 border border-amber-500/30 hover:border-amber-400 rounded-3xl p-4 sm:p-5 shadow-lg shadow-black/30 cursor-pointer transition-all duration-300 hover:translate-y-[-2px] hover:shadow-xl active:scale-[0.99] animate-fade-in-up"
+          className="group relative bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-indigo-500/10 dark:from-amber-500/10 dark:via-slate-900 dark:to-indigo-500/10 bg-white dark:bg-slate-900 border border-amber-500/30 hover:border-amber-500 dark:hover:border-amber-400 rounded-3xl p-4 sm:p-5 shadow-md hover:shadow-lg dark:shadow-black/30 cursor-pointer transition-all duration-300 hover:translate-y-[-2px] active:scale-[0.99] animate-fade-in-up"
         >
           <div className="flex items-center justify-between gap-2 mb-2">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/40">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/40">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 dark:bg-amber-400 animate-ping" />
                 Lanjutkan Menulis
               </span>
-              <span className="text-[11px] text-slate-400 truncate max-w-[150px] sm:max-w-xs font-semibold">
+              <span className="text-[11px] text-slate-600 dark:text-slate-400 truncate max-w-[150px] sm:max-w-xs font-semibold">
                 {recentBook.title}
               </span>
             </div>
 
-            <span className="text-[10px] text-slate-500 flex-shrink-0">
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 flex-shrink-0">
               {formatTimeAgo(recentChapter.updatedAt)}
             </span>
           </div>
 
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <h3 className="text-base sm:text-lg font-black text-white group-hover:text-amber-400 transition-colors truncate">
+              <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors truncate">
                 Bab {recentChapter.order || 1}: {recentChapter.title || 'Bab Tanpa Judul'}
               </h3>
-              <p className="text-xs text-slate-400 truncate mt-0.5">
+              <p className="text-xs text-slate-600 dark:text-slate-400 truncate mt-0.5">
                 {(recentChapter.wordCount || 0).toLocaleString()} kata • Target{' '}
                 {recentChapter.targetWordCount || 1500} kata
               </p>
@@ -125,7 +125,7 @@ export const BookListDashboard: React.FC<BookListDashboardProps> = ({
 
             <button
               type="button"
-              className="py-2 px-3.5 rounded-2xl bg-amber-500 group-hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/20 transition flex items-center gap-1.5 flex-shrink-0 group-hover:translate-x-0.5 active:scale-95"
+              className="py-2 px-3.5 rounded-2xl bg-amber-500 hover:bg-amber-600 dark:group-hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/20 transition flex items-center gap-1.5 flex-shrink-0 group-hover:translate-x-0.5 active:scale-95"
             >
               <span>Tulis</span>
               <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -133,7 +133,7 @@ export const BookListDashboard: React.FC<BookListDashboardProps> = ({
           </div>
 
           {/* Micro Progress Bar */}
-          <div className="w-full bg-slate-800/80 rounded-full h-1.5 mt-3 overflow-hidden border border-slate-700/60">
+          <div className="w-full bg-slate-200 dark:bg-slate-800/80 rounded-full h-1.5 mt-3 overflow-hidden border border-slate-300 dark:border-slate-700/60">
             <div
               className="bg-gradient-to-r from-amber-500 to-amber-400 h-full rounded-full transition-all duration-300"
               style={{
@@ -182,19 +182,19 @@ export const BookListDashboard: React.FC<BookListDashboardProps> = ({
       )}
 
       {/* 💡 2. AI Quick Spark Pad (Inkubator Ide Cepat) */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-sm">
+      <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-sm">
         <div className="flex items-center gap-2 min-w-0">
-          <div className="p-2 rounded-xl bg-amber-500/15 text-amber-400 flex-shrink-0">
+          <div className="p-2 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex-shrink-0">
             <Lightbulb className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <h4 className="text-xs font-bold text-white flex items-center gap-1.5 truncate">
+            <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5 truncate">
               <span>Inkubator Ide Cerita</span>
-              <span className="text-[9px] uppercase px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-extrabold">
+              <span className="text-[9px] uppercase px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 font-extrabold">
                 AI Spark
               </span>
             </h4>
-            <p className="text-[10px] text-slate-400 truncate">
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
               Pancing plot twist, konsep karakter, atau pembuka adegan baru
             </p>
           </div>
@@ -203,33 +203,33 @@ export const BookListDashboard: React.FC<BookListDashboardProps> = ({
         <button
           type="button"
           onClick={handleOpenSparkModal}
-          className="inline-flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs border border-slate-700 active:scale-95 transition flex-shrink-0"
+          className="inline-flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-amber-700 dark:text-amber-300 font-bold text-xs border border-slate-200 dark:border-slate-700 active:scale-95 transition flex-shrink-0"
         >
-          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+          <Sparkles className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
           <span>Brainstorm Ide</span>
         </button>
       </div>
 
       {/* 📊 3. Studio Momentum Micro-Stats */}
       <div className="grid grid-cols-3 gap-2">
-        <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-2.5 text-center">
+        <div className="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-2.5 text-center shadow-sm">
           <span className="text-[10px] text-slate-500 font-semibold block">Total Karya</span>
-          <span className="text-sm sm:text-base font-black text-white">{books.length} Buku</span>
+          <span className="text-sm sm:text-base font-black text-slate-900 dark:text-white">{books.length} Buku</span>
         </div>
-        <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-2.5 text-center">
+        <div className="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-2.5 text-center shadow-sm">
           <span className="text-[10px] text-slate-500 font-semibold block">Total Bab</span>
-          <span className="text-sm sm:text-base font-black text-amber-400">{allChapters.length} Bab</span>
+          <span className="text-sm sm:text-base font-black text-amber-600 dark:text-amber-400">{allChapters.length} Bab</span>
         </div>
-        <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-2.5 text-center">
+        <div className="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-2.5 text-center shadow-sm">
           <span className="text-[10px] text-slate-500 font-semibold block">Kata Tertulis</span>
-          <span className="text-sm sm:text-base font-black text-indigo-300">
+          <span className="text-sm sm:text-base font-black text-indigo-600 dark:text-indigo-300">
             {totalWords > 1000 ? `${(totalWords / 1000).toFixed(1)}k` : totalWords}
           </span>
         </div>
       </div>
 
       {/* 📚 4. Category Segmented Control (Draft / Released / All) */}
-      <div className="bg-slate-900/90 border border-slate-800/80 p-1 rounded-2xl shadow-sm">
+      <div className="bg-slate-200/80 dark:bg-slate-900/90 border border-slate-300/70 dark:border-slate-800/80 p-1 rounded-2xl shadow-inner">
         <div className="grid grid-cols-3 gap-1">
           {/* Draft Tab */}
           <button
@@ -237,7 +237,7 @@ export const BookListDashboard: React.FC<BookListDashboardProps> = ({
             className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-bold transition-all ${
               activeCategory === 'draft'
                 ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-800/60'
             }`}
           >
             <Clock className="w-3.5 h-3.5" />
@@ -246,7 +246,7 @@ export const BookListDashboard: React.FC<BookListDashboardProps> = ({
               className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
                 activeCategory === 'draft'
                   ? 'bg-slate-950 text-amber-400'
-                  : 'bg-slate-800 text-slate-300'
+                  : 'bg-slate-300 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
               }`}
             >
               {draftBooks.length}
@@ -259,7 +259,7 @@ export const BookListDashboard: React.FC<BookListDashboardProps> = ({
             className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-bold transition-all ${
               activeCategory === 'released'
                 ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-800/60'
             }`}
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
@@ -268,7 +268,7 @@ export const BookListDashboard: React.FC<BookListDashboardProps> = ({
               className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
                 activeCategory === 'released'
                   ? 'bg-slate-950 text-emerald-400'
-                  : 'bg-slate-800 text-slate-300'
+                  : 'bg-slate-300 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
               }`}
             >
               {releasedBooks.length}
@@ -281,7 +281,7 @@ export const BookListDashboard: React.FC<BookListDashboardProps> = ({
             className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-bold transition-all ${
               activeCategory === 'all'
                 ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-800/60'
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
@@ -290,7 +290,7 @@ export const BookListDashboard: React.FC<BookListDashboardProps> = ({
               className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
                 activeCategory === 'all'
                   ? 'bg-slate-950 text-indigo-300'
-                  : 'bg-slate-800 text-slate-300'
+                  : 'bg-slate-300 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
               }`}
             >
               {books.length}
@@ -302,13 +302,13 @@ export const BookListDashboard: React.FC<BookListDashboardProps> = ({
       {/* Search & New Book Action Bar */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
-          <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Cari judul cerita, genre, atau sinopsis..."
-            className="w-full pl-9 pr-3 py-2 bg-slate-900/80 border border-slate-800 rounded-xl text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/60"
+            className="w-full pl-9 pr-3 py-2 bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-500/60 shadow-sm"
           />
         </div>
 

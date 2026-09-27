@@ -13,6 +13,8 @@ import {
   Sparkles
 } from 'lucide-react';
 import { navStack } from '../../services/backNavigationService';
+import { usePrivacy } from '../../contexts/PrivacyContext';
+import { ImageViewerModal } from '../common/ImageViewerModal';
 
 interface MediaGalleryViewProps {
   bookId: string;
@@ -26,6 +28,7 @@ const ImageThumbnail: React.FC<{
   onDelete: (id: string, name: string) => void;
 }> = ({ item, onSelect, onDelete }) => {
   const { url, loading } = useMediaUrl(item.id);
+  const { getBlurImageClass, getBlurTitleClass } = usePrivacy();
 
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return bytes + ' B';
@@ -46,7 +49,7 @@ const ImageThumbnail: React.FC<{
         <img
           src={url}
           alt={item.name}
-          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ${getBlurImageClass()}`}
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center text-slate-600">

@@ -1078,41 +1078,60 @@ export interface ChapterBranchOption {
   characterConditions?: string;
   climax?: string;
   potentialTwist?: string;
+  continuityNote?: string;
+  isConsistentWithPrevious?: boolean;
 }
 
 export async function generateNextChapterBranches(
   chapterTitle: string,
   bookTitle: string,
   contentText: string,
-  premise?: string
+  premise?: string,
+  roughDraft?: string
 ): Promise<ChapterBranchOption[]> {
+  const hasDraft = Boolean(roughDraft && roughDraft.trim());
+
   const prompt = `Anda adalah story architect dan continuity supervisor novel profesional.
-Analisis naskah bab saat ini secara mendalam untuk merancang 3 rekomendasi cabang kelanjutan alur cerita (branching plot options) yang SANGAT MASUK AKAL, BERKELANJUTAN (koheren dengan apa yang baru saja terjadi), dan penuh tensi dramatis untuk bab selanjutnya:
+Analisis peristiwa bab ini secara mendalam untuk merancang RENCANA BAB SELANJUTNYA (3 rekomendasi alur cerita berkelanjutan yang SANGAT MASUK AKAL, KOHEREN DENGAN PERISTIWA BAB SEBELUMNYA, dan penuh ketegangan dramatis):
 
 Judul Buku: "${bookTitle}"
-Bab Saat Ini: "${chapterTitle}"
-Premis Bab Ini: ${premise || 'Belum ada premis tertulis'}
+Bab Saat Ini (Bab Sebelumnya bagi Bab Baru): "${chapterTitle}"
+Premis Bab Sebelumnya: ${premise || 'Belum ada premis tertulis'}
 
-Naskah Bab Saat Ini:
+Naskah Bab Sebelumnya:
 ${contentText ? contentText.slice(0, 60000) : (premise || 'Bab ini sedang ditulis')}
 
-Tugas Khusus:
-Rancang 3 arah cabang cerita bab selanjutnya dengan logika sebab-akibat yang kuat dari bab sebelumnya:
-1. Cabang A (Intensitas Tinggi): Konfrontasi langsung, pelarian berisiko tinggi, atau eskalasi krisis yang mendesak.
-2. Cabang B (Plot Twist & Misteri): Terungkapnya kebohongan, aliansi tak terduga, atau penemuan petunjuk rahasia masa lalu.
-3. Cabang C (Dilema Emosional & Karakter): Pengorbanan moral, ujian kesetiaan antar tokoh, atau pergeseran motivasi batin.
+${
+  hasDraft
+    ? `DRAFT KASAR / RENCANA DARI PENULIS UNTUK BAB SELANJUTNYA:
+"""
+${roughDraft}
+"""
 
-Setiap cabang WAJIB memuat:
-- title: Judul bab berikutnya yang kuat dan puitis/dramatis.
-- premise: Premis sinopsis bab 2-3 kalimat yang mengikat.
-- hook: Kalimat/adegan pembuka yang menggigit di paragraf awal bab baru.
-- storyPlan: Rencana alur cerita runut (langkah kejadian dari awal, eskalasi konflik, hingga penyelesaian bab yang masuk akal berdasar bab sebelumnya).
+TUGAS KHUSUS DRAFT PENULIS:
+1. Evaluasi apakah ide/draft kasar dari penulis di atas MELENCENG atau KOHEREN dari kejadian akhir bab sebelumnya!
+2. Jika ada bagian yang melenceng atau melompat logika secara aneh, beri peringatan solutif agar tetap tersambung mulus.
+3. Kembangkan 3 variasi eksekusi alur bab selanjutnya berdasarkan draft penulis tersebut yang diselaraskan secara akurat dengan bab sebelumnya.`
+    : `TUGAS KHUSUS:
+Rancang 3 arah kelanjutan cerita bab selanjutnya dengan logika sebab-akibat yang kuat berdasar akhir bab sebelumnya:
+1. Opsi A (Intensitas & Aksi): Konfrontasi langsung, eskalasi darurat, atau konsekuensi aksi sebelumnya.
+2. Opsi B (Plot Twist & Misteri): Terungkapnya motif rahasia, petunjuk mengejutkan, atau aliansi tak terduga.
+3. Opsi C (Dilema Batin & Karakter): Pengorbanan emosional, pergeseran dinamika relasi, atau ujian moral.`
+}
+
+Setiap opsi rencana WAJIB memuat:
+- title: Judul bab berikutnya yang kuat dan dramatis.
+- premise: Rangkuman premis bab baru 2-3 kalimat yang memikat.
+- hook: Kalimat atau adegan pembuka pertama bab baru yang langsung menyambung dari bab sebelumnya.
+- storyPlan: Rencana alur cerita runut babak per babak (langkah kejadian dari awal, eskalasi, hingga akhir bab yang masuk akal berdasar bab sebelumnya).
 - involvedCharacters: Daftar nama tokoh penting yang terlibat.
-- characterConditions: Kondisi fisik/emosional/status para tokoh saat cabang ini dimulai.
+- characterConditions: Kondisi fisik, emosional, dan posisi para tokoh saat bab ini dimulai.
 - climax: Titik puncak klimaks yang meledak di bab tersebut.
-- potentialTwist: Konsekuensi atau kejutan tersembunyi di bab ini.
+- potentialTwist: Konsekuensi atau kejutan tersembunyi.
 - intensity: Kategori intensitas ("Tinggi (Aksi/Konflik)" / "Misteri (Plot Twist)" / "Emosional (Drama)").
-- rationale: Alasan mengapa cabang ini logis dan memuaskan bagi pembaca setelah membaca bab sebelumnya.
+- rationale: Alasan mengapa opsi ini logis dan memuaskan kelanjutan cerita setelah bab sebelumnya.
+- continuityNote: Catatan kesinambungan (jika ada draft kasar penulis: sebutkan apakah draft sesuai atau ada catatan koreksi agar tidak melenceng dari bab sebelumnya).
+- isConsistentWithPrevious: boolean (true jika konsisten dan menyambung erat dengan bab sebelumnya).
 
 Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
 [
@@ -1126,7 +1145,9 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
     "climax": "Momen klimaks di mana puncak konflik meledak...",
     "potentialTwist": "Kejutan tak terduga yang terjadi...",
     "intensity": "Tinggi (Aksi/Konflik)",
-    "rationale": "Mengapa cabang ini sangat masuk akal..."
+    "rationale": "Mengapa opsi ini sangat masuk akal...",
+    "continuityNote": "Catatan konsistensi dengan bab sebelumnya...",
+    "isConsistentWithPrevious": true
   }
 ]`;
 
@@ -1152,6 +1173,8 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
         characterConditions: item.characterConditions || '',
         climax: item.climax || '',
         potentialTwist: item.potentialTwist || '',
+        continuityNote: item.continuityNote || '',
+        isConsistentWithPrevious: typeof item.isConsistentWithPrevious === 'boolean' ? item.isConsistentWithPrevious : true,
       }));
     }
   } catch (err) {

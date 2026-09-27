@@ -256,17 +256,15 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
       combinedSettingLore += '- Mengikuti barang/artefak yang dibawa karakter pada adegan.\n';
     }
 
-    combinedSettingLore += '\n\n=== ATURAN DUNIA & LORE (WORLD RULES) ===\n';
     if (loreEntities.length > 0) {
+      combinedSettingLore += '\n\n=== ATURAN DUNIA & LORE (WORLD RULES) ===\n';
       const targetLore = setScope === 'compact' ? loreEntities.slice(0, 4) : loreEntities;
       combinedSettingLore += targetLore
         .map((lr) => `- ${lr.name}: ${lr.shortDescription || (lr.detailedNotes ? lr.detailedNotes.slice(0, 100) : 'Hukum/aturan fiksi')}`)
         .join('\n');
-    } else {
-      combinedSettingLore += '- Mengikuti hukum konsistensi dunia fiksi yang dibangun dalam novel.\n';
     }
 
-    combinedSettingLore += '\n\n=== GAYA PENULISAN (WRITING STYLE) ===\n';
+    combinedSettingLore += '\n\n=== PEDOMAN GAYA & SUDUT PANDANG (STYLE & POV) ===\n';
     combinedSettingLore +=
       'Sudut Pandang: Orang Ketiga Terbatas (Third Person Limited)\n' +
       'Gaya Sastra: Terapkan teknik "Show, Don\'t Tell" (panca indera, gestur emosi alami), dialog berbobot dengan subteks kuat, ritme adegan dinamis tanpa kalimat klise.';

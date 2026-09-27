@@ -134,6 +134,7 @@ Instruksi Analisa Cerdas:
 - Buat karakter lengkap dengan usia, ciri fisik konkret, dan watak/sifat.
 - Buat 3 opsi kelanjutan alur yang memikat.
 - Rancang alur bab pembuka (Bab 1) secara mendalam dan siap dipakai sebagai Story Plot.
+- Tentukan gaya penulisan (writingStyle) yang paling cocok: bisa sastra puitis, emosional realistis, modern kasual santai (slang lu-gua / diksi kekinian), atau nuansa kultural dialek daerah jika ide mengarah ke sana.
 - Respon HANYA teks JSON valid.`;
 
   const response = await generateWithSmartFallback(userPrompt, systemPrompt);

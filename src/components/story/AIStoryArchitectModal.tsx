@@ -930,6 +930,9 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                       'Sastra Puitis, Deskriptif Panca Indera & Dialog Berbobot',
                       'Cepat, Lugas, Menghanyutkan & Mengalir (Page Turner)',
                       'Nuansa Gelap (Dark & Gritty) Penuh Intrik Supranatural',
+                      'Modern Kasual & Santai (Gaya Bahasa Gaul "Gua-Lu", Diksi Kekinian)',
+                      'Nuansa Lokal & Dialog Bahasa Daerah (Cita Rasa Kultural Autentik)',
+                      'Urban Pop & Metropolitan (Cepat, Gaul, Kosmopolitan)',
                     ].map((st) => (
                       <button
                         key={st}

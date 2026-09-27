@@ -18,7 +18,10 @@ import {
   Users,
   ShieldAlert,
   SlidersHorizontal,
-  Bookmark
+  Bookmark,
+  AlertCircle,
+  FileEdit,
+  Check
 } from 'lucide-react';
 import { StoryChapter, ChapterPlotBreakdown } from '../../../types';
 import {
@@ -48,6 +51,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
   const [summary, setSummary] = useState(chapter.aiSummary || chapter.premise || '');
   const [plot, setPlot] = useState<ChapterPlotBreakdown | undefined>(chapter.aiPlot);
   const [branches, setBranches] = useState<ChapterBranchOption[]>([]);
+  const [roughDraft, setRoughDraft] = useState('');
   const [nextChapter, setNextChapter] = useState<StoryChapter | null>(null);
 
   const [isSummarizing, setIsSummarizing] = useState(false);
@@ -161,13 +165,14 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
         chapter.title,
         bookTitle,
         textToBranch,
-        summary || chapter.premise
+        summary || chapter.premise,
+        roughDraft
       );
       if (generatedBranches && generatedBranches.length > 0) {
         setBranches(generatedBranches);
       }
     } catch (err: any) {
-      alert('Gagal menghasilkan rekomendasi cabang: ' + (err.message || 'Periksa API Key'));
+      alert('Gagal menghasilkan rencana bab selanjutnya: ' + (err.message || 'Periksa API Key'));
     } finally {
       setIsGeneratingBranches(false);
     }
@@ -214,13 +219,14 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
       setGenerateAllStep('Jeda aman kuota AI (2.5 detik)...');
       await delay(2500);
 
-      // 3. Rekomendasi Cabang Cerita Berkelanjutan
-      setGenerateAllStep('3/3 Merancang 3 cabang alur cerita...');
+      // 3. Rencana Bab Selanjutnya Berkelanjutan
+      setGenerateAllStep('3/3 Merancang alur bab selanjutnya...');
       const genBranches = await generateNextChapterBranches(
         chapter.title,
         bookTitle,
         text,
-        effectiveSummary || chapter.premise
+        effectiveSummary || chapter.premise,
+        roughDraft
       );
       if (genBranches && genBranches.length > 0) {
         setBranches(genBranches);
@@ -496,14 +502,14 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
         )}
       </div>
 
-      {/* 4. REKOMENDASI CABANG CHAPTER SELANJUTNYA */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
+      {/* 4. RENCANA BAB SELANJUTNYA */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div>
             <div className="flex items-center gap-1.5">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                 <Compass className="w-4 h-4 text-purple-500" />
-                <span>Rekomendasi Cabang Chapter Selanjutnya</span>
+                <span>Rencana Bab Selanjutnya</span>
               </h3>
               {!nextChapter ? (
                 <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-500 border border-amber-500/30">
@@ -516,7 +522,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
               )}
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-              Rekomendasi alur terstruktur yang sangat masuk akal berdasar peristiwa di bab ini
+              Tulis draft kasar ide bab baru atau biarkan AI merancang 3 opsi kesinambungan alur berdasar bab sebelumnya
             </p>
           </div>
 
@@ -529,15 +535,51 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
             {isGeneratingBranches ? (
               <>
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>Merancang Cabang...</span>
+                <span>Menganalisa Kesinambungan...</span>
               </>
             ) : (
               <>
                 <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                <span>Rancang 3 Cabang Plot ✨</span>
+                <span>Rancang Rencana Bab Selanjutnya ✨</span>
               </>
             )}
           </button>
+        </div>
+
+        {/* Spacious Expandable Rough Draft Input (Draft Kasar Rencana Bab) */}
+        <div className="bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 sm:p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-extrabold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+              <FileEdit className="w-3.5 h-3.5 text-indigo-500" />
+              <span>Draft Kasar / Ide Cerita Bab Berikutnya (Opsional):</span>
+            </label>
+            <span className="text-[10px] text-slate-400">
+              AI akan memverifikasi apakah alur melenceng dari bab sebelumnya
+            </span>
+          </div>
+
+          <textarea
+            value={roughDraft}
+            onChange={(e) => setRoughDraft(e.target.value)}
+            rows={4}
+            placeholder="Tulis ide kasar atau adegan yang kamu rencanakan untuk bab selanjutnya... (Contoh: Setelah kabur dari rumah, Arya dan Shinta bersembunyi di gudang tua pelabuhan, tapi mereka dikejar orang bertopeng...)"
+            className="w-full p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 shadow-inner resize-y min-h-[90px] leading-relaxed"
+          />
+
+          <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-0.5">
+            <span>
+              💡 Masukkan ide kasar agar AI mengembangkannya secara akurat sesuai kontinuitas bab sebelumnya.
+            </span>
+            {roughDraft.trim() && (
+              <button
+                type="button"
+                onClick={() => setRoughDraft('')}
+                className="text-[10px] text-rose-500 hover:underline flex-shrink-0"
+              >
+                Hapus Draft
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Existing next chapter quick link if available */}
@@ -589,9 +631,34 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
                   </span>
                 </div>
 
+                {/* Continuity Check Alert (Memeriksa apakah melenceng dari bab sebelumnya) */}
+                {b.continuityNote && (
+                  <div
+                    className={`p-2.5 rounded-2xl border text-xs flex items-start gap-2 ${
+                      b.isConsistentWithPrevious !== false
+                        ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-500/30 text-emerald-900 dark:text-emerald-300'
+                        : 'bg-amber-50/70 dark:bg-amber-950/20 border-amber-200 dark:border-amber-500/30 text-amber-900 dark:text-amber-300'
+                    }`}
+                  >
+                    {b.isConsistentWithPrevious !== false ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
+                    )}
+                    <div className="min-w-0 flex-1 leading-snug">
+                      <strong className="block text-[11px] font-extrabold uppercase">
+                        {b.isConsistentWithPrevious !== false
+                          ? 'Analisa Kesinambungan: Koheren dengan Bab Sebelumnya'
+                          : 'Catatan Koreksi Alur (Mencegah Melenceng):'}
+                      </strong>
+                      <span className="text-[11px]">{b.continuityNote}</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Premise */}
                 <div className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed bg-white/70 dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800/80">
-                  <span className="font-bold text-slate-900 dark:text-white block mb-0.5">Premis Cabang:</span>
+                  <span className="font-bold text-slate-900 dark:text-white block mb-0.5">Premis Rencana:</span>
                   <p>{b.premise}</p>
                 </div>
 
@@ -702,7 +769,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
           !nextChapter && (
             <div className="text-center py-6 px-4 bg-slate-50 dark:bg-slate-950/60 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
               <p className="text-xs text-slate-400">
-                Tekan tombol "Rancang 3 Cabang Plot" di atas untuk mendapatkan ide alur bab berikutnya dari AI.
+                Tekan tombol "Rancang Rencana Bab Selanjutnya" di atas untuk mendapatkan ide alur bab berikutnya yang berkesinambungan dari AI.
               </p>
             </div>
           )

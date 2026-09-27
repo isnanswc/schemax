@@ -43,6 +43,7 @@ import {
   getTensionColor,
   hashString
 } from '../../utils/tensionUtils';
+import { usePrivacy } from '../../contexts/PrivacyContext';
 
 interface RichTextEditorProps {
   chapter: StoryChapter;
@@ -61,6 +62,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   onChapterUpdated,
   onSwitchChapter,
 }) => {
+  const { getBlurTextClass, getBlurTitleClass, bindEmptyAreaLongPress } = usePrivacy();
   const editorRef = useRef<HTMLDivElement>(null);
   const [currentChapter, setCurrentChapter] = useState<StoryChapter>(chapter);
 
@@ -598,6 +600,7 @@ ${afterHtml}
 
   return (
     <div
+      {...bindEmptyAreaLongPress()}
       className={`fixed inset-0 z-50 bg-slate-50 dark:bg-slate-950 flex flex-col text-slate-900 dark:text-slate-100 h-[100dvh] overflow-hidden ${
         isFocusMode ? 'focus-mode' : ''
       }`}
@@ -617,10 +620,10 @@ ${afterHtml}
 
           {/* Book Title & Chapter Title Clearly Displayed */}
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] sm:text-xs text-amber-600 dark:text-amber-400 font-bold truncate leading-none mb-0.5">
+            <p className={`text-[10px] sm:text-xs text-amber-600 dark:text-amber-400 font-bold truncate leading-none mb-0.5 ${getBlurTitleClass()}`}>
               📖 {bookTitle}
             </p>
-            <h2 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
+            <h2 className={`text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate ${getBlurTitleClass()}`}>
               Bab {currentChapter.order}: {title || 'Bab Tanpa Judul'}
             </h2>
           </div>
@@ -741,7 +744,7 @@ ${afterHtml}
                 handleContentChange();
               }}
               placeholder="Judul Bab..."
-              className="w-full bg-transparent text-xl sm:text-2xl font-black text-slate-900 dark:text-white focus:outline-none placeholder:text-slate-400 border-none p-0 tracking-tight"
+              className={`w-full bg-transparent text-xl sm:text-2xl font-black text-slate-900 dark:text-white focus:outline-none placeholder:text-slate-400 border-none p-0 tracking-tight ${getBlurTitleClass()}`}
             />
           </div>
 
@@ -754,7 +757,7 @@ ${afterHtml}
             onKeyUp={checkActiveFormats}
             onMouseUp={checkActiveFormats}
             onClick={handleEditorClick}
-            className={`flex-1 min-h-[65vh] text-slate-800 dark:text-slate-200 leading-relaxed focus:outline-none ${
+            className={`flex-1 min-h-[65vh] text-slate-800 dark:text-slate-200 leading-relaxed focus:outline-none ${getBlurTextClass()} ${
               fontSize === 'sm'
                 ? 'text-sm sm:text-base'
                 : fontSize === 'lg'
