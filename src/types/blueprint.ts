@@ -1,6 +1,9 @@
 export interface BlueprintCharacter {
   name: string;
   role: string;
+  age?: string;
+  physicalTraits?: string;
+  traits?: string;
   shortDescription: string;
   want?: string;
   need?: string;
@@ -33,12 +36,25 @@ export interface BlueprintChapter {
   targetWordCount: number;
 }
 
+export interface StoryContinuationOption {
+  id: string;
+  title: string;
+  description: string;
+}
+
 export interface StoryBlueprint {
   title: string;
+  titleOptions?: string[];
+  firstChapterTitleOptions?: string[];
   genre: string;
   logline: string;
   synopsis: string;
   thematicCore: string;
+  storyContinuations?: StoryContinuationOption[];
+  selectedContinuation?: string;
+  writingStyle?: string;
+  pointOfView?: string;
+  settingTimeAndTone?: string;
   characters: BlueprintCharacter[];
   locations: BlueprintLocation[];
   items: BlueprintItem[];

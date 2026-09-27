@@ -340,41 +340,42 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
   return (
     <div className="space-y-4 pb-24">
       {/* Top World Mode Switcher: Ensiklopedia Kartu vs Auto-Map Relasi */}
-      <div className="flex items-center justify-between gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2 rounded-2xl shadow-sm">
-        <div className="flex items-center gap-1.5">
+      <div className="flex items-center justify-between gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2 rounded-2xl shadow-sm">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
           <button
             type="button"
             onClick={() => setWorldMode('list')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition active:scale-95 ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition active:scale-95 whitespace-nowrap flex-shrink-0 ${
               worldMode === 'list'
                 ? 'bg-amber-500 text-slate-950 shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <LayoutGrid className="w-4 h-4" />
+            <LayoutGrid className="w-4 h-4 flex-shrink-0" />
             <span>Ensiklopedia ({entities.length})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setWorldMode('automap')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition active:scale-95 ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition active:scale-95 whitespace-nowrap flex-shrink-0 ${
               worldMode === 'automap'
                 ? 'bg-gradient-to-r from-pink-500 to-rose-600 text-white shadow-md shadow-pink-500/20'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <GitFork className="w-4 h-4" />
-            <span>Peta Relasi & Faksi (Auto-Map)</span>
+            <GitFork className="w-4 h-4 flex-shrink-0" />
+            <span className="hidden sm:inline">Peta Relasi &amp; Faksi (Auto-Map)</span>
+            <span className="sm:hidden">Peta Relasi</span>
           </button>
         </div>
 
         {worldMode === 'list' && (
           <button
             onClick={handleOpenAddModal}
-            className="inline-flex items-center gap-1.5 py-2 px-3.5 bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 active:scale-95 text-white font-bold rounded-xl text-xs shadow-md shadow-pink-500/20 transition flex-shrink-0"
+            className="inline-flex items-center gap-1.5 py-2 px-2.5 sm:px-3.5 bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 active:scale-95 text-white font-bold rounded-xl text-xs shadow-md shadow-pink-500/20 transition flex-shrink-0"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 flex-shrink-0" />
             <span className="hidden sm:inline">Tambah Entitas</span>
           </button>
         )}

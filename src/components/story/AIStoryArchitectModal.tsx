@@ -11,12 +11,18 @@ import {
   CheckCircle2,
   AlertTriangle,
   ArrowRight,
-  Flame,
   RotateCcw,
+  Plus,
+  Trash2,
+  Check,
   Compass,
-  FileText
+  FileText,
+  Sliders,
+  Users,
+  Feather,
+  BookMarked
 } from 'lucide-react';
-import { StoryBlueprint } from '../../types/blueprint';
+import { StoryBlueprint, BlueprintCharacter, BlueprintLocation, BlueprintItem, BlueprintChapter } from '../../types/blueprint';
 import { Book } from '../../types';
 import { generateStoryBlueprint, seedBlueprintToDatabase } from '../../services/blueprintService';
 
@@ -35,44 +41,25 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
 }) => {
   const [step, setStep] = useState<'input' | 'review'>('input');
   const [rawIdea, setRawIdea] = useState('');
-  const [genre, setGenre] = useState('Fantasi Epik');
-  const [tone, setTone] = useState('Penuh Misteri & Menegangkan');
   const [isLoading, setIsLoading] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [blueprint, setBlueprint] = useState<StoryBlueprint | null>(null);
-  const [activeReviewTab, setActiveReviewTab] = useState<'synopsis' | 'characters' | 'world' | 'chapters'>('synopsis');
+
+  // Review Tabs: 'overview' | 'characters' | 'world' | 'chapters' | 'style'
+  const [activeReviewTab, setActiveReviewTab] = useState<'overview' | 'characters' | 'world' | 'chapters' | 'style'>('overview');
 
   if (!isOpen) return null;
 
-  const genres = [
-    'Fantasi Epik',
-    'Sci-Fi / Fiksi Ilmiah',
-    'Misteri & Detektif',
-    'Dark Fantasy',
-    'Cyberpunk',
-    'Romansa & Drama',
-    'Horor Supranatural',
-    'Petualangan Sejarah',
-  ];
-
-  const tones = [
-    'Penuh Misteri & Menegangkan',
-    'Dark, Gritty, & Realistis',
-    'Emosional & Mengharukan',
-    'Epik & Megah',
-    'Ringan, Cerdas, & Penuh Humor',
-  ];
-
   const examplePrompts = [
-    'Pemburu bayaran cyberpunk menemukan target terakhirnya adalah dirinya dari masa depan.',
-    'Ksatria amnesia terbangun di menara jam terapung purba yang waktunya membeku.',
-    'Seorang gadis penenun menemukan kain kafan yang bisa membalikkan takdir orang mati.',
+    'Menceritakan seorang pemuda bernama Agung yang menemukan cincin misterius. Dia membawa pulang cincin dan malapetaka terjadi: seluruh keluarganya hilang ingatan dan membuat hubungan mereka berantakan. Santi istri Agung sampai mengira Agung adalah maling di rumahnya.',
+    'Seorang detektif swasta di Jakarta menerima kasus orang hilang, namun korban yang hilang ternyata adalah dirinya sendiri dari 10 tahun yang lalu.',
+    'Di sebuah desa lereng gunung, seorang kakek pembuat wayang menemukan kayu keramat yang membuat karakter wayang buatannya hidup dan menuntut hak sebagai manusia.',
   ];
 
   const handleGenerate = async () => {
     if (!rawIdea.trim()) {
-      alert('Silakan masukkan ide atau premis cerita Anda.');
+      alert('Silakan tulis ide atau premis cerita Anda.');
       return;
     }
 
@@ -80,7 +67,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
     setError(null);
 
     try {
-      const generated = await generateStoryBlueprint(rawIdea, genre, tone);
+      const generated = await generateStoryBlueprint(rawIdea);
       setBlueprint(generated);
       setStep('review');
     } catch (err: any) {
@@ -105,16 +92,111 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
     }
   };
 
+  // Helper updater for Blueprint state
+  const updateBlueprint = (fields: Partial<StoryBlueprint>) => {
+    if (!blueprint) return;
+    setBlueprint({ ...blueprint, ...fields });
+  };
+
+  // Character mutations
+  const handleUpdateCharacter = (index: number, field: keyof BlueprintCharacter, value: any) => {
+    if (!blueprint) return;
+    const updated = [...blueprint.characters];
+    updated[index] = { ...updated[index], [field]: value };
+    updateBlueprint({ characters: updated });
+  };
+
+  const handleAddCharacter = () => {
+    if (!blueprint) return;
+    const newChar: BlueprintCharacter = {
+      name: 'Karakter Baru',
+      role: 'Pendukung / Keluarga',
+      age: '25 Tahun',
+      physicalTraits: 'Wajah ramah, perawakan sedang, busana kasual rapi.',
+      traits: 'Setia kawan, jujur, protektif terhadap orang tersayang.',
+      shortDescription: 'Anggota keluarga atau kerabat dekat yang terlibat dalam insiden.',
+      attributes: [{ label: 'Peran', value: 'Pendukung' }],
+      tags: ['Karakter'],
+    };
+    updateBlueprint({ characters: [...blueprint.characters, newChar] });
+  };
+
+  const handleDeleteCharacter = (index: number) => {
+    if (!blueprint) return;
+    const updated = blueprint.characters.filter((_, idx) => idx !== index);
+    updateBlueprint({ characters: updated });
+  };
+
+  // Location mutations
+  const handleUpdateLocation = (index: number, field: keyof BlueprintLocation, value: any) => {
+    if (!blueprint) return;
+    const updated = [...blueprint.locations];
+    updated[index] = { ...updated[index], [field]: value };
+    updateBlueprint({ locations: updated });
+  };
+
+  const handleAddLocation = () => {
+    if (!blueprint) return;
+    const newLoc: BlueprintLocation = {
+      name: 'Lokasi Baru',
+      shortDescription: 'Deskripsi suasana dan detail lokasi.',
+      detailedNotes: 'Catatan rahasia atau bahaya yang ada di lokasi ini.',
+      attributes: [{ label: 'Tipe', value: 'Tempat Utama' }],
+      tags: ['Lokasi'],
+    };
+    updateBlueprint({ locations: [...blueprint.locations, newLoc] });
+  };
+
+  const handleDeleteLocation = (index: number) => {
+    if (!blueprint) return;
+    const updated = blueprint.locations.filter((_, idx) => idx !== index);
+    updateBlueprint({ locations: updated });
+  };
+
+  // Item mutations
+  const handleUpdateItem = (index: number, field: keyof BlueprintItem, value: any) => {
+    if (!blueprint) return;
+    const updated = [...blueprint.items];
+    updated[index] = { ...updated[index], [field]: value };
+    updateBlueprint({ items: updated });
+  };
+
+  const handleAddItem = () => {
+    if (!blueprint) return;
+    const newItem: BlueprintItem = {
+      name: 'Item / Artefak Baru',
+      shortDescription: 'Fungsi atau efek anomali dari barang ini.',
+      detailedNotes: 'Asal usul dan konsekuensi penggunaannya.',
+      attributes: [{ label: 'Jenis', value: 'Benda Misterius' }],
+      tags: ['Relik'],
+    };
+    updateBlueprint({ items: [...blueprint.items, newItem] });
+  };
+
+  const handleDeleteItem = (index: number) => {
+    if (!blueprint) return;
+    const updated = blueprint.items.filter((_, idx) => idx !== index);
+    updateBlueprint({ items: updated });
+  };
+
+  // Chapter mutations
+  const handleUpdateChapter = (index: number, field: keyof BlueprintChapter, value: any) => {
+    if (!blueprint) return;
+    const updated = [...blueprint.chapters];
+    updated[index] = { ...updated[index], [field]: value };
+    updateBlueprint({ chapters: updated });
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-900/40 dark:bg-black/80 backdrop-blur-md transition-opacity animate-in fade-in duration-200"
+        className="fixed inset-0 bg-slate-900/50 dark:bg-black/80 backdrop-blur-md transition-opacity animate-in fade-in duration-200"
         onClick={onClose}
       />
 
       {/* Main Container */}
-      <div className="relative w-full sm:max-w-2xl bg-white dark:bg-slate-900 border-t sm:border border-slate-200 dark:border-slate-800 rounded-t-3xl sm:rounded-3xl shadow-2xl z-10 max-h-[94vh] flex flex-col animate-in slide-in-from-bottom duration-250 safe-bottom">
+      <div className="relative w-full sm:max-w-3xl bg-white dark:bg-slate-900 border-t sm:border border-slate-200 dark:border-slate-800 rounded-t-3xl sm:rounded-3xl shadow-2xl z-10 max-h-[95vh] flex flex-col animate-in slide-in-from-bottom duration-250 safe-bottom">
         {/* Swipe Handle for Mobile */}
         <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700/80 rounded-full mx-auto mt-3 mb-1 sm:hidden flex-shrink-0" />
 
@@ -130,11 +212,11 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                   AI Story Architect
                 </h3>
                 <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 uppercase">
-                  Planning
+                  Novel Engine
                 </span>
               </div>
               <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400">
-                Ubah 1 ide kasar jadi Blueprint Novel & Worldbuilding lengkap
+                Tulis 1 ide premis kasar ➔ AI merancang Judul, Karakter, Latar, &amp; Story Plot Bab
               </p>
             </div>
           </div>
@@ -147,89 +229,54 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
           </button>
         </div>
 
-        {/* STEP 1: FORMULIR INPUT */}
+        {/* ========================================================================= */}
+        {/* STEP 1: FORMULIR INPUT PREMIS MENTAH                                      */}
+        {/* ========================================================================= */}
         {step === 'input' && (
-          <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 no-scrollbar">
-            {/* Raw Idea Input */}
-            <div>
-              <label className="text-[11px] font-extrabold uppercase tracking-wider text-amber-700 dark:text-amber-400 block mb-1.5">
-                Ide / Premis Mentah Ceritamu:
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 no-scrollbar">
+            <div className="space-y-2">
+              <label className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <Feather className="w-4 h-4 text-amber-500" />
+                <span>Tuliskan Ide / Premis Ceritamu Bebas:</span>
               </label>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                Ceritakan siapa tokohnya, apa yang dia temukan atau alami, konflik keluarga/dunianya, dan petaka apa yang terjadi. AI akan otomatis menganalisa relasi keluarga, ciri fisik, umur, watak, serta plot ceritanya.
+              </p>
+
               <textarea
-                rows={4}
+                rows={6}
                 value={rawIdea}
                 onChange={(e) => setRawIdea(e.target.value)}
-                placeholder="Tulis ide atau premis kasarmu di sini (cukup 1-2 kalimat)..."
-                className="w-full p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs sm:text-sm text-slate-900 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-amber-400 leading-relaxed resize-none shadow-inner"
+                placeholder="Contoh: Menceritakan seorang pemuda yang bernama Agung, yang menemukan cincin misterius. Dia membawa pulang cincin dan malapetaka terjadi: seluruh keluarganya hilang ingatan dan membuat hubungan mereka berantakan, Santi istri Agung sampai mengira Agung adalah maling di rumahnya..."
+                className="w-full p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-amber-500 leading-relaxed resize-none shadow-inner"
               />
-
-              {/* Quick Preset Examples */}
-              <div className="mt-2 space-y-1">
-                <span className="text-[10px] text-slate-500 font-bold block">
-                  💡 Atau coba contoh ide ini:
-                </span>
-                <div className="flex flex-col gap-1">
-                  {examplePrompts.map((ex, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => setRawIdea(ex)}
-                      className="text-left text-[11px] text-slate-600 dark:text-slate-400 hover:text-amber-700 dark:hover:text-amber-300 bg-slate-100/70 dark:bg-slate-950/60 p-2 rounded-xl border border-slate-200 dark:border-slate-800/80 transition truncate"
-                    >
-                      "{ex}"
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
 
-            {/* Genre Selection Chips */}
-            <div>
-              <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600 dark:text-slate-400 block mb-1.5">
-                Pilih Genre Utama:
-              </label>
-              <div className="flex flex-wrap gap-1.5">
-                {genres.map((g) => (
+            {/* Quick Inspiration Templates */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1">
+                <span>💡 Contoh Ide Siap Coba:</span>
+              </span>
+              <div className="flex flex-col gap-1.5">
+                {examplePrompts.map((ex, i) => (
                   <button
-                    key={g}
+                    key={i}
                     type="button"
-                    onClick={() => setGenre(g)}
-                    className={`py-1.5 px-3 rounded-xl text-xs font-semibold transition active:scale-95 ${
-                      genre === g
-                        ? 'bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20'
-                        : 'bg-slate-100 dark:bg-slate-950 text-slate-700 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-800'
-                    }`}
+                    onClick={() => setRawIdea(ex)}
+                    className="text-left text-[11px] text-slate-600 dark:text-slate-300 hover:text-amber-800 dark:hover:text-amber-300 bg-slate-100/80 dark:bg-slate-950/60 hover:bg-amber-500/10 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 transition line-clamp-2"
                   >
-                    {g}
+                    "{ex}"
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Tone Selection */}
-            <div>
-              <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600 dark:text-slate-400 block mb-1.5">
-                Nada & Suasana Cerita (Tone):
-              </label>
-              <select
-                value={tone}
-                onChange={(e) => setTone(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400 font-semibold"
-              >
-                {tones.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Error Message */}
+            {/* Error Notification */}
             {error && (
-              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-2xl text-xs text-red-600 dark:text-red-300 space-y-1">
+              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-2xl text-xs text-red-600 dark:text-red-300 space-y-1 animate-in fade-in">
                 <div className="flex items-center gap-1.5 font-bold text-red-600 dark:text-red-400">
                   <AlertTriangle className="w-4 h-4" />
-                  <span>Gagal Memproses Ide</span>
+                  <span>Gagal Menganalisa Premis</span>
                 </div>
                 <p className="text-[11px]">{error}</p>
                 <button
@@ -242,221 +289,555 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
               </div>
             )}
 
-            {/* Generate Action Button */}
-            <button
-              type="button"
-              onClick={handleGenerate}
-              disabled={isLoading || !rawIdea.trim()}
-              className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-indigo-600 hover:opacity-95 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-amber-500/20 active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {isLoading ? (
-                <>
-                  <Zap className="w-4 h-4 animate-spin text-slate-950" />
-                  <span>Merancang Sinopsis, Karakter, & Bab...</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 text-slate-950" />
-                  <span>Mulai Rancang Arsitektur Cerita ✨</span>
-                </>
-              )}
-            </button>
+            {/* Action Button */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleGenerate}
+                disabled={isLoading || !rawIdea.trim()}
+                className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-indigo-600 hover:opacity-95 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-amber-500/20 active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isLoading ? (
+                  <>
+                    <Zap className="w-4 h-4 animate-spin text-slate-950" />
+                    <span>Menganalisa Cerita, Karakter &amp; Plot...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 text-slate-950" />
+                    <span>Analisa &amp; Rancang Cerita Lengkap ✨</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         )}
 
-        {/* STEP 2: REVIEW & SEED BLUEPRINT */}
+        {/* ========================================================================= */}
+        {/* STEP 2: REVIEW, EDIT SEMUA FIELD & BUAT PLOT BUKU BARU                    */}
+        {/* ========================================================================= */}
         {step === 'review' && blueprint && (
           <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 no-scrollbar">
-            {/* Title & Logline Hero Banner */}
-            <div className="bg-gradient-to-r from-amber-500/10 via-amber-50/50 dark:via-slate-950 to-indigo-500/10 border border-amber-300/80 dark:border-amber-500/30 rounded-2xl p-4 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/40">
-                  {blueprint.genre}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setStep('input')}
-                  className="text-[11px] text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white flex items-center gap-1"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  <span>Ubah Ide</span>
-                </button>
-              </div>
-
-              <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white leading-tight">
-                {blueprint.title}
-              </h2>
-
-              <p className="text-xs text-amber-800 dark:text-amber-200/90 italic leading-relaxed">
-                "{blueprint.logline}"
-              </p>
-            </div>
-
-            {/* Review Segmented Tabs */}
-            <div className="grid grid-cols-4 gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-2xl border border-slate-200 dark:border-slate-800">
+            {/* Top Return & Summary Card */}
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
               <button
                 type="button"
-                onClick={() => setActiveReviewTab('synopsis')}
-                className={`py-1.5 px-2 rounded-xl text-[11px] font-bold transition truncate ${
-                  activeReviewTab === 'synopsis'
+                onClick={() => setStep('input')}
+                className="text-xs font-bold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white flex items-center gap-1.5 transition"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Ubah Ide Mentah</span>
+              </button>
+              <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/30">
+                Blueprint Teranalisa ✨
+              </span>
+            </div>
+
+            {/* 1. SELEKSI JUDUL BUKU & BAB PERTAMA */}
+            <div className="p-3.5 rounded-2xl bg-gradient-to-br from-amber-500/10 via-slate-50 to-indigo-500/10 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950/30 border border-amber-500/30 space-y-2.5">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-700 dark:text-amber-400 block">
+                1. Pilihan Judul Buku (Bisa Anda Pilih / Ketik):
+              </span>
+
+              {blueprint.titleOptions && blueprint.titleOptions.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {blueprint.titleOptions.map((opt, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => updateBlueprint({ title: opt })}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                        blueprint.title === opt
+                          ? 'bg-amber-500 text-slate-950 shadow-sm'
+                          : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-amber-400'
+                      }`}
+                    >
+                      {blueprint.title === opt && <Check className="w-3 h-3" />}
+                      <span>{opt}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Editable Title Input */}
+              <input
+                type="text"
+                value={blueprint.title}
+                onChange={(e) => updateBlueprint({ title: e.target.value })}
+                placeholder="Judul Buku..."
+                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-bold text-slate-900 dark:text-white focus:outline-none focus:border-amber-500 shadow-sm"
+              />
+            </div>
+
+            {/* Review Navigation Segmented Tabs */}
+            <div className="grid grid-cols-5 gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-2xl border border-slate-200 dark:border-slate-800 text-[10px] sm:text-xs">
+              <button
+                type="button"
+                onClick={() => setActiveReviewTab('overview')}
+                className={`py-1.5 px-1 sm:px-2 rounded-xl font-bold transition truncate text-center ${
+                  activeReviewTab === 'overview'
                     ? 'bg-amber-500 text-slate-950 shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-white'
                 }`}
               >
-                Sinopsis
+                Alur &amp; Opsi
               </button>
               <button
                 type="button"
                 onClick={() => setActiveReviewTab('characters')}
-                className={`py-1.5 px-2 rounded-xl text-[11px] font-bold transition truncate ${
+                className={`py-1.5 px-1 sm:px-2 rounded-xl font-bold transition truncate text-center ${
                   activeReviewTab === 'characters'
                     ? 'bg-pink-500 text-white shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-white'
                 }`}
               >
-                Tokoh ({blueprint.characters.length})
+                Karakter ({blueprint.characters.length})
               </button>
               <button
                 type="button"
                 onClick={() => setActiveReviewTab('world')}
-                className={`py-1.5 px-2 rounded-xl text-[11px] font-bold transition truncate ${
+                className={`py-1.5 px-1 sm:px-2 rounded-xl font-bold transition truncate text-center ${
                   activeReviewTab === 'world'
                     ? 'bg-cyan-500 text-slate-950 shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-white'
                 }`}
               >
-                Latar & Relik
+                Alat &amp; Latar
               </button>
               <button
                 type="button"
                 onClick={() => setActiveReviewTab('chapters')}
-                className={`py-1.5 px-2 rounded-xl text-[11px] font-bold transition truncate ${
+                className={`py-1.5 px-1 sm:px-2 rounded-xl font-bold transition truncate text-center ${
                   activeReviewTab === 'chapters'
                     ? 'bg-indigo-500 text-white shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-white'
                 }`}
               >
                 Bab ({blueprint.chapters.length})
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveReviewTab('style')}
+                className={`py-1.5 px-1 sm:px-2 rounded-xl font-bold transition truncate text-center ${
+                  activeReviewTab === 'style'
+                    ? 'bg-purple-600 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-white'
+                }`}
+              >
+                Gaya &amp; POV
+              </button>
             </div>
 
-            {/* TAB CONTENT: SYNOPSIS */}
-            {activeReviewTab === 'synopsis' && (
-              <div className="space-y-3 bg-slate-50 dark:bg-slate-950/70 p-4 rounded-2xl border border-slate-200 dark:border-slate-800/80 text-xs text-slate-800 dark:text-slate-200 animate-in fade-in">
-                <div>
-                  <span className="text-[10px] font-bold uppercase text-amber-700 dark:text-amber-400 block mb-1">
-                    Tema Filosofis Sentral:
+            {/* ========================================================================= */}
+            {/* TAB 1: OVERVIEW, SINOPSIS & PILIHAN LANJUTAN ALUR                          */}
+            {/* ========================================================================= */}
+            {activeReviewTab === 'overview' && (
+              <div className="space-y-3.5 animate-in fade-in text-xs">
+                {/* Synopsis Editor */}
+                <div className="space-y-1.5 bg-slate-50 dark:bg-slate-950/70 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800">
+                  <span className="text-[10px] font-extrabold uppercase text-amber-700 dark:text-amber-400 block">
+                    Sinopsis Cerita Inti:
                   </span>
-                  <p className="text-slate-700 dark:text-slate-300 font-medium italic">
-                    "{blueprint.thematicCore}"
-                  </p>
+                  <textarea
+                    rows={4}
+                    value={blueprint.synopsis}
+                    onChange={(e) => updateBlueprint({ synopsis: e.target.value })}
+                    className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 leading-relaxed focus:outline-none focus:border-amber-400 resize-none"
+                  />
                 </div>
 
-                <div className="pt-2 border-t border-slate-200 dark:border-slate-800/80">
-                  <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 block mb-1.5">
-                    Alur Cerita Menyeluruh:
-                  </span>
-                  <p className="text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line text-justify">
-                    {blueprint.synopsis}
-                  </p>
-                </div>
+                {/* Multiple Story Continuations Options */}
+                {blueprint.storyContinuations && blueprint.storyContinuations.length > 0 && (
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-extrabold uppercase text-slate-700 dark:text-slate-300 block">
+                      Pilihan Arah Lanjutan Cerita (Klik untuk Memilih):
+                    </span>
+                    <div className="space-y-2">
+                      {blueprint.storyContinuations.map((opt) => {
+                        const isSelected = blueprint.selectedContinuation === `${opt.title}: ${opt.description}`;
+                        return (
+                          <div
+                            key={opt.id}
+                            onClick={() =>
+                              updateBlueprint({
+                                selectedContinuation: `${opt.title}: ${opt.description}`,
+                              })
+                            }
+                            className={`p-3 rounded-2xl border transition cursor-pointer ${
+                              isSelected
+                                ? 'bg-amber-500/10 border-amber-500/80 shadow-xs'
+                                : 'bg-slate-50 dark:bg-slate-950/60 border-slate-200 dark:border-slate-800 hover:border-amber-400'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-extrabold text-xs text-slate-900 dark:text-white flex items-center gap-1.5">
+                                <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] ${isSelected ? 'bg-amber-500 text-slate-950 font-black' : 'border border-slate-400'}`}>
+                                  {isSelected && '✓'}
+                                </span>
+                                <span>{opt.title}</span>
+                              </span>
+                              {isSelected && (
+                                <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/20 px-2 py-0.5 rounded-md">
+                                  Terpilih
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed pl-5">
+                              {opt.description}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* TAB CONTENT: CHARACTERS */}
+            {/* ========================================================================= */}
+            {/* TAB 2: KARAKTER LENGKAP: UMUR, CIRI FISIK, SIFAT & WATAK                    */}
+            {/* ========================================================================= */}
             {activeReviewTab === 'characters' && (
-              <div className="space-y-2.5 animate-in fade-in">
+              <div className="space-y-3 animate-in fade-in">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400">
+                    Daftar Karakter &amp; Dinamika Keluarga (Dapat Diedit/Ditambah):
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleAddCharacter}
+                    className="py-1 px-2.5 rounded-xl bg-pink-500/15 hover:bg-pink-500/25 text-pink-600 dark:text-pink-300 text-xs font-bold transition flex items-center gap-1 active:scale-95"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Tambah Karakter</span>
+                  </button>
+                </div>
+
                 {blueprint.characters.map((char, i) => (
                   <div
                     key={i}
-                    className="bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 space-y-2"
+                    className="bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 space-y-2.5"
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="w-7 h-7 rounded-xl bg-pink-500/20 text-pink-600 dark:text-pink-400 flex items-center justify-center font-bold text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span className="w-6 h-6 rounded-lg bg-pink-500/20 text-pink-600 dark:text-pink-400 flex items-center justify-center font-bold text-xs flex-shrink-0">
                           {i + 1}
                         </span>
-                        <div>
-                          <h4 className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">{char.name}</h4>
-                          <span className="text-[10px] text-pink-600 dark:text-pink-400 font-semibold">{char.role}</span>
-                        </div>
+                        <input
+                          type="text"
+                          value={char.name}
+                          onChange={(e) => handleUpdateCharacter(i, 'name', e.target.value)}
+                          placeholder="Nama Karakter"
+                          className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 px-1 py-0.5 focus:outline-none focus:border-pink-500 flex-1 min-w-0"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <input
+                          type="text"
+                          value={char.role || ''}
+                          onChange={(e) => handleUpdateCharacter(i, 'role', e.target.value)}
+                          placeholder="Peran (misal: Suami/Istri)"
+                          className="text-[10px] font-bold text-pink-600 dark:text-pink-400 bg-pink-500/10 px-2 py-0.5 rounded-md border border-pink-500/20 focus:outline-none max-w-[120px]"
+                        />
+                        {blueprint.characters.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCharacter(i)}
+                            className="p-1 text-slate-400 hover:text-red-500 transition"
+                            title="Hapus Karakter"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     </div>
 
-                    <p className="text-xs text-slate-700 dark:text-slate-300 leading-snug">{char.shortDescription}</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      {/* Usia & Peran */}
+                      <div>
+                        <label className="text-[10px] font-bold uppercase text-slate-500 block mb-0.5">
+                          Perkiraan Usia:
+                        </label>
+                        <input
+                          type="text"
+                          value={char.age || ''}
+                          onChange={(e) => handleUpdateCharacter(i, 'age', e.target.value)}
+                          placeholder="Contoh: 28 Tahun"
+                          className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-pink-400"
+                        />
+                      </div>
 
-                    {/* Psychological Want vs Need */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1 text-[11px]">
-                      {char.want && (
-                        <div className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800">
-                          <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 block">Ingin (Want):</span>
-                          <span className="text-slate-700 dark:text-slate-300">{char.want}</span>
-                        </div>
-                      )}
-                      {char.need && (
-                        <div className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800">
-                          <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 block">Butuh (Need):</span>
-                          <span className="text-slate-700 dark:text-slate-300">{char.need}</span>
-                        </div>
-                      )}
+                      {/* Deskripsi Singkat */}
+                      <div>
+                        <label className="text-[10px] font-bold uppercase text-slate-500 block mb-0.5">
+                          Peran / Hubungan:
+                        </label>
+                        <input
+                          type="text"
+                          value={char.shortDescription || ''}
+                          onChange={(e) => handleUpdateCharacter(i, 'shortDescription', e.target.value)}
+                          placeholder="Contoh: Kepala keluarga yang mengalami musibah cincin"
+                          className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-pink-400"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Ciri-Ciri Fisik */}
+                    <div>
+                      <label className="text-[10px] font-bold uppercase text-amber-700 dark:text-amber-400 block mb-0.5">
+                        👤 Ciri-Ciri Fisik (Wajah, Postur, Rambut &amp; Busana):
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={char.physicalTraits || ''}
+                        onChange={(e) => handleUpdateCharacter(i, 'physicalTraits', e.target.value)}
+                        placeholder="Contoh: Pria berwajah ramah khas nusantara, kulit sawo matang, rambut pendek ikal, mengenakan jaket katun lusuh..."
+                        className="w-full p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-amber-400 resize-none leading-relaxed"
+                      />
+                    </div>
+
+                    {/* Sifat & Watak */}
+                    <div>
+                      <label className="text-[10px] font-bold uppercase text-emerald-700 dark:text-emerald-400 block mb-0.5">
+                        ⚡ Sifat &amp; Watak Kepribadian:
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={char.traits || ''}
+                        onChange={(e) => handleUpdateCharacter(i, 'traits', e.target.value)}
+                        placeholder="Contoh: Penyayang, pekerja keras, mudah cemas, keras kepala saat mempertahankan kebenaran..."
+                        className="w-full p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-400 resize-none leading-relaxed"
+                      />
                     </div>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* TAB CONTENT: WORLD & RELICS */}
+            {/* ========================================================================= */}
+            {/* TAB 3: ALAT (ITEM/RELIK) & TEMPAT (LOKASI)                                */}
+            {/* ========================================================================= */}
             {activeReviewTab === 'world' && (
-              <div className="space-y-2.5 animate-in fade-in">
-                {/* Locations */}
-                {blueprint.locations.map((loc, i) => (
-                  <div key={i} className="bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 space-y-1">
-                    <div className="flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
-                      <h4 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white">{loc.name}</h4>
-                    </div>
-                    <p className="text-xs text-slate-700 dark:text-slate-300 leading-snug">{loc.shortDescription}</p>
-                    {loc.detailedNotes && (
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 italic pt-1">{loc.detailedNotes}</p>
-                    )}
+              <div className="space-y-4 animate-in fade-in text-xs">
+                {/* Items Section */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-extrabold text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                      <Shield className="w-4 h-4" />
+                      <span>Alat / Item / Artefak Misterius:</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleAddItem}
+                      className="py-1 px-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 font-bold text-[11px] transition flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Tambah Item</span>
+                    </button>
                   </div>
-                ))}
 
-                {/* Items */}
-                {blueprint.items.map((itm, i) => (
-                  <div key={i} className="bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 space-y-1">
-                    <div className="flex items-center gap-1.5">
-                      <Shield className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                      <h4 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white">{itm.name}</h4>
+                  {blueprint.items.map((itm, i) => (
+                    <div key={i} className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <input
+                          type="text"
+                          value={itm.name}
+                          onChange={(e) => handleUpdateItem(i, 'name', e.target.value)}
+                          placeholder="Nama Item"
+                          className="font-bold text-xs text-slate-900 dark:text-white bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 px-1 py-0.5 focus:outline-none focus:border-amber-500 flex-1"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteItem(i)}
+                          className="p-1 text-slate-400 hover:text-red-500 transition"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <textarea
+                        rows={2}
+                        value={itm.shortDescription}
+                        onChange={(e) => handleUpdateItem(i, 'shortDescription', e.target.value)}
+                        placeholder="Efek, kutukan, atau dampak artefak terhadap cerita..."
+                        className="w-full p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 resize-none focus:outline-none focus:border-amber-400"
+                      />
                     </div>
-                    <p className="text-xs text-slate-700 dark:text-slate-300 leading-snug">{itm.shortDescription}</p>
+                  ))}
+                </div>
+
+                {/* Locations Section */}
+                <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <span className="font-extrabold text-cyan-600 dark:text-cyan-400 flex items-center gap-1.5">
+                      <MapPin className="w-4 h-4" />
+                      <span>Tempat / Lokasi Cerita:</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleAddLocation}
+                      className="py-1 px-2.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-600 dark:text-cyan-300 font-bold text-[11px] transition flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Tambah Tempat</span>
+                    </button>
                   </div>
-                ))}
+
+                  {blueprint.locations.map((loc, i) => (
+                    <div key={i} className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <input
+                          type="text"
+                          value={loc.name}
+                          onChange={(e) => handleUpdateLocation(i, 'name', e.target.value)}
+                          placeholder="Nama Lokasi"
+                          className="font-bold text-xs text-slate-900 dark:text-white bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 px-1 py-0.5 focus:outline-none focus:border-cyan-500 flex-1"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteLocation(i)}
+                          className="p-1 text-slate-400 hover:text-red-500 transition"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <textarea
+                        rows={2}
+                        value={loc.shortDescription}
+                        onChange={(e) => handleUpdateLocation(i, 'shortDescription', e.target.value)}
+                        placeholder="Deskripsi suasana dan detail lokasi..."
+                        className="w-full p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 resize-none focus:outline-none focus:border-cyan-400"
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
-            {/* TAB CONTENT: CHAPTERS */}
+            {/* ========================================================================= */}
+            {/* TAB 4: RANCANGAN BAB & STORY PLOT AWAL                                    */}
+            {/* ========================================================================= */}
             {activeReviewTab === 'chapters' && (
-              <div className="space-y-2 animate-in fade-in">
+              <div className="space-y-3 animate-in fade-in text-xs">
+                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block px-1">
+                  Rencana Bab Pembuka (Plot otomatis terisi saat buku dibuat):
+                </span>
+
                 {blueprint.chapters.map((chap, i) => (
-                  <div key={i} className="bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 space-y-1.5">
+                  <div key={i} className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-700 dark:text-indigo-300">
                         Bab {chap.order || i + 1}
                       </span>
-                      <span className="text-[10px] text-slate-500">
-                        Target ~{chap.targetWordCount || 1800} kata
+                      <span className="text-[10px] text-slate-400">
+                        Target {chap.targetWordCount || 1800} kata
                       </span>
                     </div>
 
-                    <h4 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white">{chap.title}</h4>
-                    <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">{chap.premise}</p>
+                    <input
+                      type="text"
+                      value={chap.title}
+                      onChange={(e) => handleUpdateChapter(i, 'title', e.target.value)}
+                      placeholder="Judul Bab..."
+                      className="w-full font-bold text-xs sm:text-sm text-slate-900 dark:text-white bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 shadow-sm"
+                    />
+
+                    <div>
+                      <label className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 block mb-0.5">
+                        Alur Story Plot Adegan:
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={chap.premise}
+                        onChange={(e) => handleUpdateChapter(i, 'premise', e.target.value)}
+                        placeholder="Poin-poin kejadian yang terjadi di bab ini..."
+                        className="w-full p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 leading-relaxed resize-none focus:outline-none focus:border-indigo-400"
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Final Build Project Button */}
+            {/* ========================================================================= */}
+            {/* TAB 5: GAYA PENULISAN & SUDUT PANDANG (POV)                                */}
+            {/* ========================================================================= */}
+            {activeReviewTab === 'style' && (
+              <div className="space-y-3.5 animate-in fade-in text-xs">
+                {/* Point of View */}
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 space-y-2">
+                  <label className="text-[11px] font-extrabold uppercase text-purple-700 dark:text-purple-400 block">
+                    Sudut Pandang (Point of View):
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {[
+                      'Orang Ketiga Terbatas (Menyorot Tokoh Utama)',
+                      'Orang Pertama (POV Protagonis - "Aku")',
+                      'Orang Ketiga Mahatahu (Omniscient)',
+                    ].map((pov) => (
+                      <button
+                        key={pov}
+                        type="button"
+                        onClick={() => updateBlueprint({ pointOfView: pov })}
+                        className={`p-2.5 rounded-xl border text-left text-[11px] font-bold transition ${
+                          blueprint.pointOfView === pov
+                            ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-purple-400'
+                        }`}
+                      >
+                        {pov}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Writing Style */}
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 space-y-2">
+                  <label className="text-[11px] font-extrabold uppercase text-purple-700 dark:text-purple-400 block">
+                    Gaya Penulisan &amp; Diksi:
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {[
+                      'Emosional, Penuh Ketegangan Batin & Realistis',
+                      'Sastra Puitis, Deskriptif Panca Indera & Dialog Berbobot',
+                      'Cepat, Lugas, Menghanyutkan & Mengalir (Page Turner)',
+                      'Nuansa Gelap (Dark & Gritty) Penuh Intrik Supranatural',
+                    ].map((st) => (
+                      <button
+                        key={st}
+                        type="button"
+                        onClick={() => updateBlueprint({ writingStyle: st })}
+                        className={`p-2.5 rounded-xl border text-left text-[11px] font-bold transition ${
+                          blueprint.writingStyle === st
+                            ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-purple-400'
+                        }`}
+                      >
+                        {st}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Genre & Setting notes */}
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 space-y-2">
+                  <label className="text-[11px] font-extrabold uppercase text-slate-700 dark:text-slate-300 block">
+                    Latar Budaya &amp; Nuansa Dunia:
+                  </label>
+                  <input
+                    type="text"
+                    value={blueprint.settingTimeAndTone || ''}
+                    onChange={(e) => updateBlueprint({ settingTimeAndTone: e.target.value })}
+                    placeholder="Contoh: Indonesia Kontemporer / Realitas Lokal bernuansa Misteri Hangat"
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-purple-400"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* CTA BUTTON: BANGUN BUKU & STORY PLOT KE DATABASE                          */}
+            {/* ========================================================================= */}
             <div className="pt-2">
               <button
                 type="button"
@@ -467,17 +848,17 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                 {isSeeding ? (
                   <>
                     <Zap className="w-4 h-4 animate-spin text-slate-950" />
-                    <span>Membangun Buku, Karakter, & Bab ke Database...</span>
+                    <span>Membangun Buku, Karakter &amp; Story Plot...</span>
                   </>
                 ) : (
                   <>
                     <Rocket className="w-4 h-4 text-slate-950" />
-                    <span>🚀 Bangun Proyek Cerita Sekarang!</span>
+                    <span>Membuat Plot &amp; Bangun Buku Baru 🚀</span>
                   </>
                 )}
               </button>
               <p className="text-[10px] text-slate-500 text-center mt-1.5">
-                Semua karakter, lokasi, dan bab otomatis tersimpan di IndexedDB lokal Anda.
+                Buku baru akan dibuat bersama entitas ensiklopedia dan Story Plot bab yang sudah terisi.
               </p>
             </div>
           </div>

@@ -39,6 +39,24 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
 
   const activeEntity = currentEntity || entity;
   const { url } = useMediaUrl(activeEntity?.avatarMediaId);
+  const [activeTab, setActiveTab] = useState<'info' | 'traits' | 'physical' | 'relations' | 'chronology'>('info');
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopyFeedback(label);
+    setTimeout(() => setCopyFeedback(null), 2000);
+  };
+
+  const getEffectiveVisualPrompt = () => {
+    if (!activeEntity) return '';
+    if (activeEntity.visualPrompt) return activeEntity.visualPrompt;
+    const genderTerm = activeEntity.tags?.some((t) => t.toLowerCase() === 'wanita' || t.toLowerCase() === 'perempuan')
+      ? 'Indonesian woman'
+      : 'Indonesian character';
+    const physicalDesc = activeEntity.physicalTraits || activeEntity.shortDescription || 'standing upright, natural appearance';
+    return `Full body portrait standing upright, centered, ${genderTerm}, ${physicalDesc}, hyper realistic, 8k resolution, cinematic lighting, photorealistic textures, 9:16 aspect ratio`;
+  };
 
   if (!isOpen || !activeEntity) return null;
 
@@ -147,158 +165,290 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
           </button>
         </div>
 
-        {/* Scrollable Body Content */}
-        <div className="flex-1 overflow-y-auto pr-1 space-y-4">
-
-        {/* Condition Note if specified */}
-        {activeEntity.conditionDetails && (
-          <div className="mb-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-600 dark:text-amber-300">
-            <strong>Kondisi Saat Ini:</strong> {activeEntity.conditionDetails}
-          </div>
-        )}
-
-        {/* Karakteristik & Dinamika Evolusi Sifat */}
-        {(activeEntity.initialTraits || activeEntity.currentTraits || activeEntity.initialDescription || activeEntity.currentDescription || activeEntity.evolutionSummary) && (
-          <div className="mb-3.5 p-3.5 rounded-2xl bg-gradient-to-br from-slate-50 via-slate-100/50 to-amber-500/5 dark:from-slate-950/80 dark:via-slate-900/60 dark:to-amber-500/10 border border-slate-200 dark:border-slate-800 space-y-3">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-slate-200">
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>Dinamika Sifat &amp; Perkembangan Entitas</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {/* Kolom Sifat Awal */}
-              <div className="p-3 rounded-xl bg-white dark:bg-slate-900/90 border border-emerald-500/20 shadow-xs space-y-1.5">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                  🌱 Sifat &amp; Latar Awal
-                </span>
-                {activeEntity.initialTraits && (
-                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-snug">
-                    {activeEntity.initialTraits}
-                  </p>
-                )}
-                {activeEntity.initialDescription && (
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed italic">
-                    {activeEntity.initialDescription}
-                  </p>
-                )}
-                {!activeEntity.initialTraits && !activeEntity.initialDescription && (
-                  <p className="text-[11px] text-slate-400 italic">Belum ada catatan sifat awal.</p>
-                )}
-              </div>
-
-              {/* Kolom Sifat Saat Ini */}
-              <div className="p-3 rounded-xl bg-white dark:bg-slate-900/90 border border-amber-500/20 shadow-xs space-y-1.5">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                  ⚡ Sifat &amp; Kondisi Terkini
-                </span>
-                {activeEntity.currentTraits && (
-                  <p className="text-xs font-bold text-slate-900 dark:text-white leading-snug">
-                    {activeEntity.currentTraits}
-                  </p>
-                )}
-                {activeEntity.currentDescription && (
-                  <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                    {activeEntity.currentDescription}
-                  </p>
-                )}
-                {!activeEntity.currentTraits && !activeEntity.currentDescription && (
-                  <p className="text-[11px] text-slate-400 italic">Belum ada catatan sifat terkini.</p>
-                )}
-              </div>
-            </div>
-
-            {/* Titik Balik Perubahan */}
-            {activeEntity.evolutionSummary && (
-              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-800 dark:text-amber-200">
-                <span className="font-bold flex items-center gap-1 mb-0.5">
-                  🔄 Titik Balik / Peristiwa Perubahan:
-                </span>
-                <p className="text-[11px] leading-relaxed italic">{activeEntity.evolutionSummary}</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Short Description */}
-        {activeEntity.shortDescription && (
-          <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-950/60 p-3 rounded-2xl border border-slate-200 dark:border-slate-800/80 mb-3.5">
-            {activeEntity.shortDescription}
-          </p>
-        )}
-
-        {/* Dynamic Attributes Grid */}
-        {entity.attributes && entity.attributes.length > 0 && (
-          <div className="mb-3.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-1.5">
-              Atribut Kunci
-            </span>
-            <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto no-scrollbar">
-              {entity.attributes.map((attr) => (
-                <div
-                  key={attr.id}
-                  className="bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800/80 rounded-xl px-2.5 py-1.5 text-xs flex flex-col"
-                >
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400">{attr.label}</span>
-                  <span className="font-semibold text-slate-900 dark:text-white truncate">{attr.value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Detailed Notes */}
-        {entity.detailedNotes && (
-          <div className="mb-3.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400/90 block mb-1">
-              Catatan & Rahasia Karakter
-            </span>
-            <div className="max-h-32 overflow-y-auto no-scrollbar text-xs text-slate-700 dark:text-slate-300 bg-amber-50/50 dark:bg-slate-950/40 p-2.5 rounded-xl border border-amber-200/60 dark:border-slate-800/60 leading-relaxed italic">
-              {entity.detailedNotes}
-            </div>
-          </div>
-        )}
-
-        {/* Tags */}
-        {activeEntity.tags && activeEntity.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {activeEntity.tags.map((tag, i) => (
-              <span
-                key={i}
-                className="px-2 py-0.5 rounded-lg text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700/60"
-              >
-                #{tag}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Kronologi Kondisi Bab & Scene Accordion */}
-        <div className="pt-3 border-t border-slate-200 dark:border-slate-800">
-          <ChapterSceneChronologyAccordion
-            entity={activeEntity}
-            bookId={activeEntity.bookId}
-            onUpdate={() => onEntityUpdated?.(activeEntity)}
-          />
+        {/* 5 Integrated Tabs Navigation */}
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-2 mb-3 border-b border-slate-100 dark:border-slate-800/80 flex-shrink-0 text-xs">
+          {[
+            { id: 'info', label: 'Info Dasar' },
+            { id: 'traits', label: 'Sifat & Watak' },
+            { id: 'physical', label: 'Ciri Fisik & Prompt AI' },
+            { id: 'relations', label: 'Relasi Entitas' },
+            { id: 'chronology', label: 'Riwayat Bab' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition active:scale-95 text-xs ${
+                activeTab === tab.id
+                  ? 'bg-pink-500 text-white shadow-sm'
+                  : 'bg-slate-100 dark:bg-slate-800/70 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
-      </div>
 
-      {/* Action Buttons Footer */}
-      <div className="flex items-center gap-2 pt-3 border-t border-slate-100 dark:border-slate-800 flex-shrink-0">
-        <button
-          type="button"
-          onClick={() => setIsImagePickerOpen(true)}
-          className="flex-1 py-2.5 px-3 rounded-xl bg-pink-500/10 hover:bg-pink-500/20 text-pink-500 dark:text-pink-400 font-bold text-xs transition active:scale-95 flex items-center justify-center gap-1.5 border border-pink-500/30"
-        >
-          <Camera className="w-4 h-4" />
-          <span>Pasang Gambar Utama</span>
-        </button>
-        <button
-          onClick={onClose}
-          className="flex-1 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs transition active:scale-95 text-center border border-slate-200 dark:border-slate-700 shadow-sm"
-        >
-          Tutup Pratinjau
-        </button>
-      </div>
+        {/* Scrollable Tab Body Content */}
+        <div className="flex-1 overflow-y-auto pr-1 space-y-4">
+          {/* TAB 1: INFORMASI DASAR */}
+          {activeTab === 'info' && (
+            <div className="space-y-3.5 animate-in fade-in">
+              {/* Short Description */}
+              {activeEntity.shortDescription && (
+                <div className="bg-slate-50 dark:bg-slate-950/60 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800/80">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                    Ringkasan Entitas
+                  </span>
+                  <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                    {activeEntity.shortDescription}
+                  </p>
+                </div>
+              )}
+
+              {/* Aliases */}
+              {activeEntity.aliases && activeEntity.aliases.length > 0 && (
+                <div className="bg-slate-50 dark:bg-slate-950/60 p-3 rounded-2xl border border-slate-200 dark:border-slate-800/80">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500 block mb-1">
+                    Alias / Sebutan Lain
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {activeEntity.aliases.map((al, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20"
+                      >
+                        {al}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Dynamic Attributes Grid */}
+              {activeEntity.attributes && activeEntity.attributes.length > 0 && (
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-1.5">
+                    Atribut Kunci
+                  </span>
+                  <div className="grid grid-cols-2 gap-1.5 max-h-40 overflow-y-auto no-scrollbar">
+                    {activeEntity.attributes.map((attr) => (
+                      <div
+                        key={attr.id}
+                        className="bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800/80 rounded-xl px-2.5 py-1.5 text-xs flex flex-col"
+                      >
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400">{attr.label}</span>
+                        <span className="font-semibold text-slate-900 dark:text-white truncate">{attr.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Detailed Notes */}
+              {activeEntity.detailedNotes && (
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400/90 block mb-1">
+                    Catatan Lore &amp; Rahasia
+                  </span>
+                  <div className="max-h-36 overflow-y-auto no-scrollbar text-xs text-slate-700 dark:text-slate-300 bg-amber-50/50 dark:bg-slate-950/40 p-2.5 rounded-xl border border-amber-200/60 dark:border-slate-800/60 leading-relaxed italic">
+                    {activeEntity.detailedNotes}
+                  </div>
+                </div>
+              )}
+
+              {/* Tags */}
+              {activeEntity.tags && activeEntity.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {activeEntity.tags.map((tag, i) => (
+                    <span
+                      key={i}
+                      className="px-2 py-0.5 rounded-lg text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700/60"
+                    >
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 2: SIFAT & WATAK */}
+          {activeTab === 'traits' && (
+            <div className="space-y-3.5 animate-in fade-in">
+              <div className="p-3.5 rounded-2xl bg-gradient-to-br from-slate-50 via-slate-100/50 to-amber-500/5 dark:from-slate-950/80 dark:via-slate-900/60 dark:to-amber-500/10 border border-slate-200 dark:border-slate-800 space-y-3">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-slate-200">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Dinamika Sifat &amp; Kepribadian Karakter</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {/* Kolom Sifat Awal */}
+                  <div className="p-3 rounded-xl bg-white dark:bg-slate-900/90 border border-emerald-500/20 shadow-xs space-y-1.5">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                      🌱 Sifat &amp; Latar Awal
+                    </span>
+                    {activeEntity.initialTraits && (
+                      <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-snug">
+                        {activeEntity.initialTraits}
+                      </p>
+                    )}
+                    {activeEntity.initialDescription && (
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed italic">
+                        {activeEntity.initialDescription}
+                      </p>
+                    )}
+                    {!activeEntity.initialTraits && !activeEntity.initialDescription && (
+                      <p className="text-[11px] text-slate-400 italic">Belum ada catatan sifat awal.</p>
+                    )}
+                  </div>
+
+                  {/* Kolom Sifat Terkini */}
+                  <div className="p-3 rounded-xl bg-white dark:bg-slate-900/90 border border-amber-500/20 shadow-xs space-y-1.5">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                      ⚡ Sifat &amp; Kondisi Terkini
+                    </span>
+                    {activeEntity.currentTraits && (
+                      <p className="text-xs font-bold text-slate-900 dark:text-white leading-snug">
+                        {activeEntity.currentTraits}
+                      </p>
+                    )}
+                    {activeEntity.currentDescription && (
+                      <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                        {activeEntity.currentDescription}
+                      </p>
+                    )}
+                    {!activeEntity.currentTraits && !activeEntity.currentDescription && (
+                      <p className="text-[11px] text-slate-400 italic">Belum ada catatan sifat terkini.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Titik Balik Perubahan */}
+                {activeEntity.evolutionSummary && (
+                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-800 dark:text-amber-200">
+                    <span className="font-bold flex items-center gap-1 mb-0.5">
+                      🔄 Titik Balik / Peristiwa Perubahan:
+                    </span>
+                    <p className="text-[11px] leading-relaxed italic">{activeEntity.evolutionSummary}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: CIRI FISIK & PROMPT AI */}
+          {activeTab === 'physical' && (
+            <div className="space-y-3.5 animate-in fade-in">
+              {/* Deskripsi Ciri Fisik */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 space-y-2">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-500 flex items-center gap-1">
+                  👤 Ciri-Ciri Fisik Karakter
+                </span>
+                <p className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed">
+                  {activeEntity.physicalTraits ||
+                    'Ciri fisik belum tercatat secara rinci. Saat Anda menjalankan Pindai Entitas (AI Scan) di bab, ciri fisik akan otomatis terisi dan terbarui.'}
+                </p>
+              </div>
+
+              {/* Text-to-Image Visual Prompt Generator Box */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-br from-purple-500/10 via-pink-500/5 to-transparent border border-purple-500/30 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-purple-500" />
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">
+                      Prompt Generator Visual (HP 9:16)
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(getEffectiveVisualPrompt(), 'Prompt Visual')}
+                    className="px-2.5 py-1 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-[11px] flex items-center gap-1 active:scale-95 transition shadow-sm"
+                  >
+                    <span>{copyFeedback === 'Prompt Visual' ? 'Tersalin!' : 'Salin Prompt'}</span>
+                  </button>
+                </div>
+
+                <div className="p-3 rounded-xl bg-white dark:bg-slate-950/80 border border-purple-500/20 font-mono text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed max-h-36 overflow-y-auto select-all">
+                  {getEffectiveVisualPrompt()}
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap text-[10px] text-purple-700 dark:text-purple-300 font-medium">
+                  <span className="px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20">📱 Rasio: 9:16 (Layar HP)</span>
+                  <span className="px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20">🧍 Berdiri Tegap Sentral</span>
+                  <span className="px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20">🇮🇩 Etnis: Nusantara / Indonesia</span>
+                  <span className="px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20">✨ Hyper Realistic 8k</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: RELASI ENTITAS */}
+          {activeTab === 'relations' && (
+            <div className="space-y-3 animate-in fade-in">
+              {activeEntity.relationships && activeEntity.relationships.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {activeEntity.relationships.map((rel, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 space-y-1"
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-extrabold text-xs text-slate-900 dark:text-white">
+                          {rel.targetEntityName || 'Entitas Lain'}
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-500/20">
+                          {rel.label || rel.relationshipType}
+                        </span>
+                      </div>
+                      {rel.description && (
+                        <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed italic">
+                          {rel.description}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-10 px-4 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-xs text-slate-400">
+                  <p>Belum ada relasi yang terhubung ke entitas ini.</p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Gunakan fitur <strong>Peta Relasi Otomatis (World Auto-Map)</strong> di tab Ensiklopedia untuk memetakan jejaring aliansi dan rivalitas.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 5: RIWAYAT BAB & KRONOLOGI */}
+          {activeTab === 'chronology' && (
+            <div className="space-y-3 animate-in fade-in">
+              <ChapterSceneChronologyAccordion
+                entity={activeEntity}
+                bookId={activeEntity.bookId}
+                onUpdate={() => onEntityUpdated?.(activeEntity)}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Action Buttons Footer */}
+        <div className="flex items-center gap-2 pt-3 border-t border-slate-100 dark:border-slate-800 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => setIsImagePickerOpen(true)}
+            className="flex-1 py-2.5 px-3 rounded-xl bg-pink-500/10 hover:bg-pink-500/20 text-pink-500 dark:text-pink-400 font-bold text-xs transition active:scale-95 flex items-center justify-center gap-1.5 border border-pink-500/30"
+          >
+            <Camera className="w-4 h-4" />
+            <span>Pasang Gambar Utama</span>
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs transition active:scale-95 text-center border border-slate-200 dark:border-slate-700 shadow-sm"
+          >
+            Tutup Pratinjau
+          </button>
+        </div>
       </div>
 
       {/* Main Image Picker Modal */}

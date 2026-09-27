@@ -28,6 +28,8 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
   const [initialTraits, setInitialTraits] = useState('');
   const [currentTraits, setCurrentTraits] = useState('');
   const [evolutionSummary, setEvolutionSummary] = useState('');
+  const [physicalTraits, setPhysicalTraits] = useState('');
+  const [visualPrompt, setVisualPrompt] = useState('');
   const [detailedNotes, setDetailedNotes] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [attributes, setAttributes] = useState<WorldAttribute[]>([
@@ -140,6 +142,8 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
         initialTraits: initialTraits.trim() || undefined,
         currentDescription: shortDescription.trim() || undefined,
         currentTraits: currentTraits.trim() || initialTraits.trim() || undefined,
+        physicalTraits: physicalTraits.trim() || undefined,
+        visualPrompt: visualPrompt.trim() || undefined,
         evolutionSummary: evolutionSummary.trim() || undefined,
         detailedNotes: detailedNotes.trim(),
         tags,
@@ -405,6 +409,56 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
               placeholder="Cth: Setelah dirasuki oleh jin dari pantai utara / Pengkhianatan di istana"
               className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-500 text-xs shadow-sm"
             />
+          </div>
+
+          {/* Ciri-Ciri Fisik & Visual Prompt Text-to-Image */}
+          <div className="p-3 bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-2.5">
+            <div>
+              <label className="block text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-1">
+                👤 Ciri-Ciri Fisik (Akurat)
+              </label>
+              <textarea
+                rows={2}
+                value={physicalTraits}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setPhysicalTraits(val);
+                  if (!visualPrompt) {
+                    setVisualPrompt(
+                      `Full body portrait standing upright, centered, Indonesian character, ${val || 'natural appearance'}, hyper realistic, 8k resolution, cinematic lighting, photorealistic textures, 9:16 aspect ratio`
+                    );
+                  }
+                }}
+                placeholder="Cth: Tinggi tegap 175cm, kulit sawo matang, rambut ikal hitam, mengenakan rompi tenun tradisional dan ikat kepala merah"
+                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-500 text-xs shadow-sm"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-semibold text-purple-700 dark:text-purple-400 uppercase tracking-wider">
+                  ✨ Text-to-Image Prompt (Midjourney / Flux / DALL-E)
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVisualPrompt(
+                      `Full body portrait standing upright, centered, Indonesian character, ${physicalTraits || shortDescription || 'natural appearance'}, hyper realistic, 8k resolution, cinematic lighting, photorealistic textures, 9:16 aspect ratio`
+                    );
+                  }}
+                  className="text-[10px] text-purple-600 dark:text-purple-400 hover:underline font-semibold"
+                >
+                  ⚡ Buat Ulang Prompt
+                </button>
+              </div>
+              <input
+                type="text"
+                value={visualPrompt}
+                onChange={(e) => setVisualPrompt(e.target.value)}
+                placeholder="Full body portrait standing upright, centered, Indonesian character..."
+                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-purple-500/30 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 font-mono text-[11px] shadow-sm"
+              />
+            </div>
           </div>
 
           {/* Dynamic Attributes */}

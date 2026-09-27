@@ -629,14 +629,14 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
 
               {/* Chapter Timeline Dropdown Selector (if in Worldbuilding) */}
               {!chapter && chapters.length > 0 && (
-                <div className="flex items-center gap-1.5 mt-1">
+                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                   <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">
                     Lihat Situasi Bab:
                   </span>
                   <select
                     value={selectedTimelineChapterId}
                     onChange={(e) => setSelectedTimelineChapterId(e.target.value)}
-                    className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-2 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400 focus:outline-none"
+                    className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-2 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400 focus:outline-none max-w-[200px] truncate"
                   >
                     <option value="global">🌐 Baseline Global (Awal Cerita)</option>
                     {chapters.map((ch) => (
@@ -749,11 +749,11 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
             </div>
 
             {/* Auto Arrange & AI Actions */}
-            <div className="flex items-center gap-1.5 ml-auto">
+            <div className="flex items-center gap-1.5 ml-auto flex-wrap">
               <button
                 type="button"
                 onClick={arrangeNeatFactionLayout}
-                className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center gap-1 transition"
+                className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center gap-1 transition flex-shrink-0"
                 title="Atur Ulang Tata Letak agar Rapi & Tidak Tumpang Tindih"
               >
                 <Wand2 className="w-3.5 h-3.5 text-amber-500" />
@@ -764,7 +764,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                 type="button"
                 onClick={handleTriggerAutoMap}
                 disabled={isAiLoading}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 text-white font-bold rounded-xl text-xs shadow-md shadow-pink-500/20 active:scale-95 transition disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 text-white font-bold rounded-xl text-xs shadow-md shadow-pink-500/20 active:scale-95 transition disabled:opacity-50 flex-shrink-0"
               >
                 {isAiLoading ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -777,7 +777,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsAddRelationOpen(true)}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-800 dark:text-slate-200 font-semibold rounded-xl text-xs border border-slate-200 dark:border-slate-700"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-800 dark:text-slate-200 font-semibold rounded-xl text-xs border border-slate-200 dark:border-slate-700 flex-shrink-0"
               >
                 <Plus className="w-3.5 h-3.5 text-pink-500" />
                 <span className="hidden sm:inline">Hubungan</span>

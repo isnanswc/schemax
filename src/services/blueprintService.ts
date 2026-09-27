@@ -4,138 +4,159 @@ import { generateWithSmartFallback } from './aiService';
 import { db, saveMediaItem, createSvgBlob } from '../db';
 
 export async function generateStoryBlueprint(
-  rawIdea: string,
-  genre: string,
-  tone: string
+  rawIdea: string
 ): Promise<StoryBlueprint> {
-  const systemPrompt = `Kamu adalah Arsitek Cerita Fiksi Kelas Dunia (Master Story Architect & Worldbuilder).
-Tugasmu: Mengembangkan 1 ide mentah dari penulis menjadi BLUEPRINT PROYEK CERITA LENGKAP berstandar novel/film profesional.
-Bahasa: Bahasa Indonesia sastra bermutu tinggi, memikat, dan tidak klise.
+  const systemPrompt = `Kamu adalah Arsitek Cerita Fiksi Tingkat Master (Master Story Architect & Worldbuilder).
+Tugasmu: Menganalisa satu ide/premis mentah dari penulis dan merancang BLUEPRINT PROYEK CERITA NOVEL LENGKAP berstandar sastra profesional.
 
-WAJIB MERESPON HANYA DENGAN FORMAT JSON VALID (tanpa teks pembuka atau penutup markdown selain kurung kurawal json):
+KECERDASAN ANALISA KONTEKS:
+1. DETEKSI ENTITAS & RELASI KELUARGA:
+   - Jika premis menyebut nama seseorang (misal: "Agung") dan "istrinya Santi" atau keluarga yang hilang ingatan, kenali dinamika keluarga ini secara cerdas.
+   - Sarankan karakter-karakter yang terlibat secara utuh (misal: Suami/Kepala Keluarga, Istri, Anak/Orang Tua/Mertua, atau Tetangga/Sahabat).
+   - Berikan informasi CIRI FISIK konkret (wajah, tinggi/postur, warna kulit, gaya rambut, pakaian khas bernuansa lokal Indonesia jika latar Indonesia), USIA, dan SIFAT/WATAK (kepribadian, kelebihan, kelemahan batin/wound).
+2. PILIHAN JUDUL:
+   - Berikan 3 pilihan judul buku yang puitis, memikat, dan memiliki nilai jual ("titleOptions"). Pilih satu sebagai "title" utama.
+   - Berikan 3 pilihan judul bab pertama ("firstChapterTitleOptions").
+3. RINGKASAN & PILIHAN LANJUTAN ALUR (CONTINUATIONS):
+   - Buat ringkasan cerita inti (synopsis).
+   - Berikan 3 OPSI KELANJUTAN CERITA ("storyContinuations") yang berbeda arah konflik (misal: Opsi A fokus pada misteri benda/cincin, Opsi B fokus pada drama emosional rumah tangga, Opsi C ancaman pihak ketiga/pemilik asli cincin).
+4. GAYA PENULISAN & SUDUT PANDANG:
+   - Sarankan Sudut Pandang ("pointOfView": misal 'Orang Ketiga Terbatas (Menyorot Protagonis)' atau 'Orang Pertama').
+   - Sarankan Gaya Penulisan ("writingStyle": misal 'Realis Emosional Penuh Ketegangan & Deskriptif Panca Indera').
+5. LOKASI & ITEM/RELIK:
+   - Lokasi relevan (misal: Rumah Keluarga, Tempat Penemuan Barang Misterius, dsb.).
+   - Item misterius dengan dampak/aturan supranaturalnya.
+6. BAB PEMBUKA LENGKAP:
+   - Rancang minimal 3 bab pertama dengan "title", "premise" (alur adegan berurutan yang detail), dan "notes".
+
+WAJIB MERESPON HANYA DENGAN FORMAT JSON VALID:
 {
-  "title": "Judul Cerita yang Memikat",
-  "genre": "${genre}",
-  "logline": "1-2 kalimat dramatis yang merangkum siapa protagonis, apa tujuannya, rintangan terbesar, dan apa taruhannya jika gagal.",
-  "synopsis": "Sinopsis lengkap 4 babak (Pengenalan & Inciting Incident, Eskalasi & Titik Balik, Krisis Tergelap, dan Puncak Klimaks). Minimal 2 paragraf padat.",
-  "thematicCore": "Pesan filosofis / tema sentral (misal: 'Penebusan dosa masa lalu memerlukan pengorbanan ego terbesar').",
+  "title": "Judul Buku Pilihan Utama",
+  "titleOptions": ["Opsi Judul 1", "Opsi Judul 2", "Opsi Judul 3"],
+  "firstChapterTitleOptions": ["Bab 1: Opsi Judul A", "Bab 1: Opsi Judul B", "Bab 1: Opsi Judul C"],
+  "genre": "Drama Supranatural & Misteri",
+  "logline": "1-2 kalimat dramatis yang merangkum siapa tokoh, konflik inti, dan taruhan terbesarnya.",
+  "synopsis": "Sinopsis lengkap alur cerita (minimal 2 paragraf padat).",
+  "thematicCore": "Pesan emosional / filosofis utama cerita.",
+  "storyContinuations": [
+    {
+      "id": "opt_1",
+      "title": "Fokus Pemulihan Ingatan & Rahasia Keluarga",
+      "description": "Protagonis berjuang meyakinkan pasangannya sambil mengungkap memori kelam keluarga yang terkunci di dalam artefak."
+    },
+    {
+      "id": "opt_2",
+      "title": "Ancaman Pemilik Asli Benda Misterius",
+      "description": "Sosok gaib atau kelompok pemburu artefak datang menagih tumbal atas benda yang dibawa pulang."
+    },
+    {
+      "id": "opt_3",
+      "title": "Penyebaran Efek Anomali ke Lingkungan Sekitar",
+      "description": "Bukan hanya keluarga, satu per satu tetangga mulai melupakan eksistensi protagonis di kampung halamannya."
+    }
+  ],
+  "pointOfView": "Orang Ketiga Terbatas (Third Person Limited)",
+  "writingStyle": "Emosional, Penuh Ketegangan Batin, Deskriptif Panca Indera & Dialog Bernas",
+  "settingTimeAndTone": "Indonesia Kontemporer / Realitas Lokal bernuansa Misteri Hangat",
   "characters": [
     {
-      "name": "Nama Protagonis",
-      "role": "Protagonis Utama",
-      "shortDescription": "Deskripsi singkat peran dan kepribadian",
-      "want": "Tujuan sadar yang ia kejar mati-matian",
-      "need": "Kebutuhan batiniah yang harus ia sadari untuk berubah",
-      "flawOrWound": "Luka masa lalu atau trauma psikologis",
+      "name": "Nama Karakter",
+      "role": "Protagonis / Suami",
+      "age": "28 Tahun",
+      "physicalTraits": "Pria berwajah teduh namun lelah, tinggi 172 cm, kulit sawo matang, rambut ikal pendek agak berantakan, mengenakan jaket katun lusuh.",
+      "traits": "Penyayang, pekerja keras, keras kepala, mudah cemas saat keluarga dalam bahaya.",
+      "shortDescription": "Pemuda yang menemukan benda misterius dan menjadi orang asing di rumahnya sendiri.",
+      "want": "Mengembalikan ingatan keluarganya agar mengenalinya kembali.",
+      "need": "Menerima bahwa kebahagiaan keluarga tidak bisa dibangun di atas kebohongan atau jalan pintas.",
+      "flawOrWound": "Merasa bersalah karena kegagalannya menafkahi keluarga dengan layak.",
       "attributes": [
-        { "label": "Usia", "value": "24 Tahun" },
-        { "label": "Keahlian", "value": "Manipulasi Gravitasi" },
-        { "label": "Faksi", "value": "Pemberontak Bawah Tanah" }
+        { "label": "Peran", "value": "Kepala Keluarga" },
+        { "label": "Pekerjaan", "value": "Pekerja Lepas" }
       ],
-      "tags": ["Protagonis", "Kompleks"]
+      "tags": ["Protagonis", "Keluarga"]
     },
     {
-      "name": "Nama Antagonis / Rival",
-      "role": "Antagonis Utama",
-      "shortDescription": "Deskripsi motif antagonis yang masuk akal dan berbahaya",
-      "want": "Tujuan lawan",
-      "need": "Kelemahan fatalnya",
-      "flawOrWound": "Ideologi ekstremnya",
+      "name": "Nama Istri / Pasangan",
+      "role": "Istri Protagonis",
+      "age": "26 Tahun",
+      "physicalTraits": "Wanita berparas manis khas nusantara, rambut sebahu diikat sederhana, tatapan mata waspada dan defensif, daster batik rapi.",
+      "traits": "Tegas, protektif terhadap rumah, curigaan terhadap orang asing, sebenarnya rapuh di dalam batin.",
+      "shortDescription": "Istri yang kehilangan ingatan tentang suaminya dan mengiranya sebagai penyusup.",
+      "want": "Melindungi rumah dan ketenangannya dari pria asing yang mengaku suaminya.",
+      "need": "Mengingat kembali ikatan cinta tulus yang pernah ada.",
+      "flawOrWound": "Trauma terhadap orang asing di masa kecil.",
       "attributes": [
-        { "label": "Peran", "value": "Panglima Kekaisaran" },
-        { "label": "Kekuatan", "value": "Absorpsi Energi" }
+        { "label": "Status", "value": "Kehilangan Ingatan" }
       ],
-      "tags": ["Antagonis", "Karisma"]
-    },
-    {
-      "name": "Nama Sekutu / Mentor",
-      "role": "Mentor / Deuteragonis",
-      "shortDescription": "Sahabat setia atau mentor misterius yang menyimpan rahasia",
-      "want": "Membimbing protagonis",
-      "need": "Memaafkan masa lalunya sendiri",
-      "flawOrWound": "Rahasia kelam era perang",
-      "attributes": [
-        { "label": "Peran", "value": "Penjaga Arsip Terlarang" }
-      ],
-      "tags": ["Sekutu", "Misterius"]
+      "tags": ["Istri", "Inti Konflik"]
     }
   ],
   "locations": [
     {
-      "name": "Nama Lokasi Utama 1",
-      "shortDescription": "Deskripsi visual kota / benteng / alam dengan atmosfer tajam",
-      "detailedNotes": "Bahaya, misteri, atau aturan kehidupan di lokasi ini",
+      "name": "Rumah Keluarga",
+      "shortDescription": "Rumah sederhana berdinding bata ekspos dengan pagar kayu kecil di pinggiran kota.",
+      "detailedNotes": "Tempat yang dulunya penuh kehangatan, kini menjadi tempat paling asing dan mencekam bagi protagonis.",
       "attributes": [
-        { "label": "Tipe", "value": "Metropolis Terapung" },
-        { "label": "Atmosfer", "value": "Kelabu, Lembab, & Penuh Kabut" }
+        { "label": "Tipe", "value": "Hunian Pribadi" }
       ],
-      "tags": ["Ikonik", "Pusat Cerita"]
-    },
-    {
-      "name": "Nama Lokasi Utama 2",
-      "shortDescription": "Lokasi rahasia atau perbatasan berbahaya",
-      "detailedNotes": "Tempat artefak atau pertempuran penting berlangsung",
-      "attributes": [
-        { "label": "Bahaya", "value": "Tinggi / Anomali Temporal" }
-      ],
-      "tags": ["Berbahaya"]
+      "tags": ["Lokasi Utama"]
     }
   ],
   "items": [
     {
-      "name": "Nama Relik / Artefak / Aturan Dunia",
-      "shortDescription": "Fungsi dan dampak artefak ini terhadap jalannya cerita",
-      "detailedNotes": "Asal-usul purba dan harga mahal atau efek samping setiap kali digunakan",
+      "name": "Cincin Berukir Aksara Kuno",
+      "shortDescription": "Cincin perak kusam dengan motif melingkar seperti pusaran air yang tidak pernah berujung.",
+      "detailedNotes": "Benda pemicu yang menghapus memori orang-orang di sekitar pembawanya tentang keberadaan si pembawa.",
       "attributes": [
-        { "label": "Kelangkaan", "value": "Artefak Purba Unik" },
-        { "label": "Efek", "value": "Menghentikan Waktu Sejenak" }
+        { "label": "Efek", "value": "Amnesia Kolektif Temporal" }
       ],
-      "tags": ["Relik", "Kunci Plot"]
+      "tags": ["Artefak Pemicu"]
     }
   ],
   "chapters": [
     {
-      "title": "Bab 1: [Judul Pembuka]",
+      "title": "Bab 1: Mengetuk Pintu Rumah Sendiri",
       "order": 1,
-      "premise": "Adegan pembuka yang menunjukkan dunia normal protagonis sebelum sebuah insiden mengejutkan membalikkan hidupnya.",
-      "notes": "Tekankan luka batin protagonis dan hadirkan misteri utama.",
-      "targetWordCount": 1500
+      "premise": "1. Protagonis pulang ke rumah membawa benda misterius yang ia temukan siang tadi.\\n2. Sang istri menyambut di pintu dengan wajah ketakutan dan berteriak memanggil tetangga mengira ia adalah maling.\\n3. Protagonis syok melihat seluruh foto pernikahan dan jejak keberadaannya di rumah tiba-tiba lenyap.",
+      "notes": "Hadirkan atmosfer kebingungan yang mencekam dan luka emosional yang mendalam.",
+      "targetWordCount": 1600
     },
     {
-      "title": "Bab 2: [Pemicu Alur]",
+      "title": "Bab 2: Jejak yang Dihapus",
       "order": 2,
-      "premise": "Peristiwa pemicu (inciting incident) yang memaksa protagonis mengambil keputusan berbahaya tanpa jalan mundur.",
-      "notes": "Perkenalkan antagonis atau ancaman nyata pertama kali.",
+      "premise": "1. Protagonis terpaksa melarikan diri dari kejaran warga sekitar.\\n2. Mengamati cincin di bawah sinar lampu jalan dan menyadari anomali hawa dingin yang keluar dari batu cincin.\\n3. Menemui sahabat dekatnya untuk meminta bantuan, namun sahabatnya pun tidak mengenalinya sama sekali.",
+      "notes": "Eskalasi rasa kesepian dan konfirmasi bahwa anomali ini bersifat menyeluruh.",
       "targetWordCount": 1800
     },
     {
-      "title": "Bab 3: [Melangkah ke Dunia Baru]",
+      "title": "Bab 3: Bisikan di Balik Logam Kuno",
       "order": 3,
-      "premise": "Protagonis memasuki lingkungan asing atau memecahkan misteri awal bersama sekutunya, menyadari bahwa taruhannya jauh lebih besar.",
-      "notes": "Munculkan petunjuk pertama tentang relik sentral.",
+      "premise": "1. Mencari informasi ke pedagang barang antik tempat ia menemukan cincin.\\n2. Menemukan petunjuk asal-usul cincin dan pantangan berat yang telah dilanggar.\\n3. Mengetahui batas waktu sebelum ingatan keluarganya terkunci selamanya.",
+      "notes": "Hadirkan batas waktu (ticking clock) untuk menaikkan ketegangan cerita.",
       "targetWordCount": 2000
     }
   ]
 }`;
 
-  const userPrompt = `Rancang Blueprint Proyek Cerita lengkap berdasarkan parameter ini:
-- Ide / Premis Kasar: "${rawIdea}"
-- Genre: "${genre}"
-- Nada & Gaya Cerita (Tone): "${tone}"
+  const userPrompt = `Rancang Blueprint Proyek Cerita lengkap berdasarkan ide/premis mentah berikut:
+"${rawIdea}"
 
-Pastikan seluruh nama karakter, lokasi, dan bab selaras dengan genre dan nada cerita. Respon HANYA teks JSON valid.`;
+Instruksi Analisa Cerdas:
+- Pahami relasi karakter dalam ide tersebut secara mendalam (misal keluarga, pasangan, sahabat, dsb.).
+- Buat karakter lengkap dengan usia, ciri fisik konkret, dan watak/sifat.
+- Buat 3 opsi kelanjutan alur yang memikat.
+- Rancang alur 3 bab pembuka yang langsung siap dipakai sebagai Story Plot.
+- Respon HANYA teks JSON valid.`;
 
   const response = await generateWithSmartFallback(userPrompt, systemPrompt);
 
   let cleanText = response.text.trim();
-  // Strip markdown code fences if present
   if (cleanText.startsWith('```json')) {
     cleanText = cleanText.replace(/^```json\s*/i, '').replace(/\s*```$/, '');
   } else if (cleanText.startsWith('```')) {
     cleanText = cleanText.replace(/^```\s*/, '').replace(/\s*```$/, '');
   }
 
-  // Find first { and last }
   const firstBrace = cleanText.indexOf('{');
   const lastBrace = cleanText.lastIndexOf('}');
   if (firstBrace !== -1 && lastBrace !== -1) {
@@ -160,11 +181,24 @@ export async function seedBlueprintToDatabase(blueprint: StoryBlueprint): Promis
   const coverBlob = createSvgBlob(blueprint.title, '#f59e0b', '📖');
   const coverMediaId = await saveMediaItem(bookId, coverBlob, 'cover-auto.svg');
 
+  // Incorporate continuation and style notes into book synopsis
+  let enrichedSynopsis = '';
+  if (blueprint.logline) {
+    enrichedSynopsis += `${blueprint.logline}\n\n`;
+  }
+  enrichedSynopsis += blueprint.synopsis || '';
+  if (blueprint.selectedContinuation) {
+    enrichedSynopsis += `\n\n[Arah Alur Terpilih]:\n${blueprint.selectedContinuation}`;
+  }
+  if (blueprint.pointOfView || blueprint.writingStyle) {
+    enrichedSynopsis += `\n\n[Pedoman Gaya & Sudut Pandang]:\n• Sudut Pandang: ${blueprint.pointOfView || 'Orang Ketiga Terbatas'}\n• Gaya Penulisan: ${blueprint.writingStyle || 'Deskriptif & Emosional'}`;
+  }
+
   // 2. Create Book entry
   const newBook: Book = {
     id: bookId,
     title: blueprint.title,
-    synopsis: `${blueprint.logline ? blueprint.logline + '\n\n' : ''}${blueprint.synopsis}`,
+    synopsis: enrichedSynopsis,
     genre: blueprint.genre || 'Fiksi',
     status: 'draft',
     coverMediaId,
@@ -175,9 +209,9 @@ export async function seedBlueprintToDatabase(blueprint: StoryBlueprint): Promis
   };
   await db.books.add(newBook);
 
-  // 3. Seed Characters into World Entities
+  // 3. Seed Characters into World Entities with Physical Traits & Personality Traits
   if (blueprint.characters && blueprint.characters.length > 0) {
-    const characterIcons = ['🧙‍♂️', '⚔️', '🎭', '👑', '🏹'];
+    const characterIcons = ['🧙‍♂️', '⚔️', '🎭', '👑', '🏹', '👤'];
     for (let i = 0; i < blueprint.characters.length; i++) {
       const char = blueprint.characters[i];
       const charId = 'ent_char_' + now.toString(36) + i;
@@ -185,12 +219,24 @@ export async function seedBlueprintToDatabase(blueprint: StoryBlueprint): Promis
       const avatarMediaId = await saveMediaItem(bookId, avatarBlob, `avatar-${char.name}.svg`, charId);
 
       const detailedNotes = [
-        char.want ? `• Ingin (Want): ${char.want}` : '',
-        char.need ? `• Butuh (Need): ${char.need}` : '',
-        char.flawOrWound ? `• Luka Masa Lalu (Ghost): ${char.flawOrWound}` : '',
+        char.role ? `• Peran: ${char.role}` : '',
+        char.age ? `• Usia: ${char.age}` : '',
+        char.want ? `• Keinginan (Want): ${char.want}` : '',
+        char.need ? `• Kebutuhan Batin (Need): ${char.need}` : '',
+        char.flawOrWound ? `• Luka Masa Lalu: ${char.flawOrWound}` : '',
       ]
         .filter(Boolean)
         .join('\n');
+
+      const attributesList = [
+        ...(char.age ? [{ id: 'attr_age', label: 'Usia', value: char.age }] : []),
+        ...(char.role ? [{ id: 'attr_role', label: 'Peran', value: char.role }] : []),
+        ...(char.attributes || []).map((attr, idx) => ({
+          id: `attr_${idx}`,
+          label: attr.label,
+          value: attr.value,
+        })),
+      ];
 
       const entity: WorldEntity = {
         id: charId,
@@ -199,14 +245,15 @@ export async function seedBlueprintToDatabase(blueprint: StoryBlueprint): Promis
         name: char.name,
         shortDescription: `${char.role ? `[${char.role}] ` : ''}${char.shortDescription || ''}`,
         detailedNotes,
+        physicalTraits: char.physicalTraits || undefined,
+        initialTraits: char.traits || undefined,
+        currentTraits: char.traits || undefined,
+        condition: 'aktif',
+        conditionDetails: 'Kondisi awal di pembuka cerita',
         tags: char.tags || ['Karakter'],
         avatarMediaId,
         galleryMediaIds: [],
-        attributes: (char.attributes || []).map((attr, idx) => ({
-          id: `attr_${idx}`,
-          label: attr.label,
-          value: attr.value,
-        })),
+        attributes: attributesList,
         createdAt: now,
         updatedAt: now,
       };
@@ -229,6 +276,8 @@ export async function seedBlueprintToDatabase(blueprint: StoryBlueprint): Promis
         name: loc.name,
         shortDescription: loc.shortDescription || '',
         detailedNotes: loc.detailedNotes || '',
+        condition: 'aktif',
+        conditionDetails: 'Lokasi aktif',
         tags: loc.tags || ['Lokasi'],
         avatarMediaId: locMediaId,
         galleryMediaIds: [],
@@ -259,6 +308,8 @@ export async function seedBlueprintToDatabase(blueprint: StoryBlueprint): Promis
         name: itm.name,
         shortDescription: itm.shortDescription || '',
         detailedNotes: itm.detailedNotes || '',
+        condition: 'aktif',
+        conditionDetails: 'Item aktif dalam cerita',
         tags: itm.tags || ['Relik'],
         avatarMediaId: itmMediaId,
         galleryMediaIds: [],
@@ -274,13 +325,13 @@ export async function seedBlueprintToDatabase(blueprint: StoryBlueprint): Promis
     }
   }
 
-  // 6. Seed Chapters into Story Chapters
+  // 6. Seed Chapters into Story Chapters with STORY PLOT pre-filled!
   if (blueprint.chapters && blueprint.chapters.length > 0) {
     for (let i = 0; i < blueprint.chapters.length; i++) {
       const chap = blueprint.chapters[i];
       const chapId = 'chap_' + now.toString(36) + i;
 
-      const initialHtml = `<h2>${chap.title}</h2><p><em>${chap.premise}</em></p><hr/><p></p>`;
+      const initialHtml = `<h2>${chap.title}</h2><p><em>${chap.premise.replace(/\\n/g, '<br/>')}</em></p><hr/><p></p>`;
 
       const chapterRecord: StoryChapter = {
         id: chapId,
@@ -290,6 +341,15 @@ export async function seedBlueprintToDatabase(blueprint: StoryBlueprint): Promis
         status: 'planned',
         premise: chap.premise,
         notes: chap.notes || '',
+        rawDrafts: [
+          {
+            id: 'plot_' + chapId,
+            title: 'Story Plot',
+            content: chap.premise,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
         contentHtml: initialHtml,
         wordCount: 0,
         targetWordCount: chap.targetWordCount || 1800,
