@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Book, StoryChapter } from '../../types';
 import { AISparkModal } from '../books/AISparkModal';
 import { BookCard } from '../books/BookCard';
@@ -14,7 +14,12 @@ import {
   BookCopy,
   TrendingUp,
   Clock,
-  Compass
+  Compass,
+  Quote,
+  RotateCcw,
+  Sun,
+  Moon,
+  Sunset
 } from 'lucide-react';
 import { navStack } from '../../services/backNavigationService';
 
@@ -32,6 +37,42 @@ interface DashboardViewProps {
   onNavigateToWorks: () => void;
 }
 
+// 📜 Curated Literary & Writing Quotes for Inspiration
+const WRITING_QUOTES = [
+  {
+    quote: 'Menulislah dengan berani, revisilah tanpa ampun.',
+    author: 'Ernest Hemingway',
+  },
+  {
+    quote: 'Tugas seorang penulis bukan menyelesaikan masalah, tetapi mengangkatnya ke permukaan.',
+    author: 'Anton Chekhov',
+  },
+  {
+    quote: 'Kamu bisa memperbaiki halaman yang buruk, tapi kamu tidak bisa memperbaiki halaman yang kosong.',
+    author: 'Jodi Picoult',
+  },
+  {
+    quote: 'Orang boleh pandai setinggi langit, tapi selama ia tidak menulis, ia akan hilang di dalam masyarakat dan dari sejarah.',
+    author: 'Pramoedya Ananta Toer',
+  },
+  {
+    quote: 'Kata-kata adalah sumber sihir kita yang paling tak ada habisnya.',
+    author: 'J.K. Rowling',
+  },
+  {
+    quote: 'Mulailah dengan menulis apa yang membuat hatimu bergetar.',
+    author: 'C.S. Lewis',
+  },
+  {
+    quote: 'Jangan menunggu inspirasi. Kejar dia dengan tongkat pemukul.',
+    author: 'Jack London',
+  },
+  {
+    quote: 'Langkah pertama untuk menulis buku hebat adalah mempercayai bahwa duniamu layak diceritakan.',
+    author: 'Schemax Muse',
+  },
+];
+
 export const DashboardView: React.FC<DashboardViewProps> = ({
   books,
   allChapters = [],
@@ -46,6 +87,53 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onNavigateToWorks,
 }) => {
   const [isSparkModalOpen, setIsSparkModalOpen] = useState(false);
+  const [quoteIndex, setQuoteIndex] = useState(() => Math.floor(Math.random() * WRITING_QUOTES.length));
+  const [displayedQuote, setDisplayedQuote] = useState('');
+  const [isTyping, setIsTyping] = useState(true);
+
+  // Typewriter effect state
+  const targetQuote = WRITING_QUOTES[quoteIndex].quote;
+  const targetAuthor = WRITING_QUOTES[quoteIndex].author;
+
+  useEffect(() => {
+    let currentIdx = 0;
+    setDisplayedQuote('');
+    setIsTyping(true);
+
+    const typingInterval = setInterval(() => {
+      if (currentIdx < targetQuote.length) {
+        setDisplayedQuote(targetQuote.slice(0, currentIdx + 1));
+        currentIdx++;
+      } else {
+        setIsTyping(false);
+        clearInterval(typingInterval);
+      }
+    }, 45); // natural human typing speed
+
+    return () => clearInterval(typingInterval);
+  }, [quoteIndex]);
+
+  const handleNextQuote = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setQuoteIndex((prev) => (prev + 1) % WRITING_QUOTES.length);
+  };
+
+  // Determine dynamic greeting based on local time
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour >= 4 && hour < 11) {
+      return { text: 'Selamat Pagi', icon: Sun, color: 'text-amber-500' };
+    } else if (hour >= 11 && hour < 15) {
+      return { text: 'Selamat Siang', icon: Sun, color: 'text-amber-500' };
+    } else if (hour >= 15 && hour < 18) {
+      return { text: 'Selamat Sore', icon: Sunset, color: 'text-orange-500' };
+    } else {
+      return { text: 'Selamat Malam', icon: Moon, color: 'text-indigo-400' };
+    }
+  };
+
+  const greeting = getGreeting();
+  const GreetingIcon = greeting.icon;
 
   const handleOpenSparkModal = () => {
     navStack.push('modal-spark', () => setIsSparkModalOpen(false));
@@ -81,7 +169,51 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="space-y-4 pb-24">
-      {/* 🌟 1. Hero Quick Resume Card ("Lanjutkan Menulis") */}
+      {/* 🌟 1. AESTHETIC GLASS BLUR GREETING & TYPEWRITER QUOTE BANNER */}
+      <div className="relative overflow-hidden rounded-3xl bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200/90 dark:border-slate-800/90 p-4 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 animate-fade-in-up">
+        {/* Soft Ambient Aurora Gradient Background */}
+        <div className="absolute -top-10 -right-10 w-44 h-44 bg-gradient-to-br from-amber-400/15 via-purple-500/10 to-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-10 -left-10 w-44 h-44 bg-gradient-to-tr from-indigo-500/10 via-amber-400/10 to-pink-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col justify-between gap-3">
+          {/* Header Row: Greeting & Spark Action */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className={`p-1.5 rounded-xl bg-amber-500/15 dark:bg-amber-400/10 ${greeting.color}`}>
+                <GreetingIcon className="w-4 h-4" />
+              </span>
+              <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-white tracking-tight">
+                {greeting.text}, Penulis
+              </h2>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleNextQuote}
+              className="p-1.5 rounded-xl bg-slate-100/80 hover:bg-slate-200/90 dark:bg-slate-800/80 dark:hover:bg-slate-700/80 text-slate-500 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 transition active:scale-90 flex items-center gap-1 text-[11px] font-semibold"
+              title="Ganti Kutipan Inspirasi"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span className="hidden xs:inline">Inspirasi Lain</span>
+            </button>
+          </div>
+
+          {/* Typewriter Quote Box with Blinking Cursor */}
+          <div className="min-h-[52px] sm:min-h-[58px] flex flex-col justify-center">
+            <p className="font-serif italic text-xs sm:text-sm text-slate-700 dark:text-slate-200 leading-relaxed">
+              <span>"{displayedQuote}"</span>
+              {/* Blinking Cursor */}
+              <span className="inline-block w-1.5 h-3.5 sm:h-4 ml-1 bg-amber-500 dark:bg-amber-400 align-middle animate-pulse" />
+            </p>
+            <div className="flex items-center justify-between pt-1 text-[10px] text-slate-600 dark:text-slate-300 font-sans">
+              <span className="font-semibold">— {targetAuthor}</span>
+              <span className="text-slate-600 dark:text-slate-300 hidden sm:inline">Ruang Tenang Menulis</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 🌟 2. Hero Quick Resume Card ("Lanjutkan Menulis") */}
       {recentChapter && recentBook && onResumeChapter && (
         <div
           onClick={() => onResumeChapter(recentBook, recentChapter)}
