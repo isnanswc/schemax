@@ -400,6 +400,10 @@ export async function generateGeminiSpeechAudio(
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`;
 
       try {
+        // Model TTS Gemini memerlukan prompt yang jelas untuk membacakan naskah (TTS Preamble)
+        // agar model tidak mengembalikan respon teks kosong atau teks biasa.
+        const ttsPrompt = `Read the following text aloud with natural voice acting and emotional tone:\n\n${taggedText}`;
+
         const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -407,7 +411,7 @@ export async function generateGeminiSpeechAudio(
             contents: [
               {
                 role: 'user',
-                parts: [{ text: taggedText }],
+                parts: [{ text: ttsPrompt }],
               },
             ],
             generationConfig: {
@@ -416,7 +420,7 @@ export async function generateGeminiSpeechAudio(
               speechConfig: {
                 voiceConfig: {
                   prebuiltVoiceConfig: {
-                    voiceName: voiceName,
+                    voiceName: voiceName || 'Aoede',
                   },
                 },
               },
@@ -427,7 +431,7 @@ export async function generateGeminiSpeechAudio(
         if (!response.ok) {
           const errJson = await response.json().catch(() => ({}));
           const msg = errJson.error?.message || `HTTP ${response.status} ${response.statusText}`;
-          console.warn(`[Gemini TTS] Slot ${slot.label} model ${model} HTTP ${response.status}:`, msg);
+          console.warn(`[Gemini TTS] Slot ${slot.label} model ${targetModel} HTTP ${response.status}:`, msg);
           if (response.status === 429) {
             // Quota limit hit on this key, break to try next key slot immediately
             lastError = new Error(`Slot ${slot.label} kuota habis (429): ${msg}`);
@@ -438,20 +442,33 @@ export async function generateGeminiSpeechAudio(
 
         const data = await response.json();
         const candidate = data.candidates?.[0];
-        const inlineDataPart = candidate?.content?.parts?.find(
-          (p: any) => p.inlineData && p.inlineData.data
+        const parts = candidate?.content?.parts || [];
+
+        // 1. Cari part yang berisi inlineData audio
+        const inlineDataPart = parts.find(
+          (p: any) => (p.inlineData && p.inlineData.data) || (p.inline_data && p.inline_data.data)
         );
 
-        if (inlineDataPart && inlineDataPart.inlineData) {
-          const mimeType = inlineDataPart.inlineData.mimeType || 'audio/wav';
-          const base64Data = inlineDataPart.inlineData.data;
+        if (inlineDataPart) {
+          const inlineObj = inlineDataPart.inlineData || inlineDataPart.inline_data;
+          const mimeType = inlineObj.mimeType || inlineObj.mime_type || 'audio/wav';
+          const base64Data = inlineObj.data;
           const audioUrl = `data:${mimeType};base64,${base64Data}`;
 
           audioUrlCache.set(cacheKey, audioUrl);
           return { audioUrl, mimeType };
         }
 
-        throw new Error('Respon Gemini tidak memuat data audio.');
+        // 2. Jika model mengembalikan teks alih-alih audio (misal model chat non-audio atau salah model ID)
+        const textPart = parts.find((p: any) => p.text);
+        if (textPart?.text) {
+          console.warn(`[Gemini TTS] Model ${targetModel} mengembalikan teks alih-alih audio:`, textPart.text);
+          throw new Error(
+            `Model "${targetModel}" mengembalikan teks ("${textPart.text.slice(0, 60)}..."). Pastikan Anda memilih model yang mendukung output audio seperti "gemini-3.1-flash-tts-preview" atau gunakan WASM Free.`
+          );
+        }
+
+        throw new Error(`Respon model "${targetModel}" tidak memuat data audio. Pilih model khusus TTS (seperti gemini-3.1-flash-tts-preview) atau beralih ke WASM.`);
       } catch (err: any) {
         lastError = err;
         console.warn(`[Gemini TTS] Gagal dengan model ${targetModel}:`, err.message);
