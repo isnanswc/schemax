@@ -926,10 +926,10 @@ export async function detectEntitiesAndAliases(
       ? existingEntities
           .map(
             (e) =>
-              `- [ID: ${e.id}] [${e.category.toUpperCase()}] ${e.name}${
-                e.aliases && e.aliases.length > 0 ? ` (Alias: ${e.aliases.join(', ')})` : ''
-              }${e.initialTraits ? ` | Sifat: ${e.initialTraits}` : ''}${
-                e.physicalTraits ? ` | Ciri Fisik: ${e.physicalTraits}` : ''
+              `- [${e.category.toUpperCase()}] ${e.name} (ID: ${e.id})${
+                e.aliases && e.aliases.length > 0 ? ` [Alias: ${e.aliases.join(', ')}]` : ''
+              }${e.currentTraits || e.initialTraits ? ` | Sifat: ${e.currentTraits || e.initialTraits}` : ''}${
+                e.physicalTraits ? ` | Fisik: ${e.physicalTraits}` : ''
               }${e.condition ? ` | Status: ${e.condition}` : ''}`
           )
           .join('\n')
@@ -945,7 +945,7 @@ Daftar Entitas Glosarium yang Sudah Ada di Buku:
 ${existingListStr}
 
 Isi Naskah Bab:
-${chapterText.slice(0, 60000)}
+${chapterText.slice(0, 30000)}
 
 Tugas Analisis Mendalam:
 1. DETEKSI ENTITAS BARU (suggestedAction: "register_new"):

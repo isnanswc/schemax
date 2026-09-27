@@ -101,7 +101,13 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
   const [charactersText, setCharactersText] = useState('');
   const [settingItemLoreText, setSettingItemLoreText] = useState('');
 
-  const loadAllContext = async () => {
+  const [characterScope, setCharacterScope] = useState<'relevant' | 'all'>('relevant');
+  const [settingScope, setSettingScope] = useState<'compact' | 'all'>('compact');
+
+  const loadAllContext = async (
+    charScope: 'relevant' | 'all' = characterScope,
+    setScope: 'compact' | 'all' = settingScope
+  ) => {
     // 1. Fetch Book data
     const b = await db.books.get(chapter.bookId);
     if (b) setBook(b);
@@ -115,17 +121,37 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
 
     const earlierDesc = [...earlierAsc].reverse();
 
-    // --- POINT 1: Story Plot (Pure Synopsis + Compact Recap of Previous Chapters) ---
+    // --- POINT 1: Story Plot (Pure Synopsis + Rolling Window Recap for Token Efficiency) ---
     let synopsisRaw = b?.synopsis?.trim() || '';
     if (earlierAsc.length > 0) {
-      const recapBullets = earlierAsc
-        .map((c) => {
-          const sum = c.aiSummary || c.premise || c.notes || 'Selesai';
-          return `- Bab ${c.order} (${c.title}): ${sum}`;
-        })
-        .join('\n');
+      // Token Optimization: If there are > 3 chapters, compress older chapters into a timeline arc
+      // and provide full event bullets for the most recent 2-3 chapters.
+      if (earlierAsc.length > 3) {
+        const olderChapters = earlierAsc.slice(0, earlierAsc.length - 2);
+        const recentChapters = earlierAsc.slice(earlierAsc.length - 2);
 
-      synopsisRaw += `\n\n[Perkembangan Cerita dari Bab-Bab Sebelumnya]:\n${recapBullets}`;
+        const olderTimeline = olderChapters
+          .map((c) => `Bab ${c.order}: ${(c.aiSummary || c.premise || c.title).slice(0, 75).replace(/\n+/g, ' ')}`)
+          .join(' ➔ ');
+
+        const recentRecap = recentChapters
+          .map((c) => {
+            const sum = c.aiSummary || c.premise || c.notes || 'Selesai';
+            return `- Bab ${c.order} (${c.title}): ${sum}`;
+          })
+          .join('\n');
+
+        synopsisRaw += `\n\n[Garis Besar Arka Cerita Terdahulu (Bab ${olderChapters[0].order}–${olderChapters[olderChapters.length - 1].order})]:\n${olderTimeline}\n\n[Peristiwa Penting Bab Terkini]:\n${recentRecap}`;
+      } else {
+        const recapBullets = earlierAsc
+          .map((c) => {
+            const sum = c.aiSummary || c.premise || c.notes || 'Selesai';
+            return `- Bab ${c.order} (${c.title}): ${sum}`;
+          })
+          .join('\n');
+
+        synopsisRaw += `\n\n[Perkembangan Cerita dari Bab-Bab Sebelumnya]:\n${recapBullets}`;
+      }
     }
     setStoryPlotText(synopsisRaw);
 
@@ -141,51 +167,76 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
     // --- POINT 3: Plot / Coretan Bab Ini ---
     setChapterPlotText(chapter.premise || chapter.rawDrafts?.[0]?.content || '');
 
-    // --- POINT 4: Characters (With Physical Traits, Latest Conditions, and Traits from previous chapters) ---
+    // --- POINT 4: Characters (Smart Relevance Scoping & Compact Personality Evolution) ---
     const charEntities = entities.filter((e) => e.category === 'character');
     if (charEntities.length > 0) {
-      const charsStr = charEntities
+      // Find keywords from current chapter premise/draft and previous chapter
+      const searchTarget = `${chapter.title} ${chapter.premise || ''} ${chapter.notes || ''} ${chapter.rawDrafts?.[0]?.content || ''} ${earlierDesc[0]?.title || ''} ${earlierDesc[0]?.aiSummary || ''}`.toLowerCase();
+
+      let targetChars = charEntities;
+      if (charScope === 'relevant') {
+        const relevantChars = charEntities.filter((c) => {
+          const nameMatch = searchTarget.includes(c.name.toLowerCase());
+          const aliasMatch = c.aliases && c.aliases.some((a) => searchTarget.includes(a.toLowerCase()));
+          const isMainRole =
+            c.tags?.some((t) => ['utama', 'protagonis', 'main', 'tokoh utama'].includes(t.toLowerCase())) ||
+            c.attributes?.some(
+              (a) =>
+                a.label.toLowerCase() === 'peran' &&
+                ['utama', 'protagonis', 'mc'].some((k) => a.value.toLowerCase().includes(k))
+            );
+          return nameMatch || aliasMatch || isMainRole;
+        });
+
+        // Use relevant characters if matched, otherwise fallback to top 4 characters
+        targetChars = relevantChars.length > 0 ? relevantChars : charEntities.slice(0, 4);
+      }
+
+      const charsStr = targetChars
         .map((c) => {
           const state = getLatestEntityState(c, chapter, earlierDesc);
-          let detail = `• ${c.name} (${c.shortDescription || 'Karakter'})\n`;
-          detail += `  - Status & Kondisi Terkini: ${state.condition.toUpperCase()}${state.conditionDetails ? ` (${state.conditionDetails})` : ''}\n`;
-          detail += `  - Ciri-Ciri Fisik: ${c.physicalTraits || '(Belum ada catatan fisik spesifik)'}\n`;
-          detail += `  - Sifat & Watak Terkini: ${c.currentTraits || c.initialTraits || '(Belum ada catatan sifat)'}${c.evolutionSummary ? ` [Perkembangan: ${c.evolutionSummary}]` : ''}\n`;
+          let detail = `• ${c.name} (${c.shortDescription || 'Tokoh'}) [Status: ${state.condition.toUpperCase()}${state.conditionDetails ? ` - ${state.conditionDetails}` : ''}]\n`;
+          detail += `  - Sifat Terkini: ${c.currentTraits || c.initialTraits || '-'}${c.evolutionSummary ? ` (Titik Balik: ${c.evolutionSummary})` : ''}\n`;
+          if (c.physicalTraits) {
+            detail += `  - Ciri Fisik: ${c.physicalTraits}\n`;
+          }
           if (c.detailedNotes) {
-            detail += `  - Profil & Motivasi:\n${c.detailedNotes
-              .split('\n')
-              .filter(Boolean)
-              .map((line) => `    ${line.trim()}`)
-              .join('\n')}\n`;
+            const compactNotes = c.detailedNotes.split('\n').filter(Boolean).slice(0, 2).map((l) => l.trim()).join('; ');
+            if (compactNotes) {
+              detail += `  - Profil Singkat: ${compactNotes}\n`;
+            }
           }
           if (c.attributes && c.attributes.length > 0) {
             const extraAttrs = c.attributes
-              .filter((a) => a.label !== 'Peran' && a.label !== 'Usia')
-              .map((a) => `    • ${a.label}: ${a.value}`)
-              .join('\n');
+              .filter((a) => a.label !== 'Peran' && a.label !== 'Usia' && a.value.trim())
+              .slice(0, 3)
+              .map((a) => `${a.label}: ${a.value}`)
+              .join(' | ');
             if (extraAttrs) {
-              detail += `  - Atribut Lainnya:\n${extraAttrs}\n`;
+              detail += `  - Atribut: ${extraAttrs}\n`;
             }
           }
           return detail.trimEnd();
         })
         .join('\n\n');
+
       setCharactersText(charsStr);
     } else {
       setCharactersText('- Karakter utama dan pendukung yang relevan dengan adegan bab ini.');
     }
 
-    // --- POINT 5: Setting, Items (Latest States), World Lore & Writing Style ---
+    // --- POINT 5: Setting, Items (Latest States), World Lore & Writing Style (Token Compact) ---
     const locEntities = entities.filter((e) => e.category === 'location');
     const itemEntities = entities.filter((e) => e.category === 'item');
     const loreEntities = entities.filter((e) => e.category === 'lore');
 
     let combinedSettingLore = '=== LOKASI & SETTING TERKINI ===\n';
     if (locEntities.length > 0) {
-      combinedSettingLore += locEntities
+      const targetLocs = setScope === 'compact' ? locEntities.slice(0, 5) : locEntities;
+      combinedSettingLore += targetLocs
         .map((l) => {
           const state = getLatestEntityState(l, chapter, earlierDesc);
-          return `- ${l.name}: ${l.shortDescription || 'Lokasi'} (Kondisi Terkini: ${state.condition}${state.conditionDetails ? ` - ${state.conditionDetails}` : ''})`;
+          return `- [Lokasi] ${l.name}: ${l.shortDescription || 'Latar'} (Kondisi: ${state.condition}${state.conditionDetails ? ` - ${state.conditionDetails}` : ''})`;
         })
         .join('\n');
     } else {
@@ -194,10 +245,11 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
 
     combinedSettingLore += '\n\n=== ITEM & ARTEFAK TERKINI ===\n';
     if (itemEntities.length > 0) {
-      combinedSettingLore += itemEntities
+      const targetItems = setScope === 'compact' ? itemEntities.slice(0, 5) : itemEntities;
+      combinedSettingLore += targetItems
         .map((it) => {
           const state = getLatestEntityState(it, chapter, earlierDesc);
-          return `- ${it.name}: ${it.shortDescription || 'Item'} (Status: ${state.condition}${state.conditionDetails ? ` - ${state.conditionDetails}` : ''})`;
+          return `- [Item] ${it.name}: ${it.shortDescription || 'Benda'} (Status: ${state.condition}${state.conditionDetails ? ` - ${state.conditionDetails}` : ''})`;
         })
         .join('\n');
     } else {
@@ -206,8 +258,9 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
 
     combinedSettingLore += '\n\n=== ATURAN DUNIA & LORE (WORLD RULES) ===\n';
     if (loreEntities.length > 0) {
-      combinedSettingLore += loreEntities
-        .map((lr) => `- ${lr.name}: ${lr.shortDescription || lr.detailedNotes || 'Hukum/mitologi'}`)
+      const targetLore = setScope === 'compact' ? loreEntities.slice(0, 4) : loreEntities;
+      combinedSettingLore += targetLore
+        .map((lr) => `- ${lr.name}: ${lr.shortDescription || (lr.detailedNotes ? lr.detailedNotes.slice(0, 100) : 'Hukum/aturan fiksi')}`)
         .join('\n');
     } else {
       combinedSettingLore += '- Mengikuti hukum konsistensi dunia fiksi yang dibangun dalam novel.\n';
@@ -216,7 +269,7 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
     combinedSettingLore += '\n\n=== GAYA PENULISAN (WRITING STYLE) ===\n';
     combinedSettingLore +=
       'Sudut Pandang: Orang Ketiga Terbatas (Third Person Limited)\n' +
-      'Gaya Sastra: Narasi deskriptif panca indera (aroma, pencahayaan, tekstur, suara latar), dialog berbobot penuh subteks alami, alur mengalir tanpa kalimat klise bertele-tele.';
+      'Gaya Sastra: Terapkan teknik "Show, Don\'t Tell" (panca indera, gestur emosi alami), dialog berbobot dengan subteks kuat, ritme adegan dinamis tanpa kalimat klise.';
 
     setSettingItemLoreText(combinedSettingLore);
   };
@@ -592,6 +645,44 @@ INSTRUKSI PENULISAN:
                         <Sparkles className="w-3.5 h-3.5 text-purple-500" />
                       )}
                       <span><span className="hidden sm:inline">Generate </span>Plot AI ✨</span>
+                    </button>
+                  )}
+
+                  {pt.id === 'characters' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = characterScope === 'relevant' ? 'all' : 'relevant';
+                        setCharacterScope(next);
+                        loadAllContext(next, settingScope);
+                      }}
+                      className={`py-1.5 px-2.5 rounded-xl border text-[10px] font-bold transition flex items-center gap-1 active:scale-95 ${
+                        characterScope === 'relevant'
+                          ? 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                      }`}
+                      title="Beralih antara hanya karakter relevan (hemat token) atau seluruh karakter buku"
+                    >
+                      <span>{characterScope === 'relevant' ? '⚡ Fokus Relevan' : '👥 Semua Tokoh'}</span>
+                    </button>
+                  )}
+
+                  {pt.id === 'setting_item_lore' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = settingScope === 'compact' ? 'all' : 'compact';
+                        setSettingScope(next);
+                        loadAllContext(characterScope, next);
+                      }}
+                      className={`py-1.5 px-2.5 rounded-xl border text-[10px] font-bold transition flex items-center gap-1 active:scale-95 ${
+                        settingScope === 'compact'
+                          ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                      }`}
+                      title="Beralih antara lore ringkas padat (hemat token) atau seluruh daftar lore"
+                    >
+                      <span>{settingScope === 'compact' ? '⚡ Lore Ringkas' : '📜 Semua Lore'}</span>
                     </button>
                   )}
 
