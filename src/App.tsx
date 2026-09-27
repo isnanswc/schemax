@@ -184,6 +184,11 @@ export function App() {
     setIsArchitectModalOpen(true);
   };
 
+  const handleCloseArchitect = () => {
+    navStack.pop('modal-architect');
+    setIsArchitectModalOpen(false);
+  };
+
   const handleOpenCornerMenu = () => {
     navStack.push('modal-corner-menu', () => setIsCornerMenuOpen(false));
     setIsCornerMenuOpen(true);
