@@ -813,7 +813,15 @@ ${afterHtml}
           )}
 
           {/* Chapter Title Field */}
-          <div className="mb-4 pt-1 border-b border-slate-100 dark:border-slate-800/80 pb-2">
+          <div className="mb-4 pt-1 border-b border-slate-200 dark:border-slate-800 pb-2.5">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                <span>📖 Judul Naskah Bab {currentChapter.order}</span>
+              </span>
+              <span className="text-[10px] text-slate-400">
+                (Judul resmi bab yang akan dicetak/dibaca)
+              </span>
+            </div>
             <input
               type="text"
               value={title}
@@ -822,7 +830,7 @@ ${afterHtml}
                 setIsSaved(false);
                 handleContentChange();
               }}
-              placeholder="Judul Bab..."
+              placeholder="Ketik judul resmi bab ini..."
               className={`w-full bg-transparent text-xl sm:text-2xl font-black text-slate-900 dark:text-white focus:outline-none placeholder:text-slate-400 border-none p-0 tracking-tight ${getBlurTitleClass()}`}
             />
           </div>
