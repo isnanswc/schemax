@@ -110,62 +110,168 @@ export function extractParagraphsFromEditor(container: HTMLElement): Array<{ ele
   return results;
 }
 
-// AI prompt to analyze tension score (0-100) per paragraph efficiently
+export interface TensionAnalysisResult {
+  items: Array<{
+    index: number;
+    score: number;
+    label: string;
+    note: string;
+    hasPlothole?: boolean;
+    plotholeSeverity?: 'warning' | 'critical';
+    plotholeNote?: string;
+    plotholeSuggestion?: string;
+  }>;
+  continuitySummary?: string;
+  plotholeCount: number;
+}
+
+// AI prompt to analyze tension score (0-100) per paragraph AND check narrative continuity/plotholes against previous chapters
 export async function analyzeChapterTensionWithAI(
   paragraphs: string[],
-  chapterTitle: string
-): Promise<Array<{ index: number; score: number; label: string; note: string }>> {
-  if (paragraphs.length === 0) return [];
+  chapterTitle: string,
+  previousChaptersContext?: string
+): Promise<TensionAnalysisResult> {
+  if (paragraphs.length === 0) {
+    return { items: [], plotholeCount: 0 };
+  }
 
   // Cap max tokens by taking up to 50 paragraphs or truncating very long paragraphs
   const numberedList = paragraphs
-    .map((p, idx) => `[P${idx}]: ${p.length > 300 ? p.slice(0, 300) + '...' : p}`)
+    .map((p, idx) => `[P${idx}]: ${p.length > 350 ? p.slice(0, 350) + '...' : p}`)
     .join('\n\n');
 
-  const prompt = `Anda adalah editor sastra dan kurator dramatisasi novel.
-Tugas Anda adalah menilai tingkat intensitas narasi / ketegangan emosi (Tension Score) untuk setiap paragraf naskah Bab "${chapterTitle}".
+  const hasPrev = Boolean(previousChaptersContext && previousChaptersContext.trim());
 
-Panduan Skala Skor (0 - 100):
-- 0 - 30: Tenang / Eksposisi (Deskripsi suasana santai, pemandangan, transisi latar, jeda istirahat).
-- 31 - 60: Menegangkan / Investigasi (Dialog serius, kecurigaan, teka-teki, rasa cemas, konflik mulai muncul).
-- 61 - 80: Tinggi / Konflik (Perdebatan memanas, aksi cepat, bahaya mendekat, tempo kalimat memburu).
-- 81 - 100: Puncak / Klimaks (Pertarungan hidup-mati, pengungkapan twist besar, pengkhianatan, klimaks emosional luar biasa).
+  const prompt = `Anda adalah editor sastra, kurator dramatisasi, dan continuity supervisor novel profesional.
+Tugas Anda adalah melakukan 2 ANALISIS SEKALIGUS DALAM 1 LANGKAH (HEMAT TOKEN):
+1. Menilai intensitas narasi / tensi emosional (Tension Score 0-100) untuk setiap paragraf.
+2. Memeriksa apakah adegan dalam bab ini memiliki GAP LOGIKA atau PLOTHOLE terhadap peristiwa/fakta di bab-bab sebelumnya.
 
-Daftar Paragraf Naskah:
+Bab yang Sedang Dianalisis: "${chapterTitle}"
+
+${
+  hasPrev
+    ? `KONTEKS & FAKTA BAB-BAB SEBELUMNYA (KONSISTENSI & KONTINUITAS):
+"""
+${previousChaptersContext}
+"""`
+    : `(Ini adalah Bab Pembuka/Awal atau belum ada riwayat bab sebelumnya).`
+}
+
+Daftar Paragraf Naskah Bab Ini:
 ${numberedList}
 
-INSTRUKSI PENTING:
-Balas HANYA dengan array JSON murni tanpa markdown pembuka, tanpa pengantar, dan tanpa penutup. Format persis:
-[
-  {"index": 0, "score": 25, "label": "Tenang", "note": "Deskripsi suasana pagi"},
-  {"index": 1, "score": 75, "label": "Konflik", "note": "Kedatangan musuh secara mendadak"}
-]`;
+PANDUAN SKALA TENSI (0 - 100):
+- 0 - 30: Tenang / Eksposisi (Suasana santai, deskripsi latar, jeda).
+- 31 - 60: Sedang / Investigasi (Dialog serius, kecurigaan, rasa cemas, misteri).
+- 61 - 80: Tinggi / Konflik (Perdebatan sengit, aksi bahaya, tempo memburu).
+- 81 - 100: Puncak / Klimaks (Pertarungan hidup-mati, pengungkapan twist besar, klimaks emosional).
+
+PANDUAN DETEKSI GAP / PLOTHOLE:
+- Teliti apakah ada:
+  * Karakter yang tiba-tiba hadir padahal di bab sebelumnya terluka parah/ditawan/berada di tempat lain.
+  * Barang/senjata yang mendadak muncul tanpa pernah diambil.
+  * Pengetahuan/rahasia yang tiba-tiba diketahui karakter padahal belum pernah diungkap sebelumnya.
+  * Kontradiksi motivasi, nama, latar waktu, atau hukum dunia yang melanggar kejadian bab lalu.
+- Jika ADA plothole pada paragraf tertentu, set:
+  * hasPlothole: true
+  * plotholeSeverity: "warning" (anomali ringan/gap penjelasan) ATAU "critical" (kontradiksi berat/melanggar plot lalu)
+  * plotholeNote: "Jelaskan dengan ringkas apa kontradiksi/gap-nya"
+  * plotholeSuggestion: "Beri saran konkrit perbaikan kalimat/alur untuk penulis"
+
+INSTRUKSI OUTPUT:
+Balas HANYA dengan objek JSON valid persis dengan struktur ini:
+{
+  "continuitySummary": "Ringkasan 1-2 kalimat mengenai kesinambungan cerita bab ini dengan bab lalu...",
+  "items": [
+    {
+      "index": 0,
+      "score": 25,
+      "label": "Tenang",
+      "note": "Deskripsi suasana pagi",
+      "hasPlothole": false
+    },
+    {
+      "index": 1,
+      "score": 75,
+      "label": "Konflik",
+      "note": "Perdebatan sengit",
+      "hasPlothole": true,
+      "plotholeSeverity": "warning",
+      "plotholeNote": "Karakter Arya tiba-tiba memegang belati perak, padahal di Bab 2 belati tersebut tertinggal di kedai.",
+      "plotholeSuggestion": "Tambahkan kalimat singkat bahwa Arya sempat mengambil kembali belatinya sebelum berangkat."
+    }
+  ]
+}`;
 
   const sysInstruction =
-    'Anda adalah AI penganalisis kurva dramatisasi naskah novel profesional yang selalu membalas dalam JSON array valid.';
+    'Anda adalah AI penganalisis dramatisasi naskah dan supervisor kontinuitas novel profesional yang selalu membalas dalam format JSON valid.';
 
   const response = await generateWithSmartFallback(prompt, sysInstruction);
   const rawText = response.text?.trim() || '';
 
   try {
-    const jsonMatch = rawText.match(/\[[\s\S]*\]/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      if (Array.isArray(parsed)) {
-        return parsed.map((item, idx) => ({
+    let cleanJson = rawText;
+    if (cleanJson.startsWith('```json')) {
+      cleanJson = cleanJson.replace(/^```json\s*/i, '').replace(/\s*```$/, '');
+    } else if (cleanJson.startsWith('```')) {
+      cleanJson = cleanJson.replace(/^```\s*/, '').replace(/\s*```$/, '');
+    }
+
+    const firstBrace = cleanJson.indexOf('{');
+    const lastBrace = cleanJson.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1) {
+      cleanJson = cleanJson.substring(firstBrace, lastBrace + 1);
+      const parsed = JSON.parse(cleanJson);
+      if (parsed && Array.isArray(parsed.items)) {
+        const items = parsed.items.map((item: any, idx: number) => ({
           index: typeof item.index === 'number' ? item.index : idx,
           score: typeof item.score === 'number' ? Math.max(0, Math.min(100, item.score)) : 50,
           label: item.label || 'Sedang',
           note: item.note || '',
+          hasPlothole: Boolean(item.hasPlothole),
+          plotholeSeverity: item.plotholeSeverity === 'critical' ? ('critical' as const) : ('warning' as const),
+          plotholeNote: item.plotholeNote || undefined,
+          plotholeSuggestion: item.plotholeSuggestion || undefined,
         }));
+
+        const plotholeCount = items.filter((it: any) => it.hasPlothole).length;
+        return {
+          items,
+          continuitySummary: parsed.continuitySummary || undefined,
+          plotholeCount,
+        };
+      }
+    }
+
+    // Try array fallback
+    const firstBracket = cleanJson.indexOf('[');
+    const lastBracket = cleanJson.lastIndexOf(']');
+    if (firstBracket !== -1 && lastBracket !== -1) {
+      const parsedArray = JSON.parse(cleanJson.substring(firstBracket, lastBracket + 1));
+      if (Array.isArray(parsedArray)) {
+        const items = parsedArray.map((item: any, idx: number) => ({
+          index: typeof item.index === 'number' ? item.index : idx,
+          score: typeof item.score === 'number' ? Math.max(0, Math.min(100, item.score)) : 50,
+          label: item.label || 'Sedang',
+          note: item.note || '',
+          hasPlothole: Boolean(item.hasPlothole),
+          plotholeSeverity: item.plotholeSeverity === 'critical' ? ('critical' as const) : ('warning' as const),
+          plotholeNote: item.plotholeNote || undefined,
+          plotholeSuggestion: item.plotholeSuggestion || undefined,
+        }));
+        return {
+          items,
+          plotholeCount: items.filter((it) => it.hasPlothole).length,
+        };
       }
     }
   } catch (err) {
-    console.warn('Gagal parse JSON tensi narasi:', err, rawText);
+    console.warn('Gagal parse JSON tensi & plothole narasi:', err, rawText);
   }
 
   // Fallback heuristic if AI output couldn't be parsed
-  return paragraphs.map((p, idx) => {
+  const items = paragraphs.map((p, idx) => {
     let score = 30;
     const lower = p.toLowerCase();
     if (/[!?]{2,}|darah|teriak|mati|pedang|hancur|lari|panik|serang|ledak/.test(lower)) {
@@ -178,6 +284,12 @@ Balas HANYA dengan array JSON murni tanpa markdown pembuka, tanpa pengantar, dan
       score,
       label: score > 70 ? 'Konflik' : score > 45 ? 'Investigasi' : 'Tenang',
       note: 'Analisis heuristik leksikal',
+      hasPlothole: false,
     };
   });
+
+  return {
+    items,
+    plotholeCount: 0,
+  };
 }

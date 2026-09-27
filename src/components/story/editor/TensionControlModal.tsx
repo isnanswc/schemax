@@ -27,6 +27,8 @@ interface TensionControlModalProps {
   isAnalyzing: boolean;
   onRunAnalysis: () => void;
   lastAnalyzedAt?: number;
+  continuitySummary?: string;
+  onJumpToParagraph?: (index: number) => void;
 }
 
 export const TensionControlModal: React.FC<TensionControlModalProps> = ({
@@ -41,6 +43,8 @@ export const TensionControlModal: React.FC<TensionControlModalProps> = ({
   isAnalyzing,
   onRunAnalysis,
   lastAnalyzedAt,
+  continuitySummary,
+  onJumpToParagraph,
 }) => {
   if (!isOpen) return null;
 
@@ -181,18 +185,85 @@ export const TensionControlModal: React.FC<TensionControlModalProps> = ({
                     </span>
                   </div>
                   <div className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-100 dark:border-slate-800">
-                    <span className="text-[10px] text-slate-400 block">Belum Dinilai</span>
-                    <span className={`text-sm font-black font-mono ${unEvaluatedCount > 0 ? 'text-amber-500 font-bold' : 'text-slate-400'}`}>
-                      {unEvaluatedCount}
+                    <span className="text-[10px] text-slate-400 block">Plothole / Gap</span>
+                    <span className={`text-sm font-black font-mono ${tensionItems.some(it => it.hasPlothole) ? 'text-rose-500 font-bold' : 'text-emerald-500'}`}>
+                      {tensionItems.filter(it => it.hasPlothole).length}
                     </span>
                   </div>
                 </div>
+
+                {/* 🛡️ Plothole & Continuity Inspector List */}
+                {tensionItems.some((it) => it.hasPlothole) && (
+                  <div className="pt-2 space-y-2 border-t border-slate-200 dark:border-slate-800">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        <span>Daftar Gap &amp; Plothole Terdeteksi ({tensionItems.filter((it) => it.hasPlothole).length}):</span>
+                      </span>
+                    </div>
+
+                    {continuitySummary && (
+                      <p className="text-[11px] text-slate-600 dark:text-slate-400 bg-white/80 dark:bg-slate-900/80 p-2 rounded-xl border border-slate-200 dark:border-slate-800 leading-relaxed italic">
+                        "{continuitySummary}"
+                      </p>
+                    )}
+
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                      {tensionItems
+                        .filter((it) => it.hasPlothole)
+                        .map((pIt, pIdx) => {
+                          const isCrit = pIt.plotholeSeverity === 'critical';
+                          return (
+                            <div
+                              key={pIdx}
+                              className={`p-3 rounded-2xl border text-xs space-y-1.5 transition ${
+                                isCrit
+                                  ? 'bg-rose-50/70 dark:bg-rose-950/20 border-rose-300 dark:border-rose-500/40 text-rose-950 dark:text-rose-200'
+                                  : 'bg-amber-50/70 dark:bg-amber-950/20 border-amber-300 dark:border-amber-500/40 text-amber-950 dark:text-amber-200'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-black text-[11px] flex items-center gap-1">
+                                  <span>{isCrit ? '🚨 Plothole Kritis' : '⚠️ Gap Narasi'}</span>
+                                  <span className="text-[10px] opacity-75">(Paragraf #{pIt.paragraphIndex + 1})</span>
+                                </span>
+
+                                {onJumpToParagraph && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      onClose();
+                                      onJumpToParagraph(pIt.paragraphIndex);
+                                    }}
+                                    className="py-1 px-2.5 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 hover:border-rose-400 text-[10px] font-extrabold shadow-xs transition active:scale-95 flex items-center gap-1"
+                                  >
+                                    <span>Lompat ke Teks</span>
+                                    <span className="text-xs">➔</span>
+                                  </button>
+                                )}
+                              </div>
+
+                              <p className="text-[11px] leading-relaxed">
+                                <strong>Anomali:</strong> {pIt.plotholeNote}
+                              </p>
+
+                              {pIt.plotholeSuggestion && (
+                                <p className="text-[11px] bg-white/70 dark:bg-slate-900/60 p-2 rounded-xl text-slate-800 dark:text-slate-200 border border-slate-200/80 dark:border-slate-850 leading-relaxed">
+                                  <strong className="text-emerald-700 dark:text-emerald-400">💡 Saran Solusi:</strong> {pIt.plotholeSuggestion}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-center py-4 text-slate-400 dark:text-slate-500 space-y-1">
                 <BarChart2 className="w-8 h-8 mx-auto opacity-30" />
-                <p className="text-[11px]">Belum ada data tensi untuk bab ini.</p>
-                <p className="text-[10px]">Klik tombol analisis AI di bawah untuk mulai memetakan.</p>
+                <p className="text-[11px]">Belum ada data tensi dan kontinuitas untuk bab ini.</p>
+                <p className="text-[10px]">Klik tombol analisis AI di bawah untuk memeriksa tensi dan plothole sekaligus.</p>
               </div>
             )}
           </div>

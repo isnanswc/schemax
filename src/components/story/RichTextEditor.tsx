@@ -11,7 +11,10 @@ import {
   FileEdit,
   Copy,
   ArrowRight,
-  Layers
+  Layers,
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import {
   StoryChapter,
@@ -135,7 +138,10 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     }
   );
 
-  // Apply visual styling to paragraphs based on tensionData
+  // Quick Plothole Navigator State
+  const [activePlotholeIndex, setActivePlotholeIndex] = useState<number | null>(null);
+
+  // Apply visual styling to paragraphs based on tensionData & plotholes
   const applyTensionStyling = (data = tensionData) => {
     if (!editorRef.current) return;
     const children = Array.from(editorRef.current.children) as HTMLElement[];
@@ -146,16 +152,21 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     const isGutter = displayMode === 'gutter' || displayMode === 'both';
     const isUnderline = displayMode === 'underline' || displayMode === 'both';
 
-    for (const child of children) {
+    for (let idx = 0; idx < children.length; idx++) {
+      const child = children[idx];
       if (child.tagName === 'FIGURE' || child.classList.contains('story-image-block')) {
         continue;
       }
+      // Attach index identifier for quick-scrolling
+      child.setAttribute('data-paragraph-index', String(idx));
+
       const txt = child.innerText?.trim() || '';
-      if (!txt || isNone) {
+      if (!txt) {
         child.style.borderLeft = '';
         child.style.paddingLeft = '';
         child.style.borderBottom = '';
         child.style.paddingBottom = '';
+        child.style.backgroundColor = '';
         child.removeAttribute('title');
         continue;
       }
@@ -165,30 +176,55 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
       if (match) {
         const color = getTensionColor(match.tensionScore);
-        if (isGutter) {
-          child.style.borderLeft = `4px solid ${color.hex}`;
-          child.style.paddingLeft = '12px';
+
+        // If paragraph has plothole, give distinctive red/amber alert highlight
+        if (match.hasPlothole) {
+          const isCritical = match.plotholeSeverity === 'critical';
+          child.style.borderLeft = isCritical ? '5px solid #ef4444' : '5px solid #f59e0b';
+          child.style.paddingLeft = '14px';
+          child.style.backgroundColor = isCritical ? 'rgba(239, 68, 68, 0.08)' : 'rgba(245, 158, 11, 0.08)';
+          child.style.borderRadius = '0.5rem';
+          if (isUnderline) {
+            child.style.borderBottom = isCritical ? '2px dashed #ef4444' : '2px dashed #f59e0b';
+            child.style.paddingBottom = '4px';
+          }
+          child.title = `⚠️ [PLOTHOLE/GAP]: ${match.plotholeNote || 'Ada potensi kontradiksi cerita'}\n💡 Saran: ${match.plotholeSuggestion || '-'}`;
+        } else if (!isNone) {
+          child.style.backgroundColor = '';
+          child.style.borderRadius = '';
+          if (isGutter) {
+            child.style.borderLeft = `4px solid ${color.hex}`;
+            child.style.paddingLeft = '12px';
+          } else {
+            child.style.borderLeft = '';
+            child.style.paddingLeft = '';
+          }
+
+          if (isUnderline) {
+            child.style.borderBottom = `2px solid ${color.hex}b3`;
+            child.style.paddingBottom = '4px';
+          } else {
+            child.style.borderBottom = '';
+            child.style.paddingBottom = '';
+          }
+          child.title = `⚡ Intensitas: ${match.tensionScore}% (${match.label || color.label})${match.note ? ` - ${match.note}` : ''}`;
         } else {
           child.style.borderLeft = '';
           child.style.paddingLeft = '';
-        }
-
-        if (isUnderline) {
-          child.style.borderBottom = `2px solid ${color.hex}b3`;
-          child.style.paddingBottom = '4px';
-        } else {
           child.style.borderBottom = '';
           child.style.paddingBottom = '';
+          child.style.backgroundColor = '';
+          child.removeAttribute('title');
         }
 
-        child.style.transition = 'border 0.2s ease, padding 0.2s ease';
-        child.title = `⚡ Intensitas: ${match.tensionScore}% (${match.label || color.label})${match.note ? ` - ${match.note}` : ''}`;
+        child.style.transition = 'all 0.2s ease';
       } else {
         // Any un-evaluated or modified text has strictly NO color
         child.style.borderLeft = '';
         child.style.paddingLeft = '';
         child.style.borderBottom = '';
         child.style.paddingBottom = '';
+        child.style.backgroundColor = '';
         child.removeAttribute('title');
       }
     }
@@ -201,32 +237,75 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
     setIsAnalyzingTension(true);
     try {
-      const results = await analyzeChapterTensionWithAI(
+      // Gather summaries and premises from preceding chapters for continuity & plothole verification
+      let prevContext = '';
+      try {
+        const earlierChapters = await db.chapters
+          .where('bookId')
+          .equals(currentChapter.bookId)
+          .filter((c) => c.order < currentChapter.order)
+          .sortBy('order');
+
+        if (earlierChapters.length > 0) {
+          prevContext = earlierChapters
+            .map((c) => {
+              const summaryText = c.aiSummary || c.premise || c.notes || '';
+              return `Bab ${c.order} ("${c.title}"):\n${summaryText.slice(0, 800)}`;
+            })
+            .join('\n\n');
+        }
+      } catch (errPrev) {
+        console.warn('Gagal memuat konteks bab sebelumnya:', errPrev);
+      }
+
+      const result = await analyzeChapterTensionWithAI(
         extracted.map((e) => e.text),
-        title || currentChapter.title || `Bab ${currentChapter.order}`
+        title || currentChapter.title || `Bab ${currentChapter.order}`,
+        prevContext
       );
 
-      const newItems: ParagraphTensionItem[] = results.map((r, i) => ({
+      const newItems: ParagraphTensionItem[] = result.items.map((r, i) => ({
         paragraphIndex: r.index,
         textHash: extracted[r.index]?.hash || extracted[i]?.hash || '',
         tensionScore: r.score,
         label: r.label,
         note: r.note,
+        hasPlothole: r.hasPlothole,
+        plotholeSeverity: r.plotholeSeverity,
+        plotholeNote: r.plotholeNote,
+        plotholeSuggestion: r.plotholeSuggestion,
       }));
 
       const newTensionData: ChapterTensionData = {
         items: newItems,
         lastAnalyzedAt: Date.now(),
         displayMode: tensionData.displayMode || 'both',
+        continuitySummary: result.continuitySummary,
+        plotholeCount: result.plotholeCount,
       };
 
       setTensionData(newTensionData);
       handleUpdateChapterFields({ tensionData: newTensionData });
       applyTensionStyling(newTensionData);
     } catch (err) {
-      console.error('Gagal analisis tensi narasi:', err);
+      console.error('Gagal analisis tensi & plothole narasi:', err);
     } finally {
       setIsAnalyzingTension(false);
+    }
+  };
+
+  // Quick Jump to Plothole Paragraph
+  const handleScrollToParagraph = (targetIdx: number) => {
+    setActivePlotholeIndex(targetIdx);
+    if (!editorRef.current) return;
+    const targetEl = editorRef.current.querySelector(`[data-paragraph-index="${targetIdx}"]`) as HTMLElement;
+    if (targetEl) {
+      targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Temporary pulse animation
+      targetEl.classList.add('ring-4', 'ring-rose-500/50', 'transition-all');
+      setTimeout(() => {
+        targetEl.classList.remove('ring-4', 'ring-rose-500/50');
+      }, 2000);
     }
   };
 
@@ -748,6 +827,72 @@ ${afterHtml}
             />
           </div>
 
+          {/* 🚨 Quick Plothole Navigator & Continuity Alert Bar */}
+          {tensionData.items.some((it) => it.hasPlothole) && (
+            <div className="mb-4 p-3 bg-rose-500/10 dark:bg-rose-950/30 border border-rose-500/40 rounded-2xl shadow-sm animate-in fade-in slide-in-from-top-2">
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="p-1 rounded-lg bg-rose-500 text-white flex-shrink-0 animate-pulse">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                  </span>
+                  <div>
+                    <h4 className="text-xs font-black text-rose-800 dark:text-rose-300 flex items-center gap-1.5">
+                      <span>Terdeteksi {tensionData.items.filter((it) => it.hasPlothole).length} Potensi Plothole / Gap</span>
+                      <span className="text-[10px] font-bold py-0.2 px-1.5 rounded-full bg-rose-500/20 text-rose-700 dark:text-rose-400">
+                        Kontinuitas Bab
+                      </span>
+                    </h4>
+                    {tensionData.continuitySummary && (
+                      <p className="text-[10px] text-slate-600 dark:text-slate-400 truncate max-w-sm sm:max-w-md">
+                        {tensionData.continuitySummary}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsTensionModalOpen(true)}
+                  className="text-[11px] font-bold text-rose-700 dark:text-rose-400 hover:underline flex-shrink-0 flex items-center gap-1"
+                >
+                  <span>Buka Detail</span>
+                  <ArrowRight className="w-3 h-3" />
+                </button>
+              </div>
+
+              {/* Quick Jump Buttons List */}
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1">
+                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 flex-shrink-0">
+                  Lompat Cepat:
+                </span>
+                {tensionData.items
+                  .filter((it) => it.hasPlothole)
+                  .map((pIt, pIdx) => {
+                    const isCrit = pIt.plotholeSeverity === 'critical';
+                    const isActive = activePlotholeIndex === pIt.paragraphIndex;
+                    return (
+                      <button
+                        key={pIdx}
+                        type="button"
+                        onClick={() => handleScrollToParagraph(pIt.paragraphIndex)}
+                        className={`inline-flex items-center gap-1 py-1 px-2.5 rounded-xl text-[10px] font-bold transition flex-shrink-0 active:scale-95 ${
+                          isActive
+                            ? 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-400'
+                            : isCrit
+                            ? 'bg-rose-500/20 text-rose-700 dark:text-rose-300 hover:bg-rose-500/30 border border-rose-500/40'
+                            : 'bg-amber-500/20 text-amber-700 dark:text-amber-300 hover:bg-amber-500/30 border border-amber-500/40'
+                        }`}
+                        title={pIt.plotholeNote || 'Klik untuk scroll langsung ke paragraf ini'}
+                      >
+                        <span>Paragraf #{pIt.paragraphIndex + 1}</span>
+                        {isCrit ? '⚠️' : '⚡'}
+                      </button>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
           {/* Editable Manuscript Canvas */}
           <div
             ref={editorRef}
@@ -818,6 +963,7 @@ ${afterHtml}
           onOpenTensionModal={() => setIsTensionModalOpen(true)}
           tensionDisplayMode={tensionData.displayMode}
           hasTensionData={tensionData.items.length > 0}
+          plotholeCount={tensionData.items.filter((it) => it.hasPlothole).length}
           onExitToTabs={() => handleTabChange('info')}
         />
       ) : (
@@ -991,6 +1137,8 @@ ${afterHtml}
         isAnalyzing={isAnalyzingTension}
         onRunAnalysis={handleRunTensionAnalysis}
         lastAnalyzedAt={tensionData.lastAnalyzedAt}
+        continuitySummary={tensionData.continuitySummary}
+        onJumpToParagraph={handleScrollToParagraph}
       />
 
       {/* Insert Story Image Modal with Worldbuilding Tagging & AI Vision */}

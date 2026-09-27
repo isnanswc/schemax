@@ -43,6 +43,7 @@ interface AdvancedEditorToolbarProps {
   onOpenTensionModal?: () => void;
   tensionDisplayMode?: TensionDisplayMode;
   hasTensionData?: boolean;
+  plotholeCount?: number;
   onExitToTabs: () => void;
 }
 
@@ -61,6 +62,7 @@ export const AdvancedEditorToolbar: React.FC<AdvancedEditorToolbarProps> = ({
   onOpenTensionModal,
   tensionDisplayMode = 'both',
   hasTensionData = false,
+  plotholeCount = 0,
   onExitToTabs,
 }) => {
   const [keyboardOffset, setKeyboardOffset] = useState(0);
@@ -146,17 +148,27 @@ export const AdvancedEditorToolbar: React.FC<AdvancedEditorToolbarProps> = ({
               type="button"
               onClick={onOpenTensionModal}
               className={`flex items-center gap-1 py-1 px-2 sm:px-2.5 rounded-full border transition active:scale-95 text-[11px] font-bold ${
-                tensionDisplayMode !== 'none'
+                plotholeCount > 0
+                  ? 'bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-500/60 shadow-xs'
+                  : tensionDisplayMode !== 'none'
                   ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/40 shadow-xs'
                   : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border-slate-200 dark:border-slate-700/80'
               }`}
-              title="Analisis & Pengaturan Tensi Cerita (AI Arc)"
+              title={
+                plotholeCount > 0
+                  ? `Terdeteksi ${plotholeCount} gap/plothole kontinuitas bab`
+                  : 'Analisis & Pengaturan Tensi Cerita (AI Arc)'
+              }
             >
               <Activity className={`w-3 h-3 ${tensionDisplayMode !== 'none' ? 'text-rose-500' : 'text-slate-400'}`} />
               <span>Tensi</span>
-              {hasTensionData && (
+              {plotholeCount > 0 ? (
+                <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-rose-500 text-white font-black animate-pulse">
+                  {plotholeCount} Gap
+                </span>
+              ) : hasTensionData ? (
                 <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-              )}
+              ) : null}
             </button>
           )}
         </div>

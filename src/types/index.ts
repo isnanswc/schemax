@@ -116,12 +116,19 @@ export interface ParagraphTensionItem {
   tensionScore: number; // 0 to 100
   label?: string; // 'Tenang', 'Kecurigaan', 'Konflik', 'Klimaks'
   note?: string; // brief reason
+  // Plothole & Continuity Check against previous chapters
+  hasPlothole?: boolean;
+  plotholeSeverity?: 'warning' | 'critical'; // warning = anomali kecil / gap, critical = plothole kontradiksi berat
+  plotholeNote?: string; // Penjelasan gap / plothole
+  plotholeSuggestion?: string; // Saran perubahan / revisi untuk penulis
 }
 
 export interface ChapterTensionData {
   items: ParagraphTensionItem[];
   lastAnalyzedAt: number;
   displayMode: TensionDisplayMode;
+  continuitySummary?: string; // Ringkasan konsistensi keseluruhan cerita terhadap bab sebelumnya
+  plotholeCount?: number; // Total plothole yang terdeteksi
 }
 
 export type EmotionType =
