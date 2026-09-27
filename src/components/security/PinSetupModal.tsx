@@ -166,7 +166,7 @@ export const PinSetupModal: React.FC<PinSetupModalProps> = ({ isOpen, onClose })
                     onClick={handleStartSetup}
                     className="w-full py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition"
                   >
-                    Ganti PIN / Kunci Pemulihan
+                    Ganti PIN
                   </button>
                 </div>
 

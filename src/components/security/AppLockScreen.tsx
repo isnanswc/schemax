@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSecurity } from '../../contexts/SecurityContext';
 import { AlertCircle, Delete } from 'lucide-react';
 
@@ -32,6 +32,9 @@ export const AppLockScreen: React.FC = () => {
     ss: '00',
     dateStr: '',
   });
+
+  // BUG-15 FIX: Track tap timing to reset count if taps are too slow (> 2s gap)
+  const lastTapTimeRef = useRef<number>(0);
 
   // Realtime clock (Hours, Minutes, Seconds) & Date
   useEffect(() => {
@@ -73,15 +76,22 @@ export const AppLockScreen: React.FC = () => {
       setErrorMessage(null);
       setSecretTapCount(0);
       setIsUnlockedSuccess(false);
+      lastTapTimeRef.current = 0;
     }
   }, [isLocked]);
 
   if (!isLocked) return null;
 
-  // Secret 5-tap on lock icon unlocks app instantly without any UI prompt or confirmation
+  // BUG-15 FIX: Secret 5-tap backdoor resets count if taps are too slow (> 2s gap)
   const handleSecretTap = () => {
     triggerHaptic('tap');
-    const nextCount = secretTapCount + 1;
+    const now = Date.now();
+    const timeSinceLast = now - lastTapTimeRef.current;
+    lastTapTimeRef.current = now;
+
+    // Reset counter if more than 2 seconds passed since last tap
+    const currentCount = timeSinceLast > 2000 ? 0 : secretTapCount;
+    const nextCount = currentCount + 1;
     setSecretTapCount(nextCount);
 
     if (nextCount >= 5) {
@@ -135,9 +145,11 @@ export const AppLockScreen: React.FC = () => {
   };
 
   return (
+    // BUG-06 NOTE: Lock screen intentionally uses a dark vault aesthetic regardless of theme.
+    // The dark bg is part of the security design language.
     <div className="fixed inset-0 z-[100] flex flex-col justify-between overflow-hidden bg-slate-950 text-slate-100 select-none animate-in fade-in duration-300">
       {/* 📜 CINEMATIC FLOATING TYPEWRITER LORE MATRIX (BACKGROUND) */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-[0.05] dark:opacity-[0.08] filter blur-[0.7px] select-none text-amber-200 font-mono text-[11px] sm:text-xs leading-loose">
+      <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-[0.07] filter blur-[0.7px] select-none text-amber-200 font-mono text-[11px] sm:text-xs leading-loose">
         <div className="animate-typewriter-stream space-y-3 px-4 py-8">
           {[...BACKGROUND_LORE_LINES, ...BACKGROUND_LORE_LINES].map((line, idx) => (
             <p key={idx} className="whitespace-nowrap tracking-wider">
@@ -152,10 +164,13 @@ export const AppLockScreen: React.FC = () => {
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50">
           {/* Shockwave expanding ring 1 */}
           <div className="w-40 h-40 rounded-full border-4 border-amber-300 bg-gradient-to-r from-amber-400/40 via-yellow-200/60 to-emerald-400/40 blur-md animate-lightburst" />
-          {/* Shockwave expanding ring 2 */}
+          {/* BUG-16 FIX: Replaced invalid `bg-radial` with explicit inline style */}
           <div
-            className="w-40 h-40 rounded-full border-2 border-emerald-400 bg-radial from-white via-amber-300/30 to-transparent blur-xl animate-lightburst"
-            style={{ animationDelay: '0.15s' }}
+            className="absolute w-40 h-40 rounded-full border-2 border-emerald-400 blur-xl animate-lightburst"
+            style={{
+              background: 'radial-gradient(circle, white, rgba(251,191,36,0.3), transparent)',
+              animationDelay: '0.15s',
+            }}
           />
         </div>
       )}
@@ -198,8 +213,9 @@ export const AppLockScreen: React.FC = () => {
             }`}
           />
 
+          {/* BUG-05 FIX: w-22/h-22 → w-20 h-20 sm:w-24 sm:h-24 (valid Tailwind values) */}
           <div
-            className={`relative w-20 h-20 sm:w-22 sm:h-22 rounded-3xl backdrop-blur-2xl flex items-center justify-center border-2 transition-all duration-500 shadow-2xl ${
+            className={`relative w-20 h-20 sm:w-24 sm:h-24 rounded-3xl backdrop-blur-2xl flex items-center justify-center border-2 transition-all duration-500 shadow-2xl ${
               isUnlockedSuccess
                 ? 'bg-emerald-950/80 border-emerald-400 shadow-emerald-500/40 scale-110'
                 : 'bg-slate-900/90 border-amber-500/40 hover:border-amber-400 shadow-amber-500/15'
@@ -227,7 +243,7 @@ export const AppLockScreen: React.FC = () => {
             {/* Custom SVG Lock Illustration with Shackle Animation */}
             <svg
               viewBox="0 0 48 48"
-              className="w-10 h-10 sm:w-11 sm:h-11 transition-all duration-300"
+              className="w-10 h-10 sm:w-12 sm:h-12 transition-all duration-300"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
             >
@@ -306,9 +322,9 @@ export const AppLockScreen: React.FC = () => {
             })}
           </div>
 
-          {/* Error Message */}
+          {/* Error Message — BUG-23 FIX: replaced invalid animate-fade-in with animate-in fade-in */}
           {errorMessage ? (
-            <p className="text-xs font-bold text-rose-400 flex items-center justify-center gap-1 animate-fade-in">
+            <p className="text-xs font-bold text-rose-400 flex items-center justify-center gap-1 animate-in fade-in duration-200">
               <AlertCircle className="w-3.5 h-3.5" />
               <span>{errorMessage}</span>
             </p>
@@ -329,10 +345,12 @@ export const AppLockScreen: React.FC = () => {
         <div className="relative w-full max-w-sm rounded-[32px] p-[2px] overflow-hidden">
           
           {/* 🌌 Wandering Neon Laser Beam Border (Looping Trail Effect) */}
-          <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-400 to-amber-500/0 animate-neon-border opacity-70 blur-[1px]" />
+          <div className="absolute inset-0 animate-neon-border opacity-70 blur-[1px]" />
 
           {/* Keypad Container: Large, spacious, easy thumb touch */}
-          <div className="relative rounded-[30px] bg-slate-900/80 dark:bg-slate-950/85 backdrop-blur-2xl border border-slate-800/80 p-3 sm:p-4 shadow-2xl">
+          {/* BUG-24: inner rounded-[30px] (= outer 32px - 2px padding) is correct */}
+          <div className="relative rounded-[30px] bg-slate-900/80 backdrop-blur-2xl border border-slate-800/80 p-3 sm:p-4 shadow-2xl">
+            {/* BUG-04 FIX: h-17 → h-16 sm:h-[68px]; active:scale-92 → active:scale-[0.92] */}
             <div className="grid grid-cols-3 gap-2.5 sm:gap-3.5">
               {[
                 { num: '1', sub: '' },
@@ -349,7 +367,7 @@ export const AppLockScreen: React.FC = () => {
                   key={btn.num}
                   type="button"
                   onClick={() => handleKeyPress(btn.num)}
-                  className="h-16 sm:h-17 rounded-2xl bg-white/5 hover:bg-white/10 active:bg-amber-500 active:text-slate-950 border border-white/10 text-slate-100 transition-all duration-100 active:scale-92 shadow-sm flex flex-col items-center justify-center gap-0.5 group"
+                  className="h-16 sm:h-[68px] rounded-2xl bg-white/5 hover:bg-white/10 active:bg-amber-500 active:text-slate-950 border border-white/10 text-slate-100 transition-all duration-100 active:scale-[0.92] shadow-sm flex flex-col items-center justify-center gap-0.5 group"
                 >
                   <span className="text-2xl sm:text-3xl font-bold font-mono group-active:text-slate-950 leading-none">
                     {btn.num}
@@ -363,13 +381,14 @@ export const AppLockScreen: React.FC = () => {
               ))}
 
               {/* Blank spacer left */}
-              <div className="h-16 sm:h-17 flex items-center justify-center" />
+              {/* BUG-04 FIX: h-17 → h-16 sm:h-[68px] */}
+              <div className="h-16 sm:h-[68px] flex items-center justify-center" />
 
               {/* Digit 0 */}
               <button
                 type="button"
                 onClick={() => handleKeyPress('0')}
-                className="h-16 sm:h-17 rounded-2xl bg-white/5 hover:bg-white/10 active:bg-amber-500 active:text-slate-950 border border-white/10 text-slate-100 transition-all duration-100 active:scale-92 shadow-sm flex flex-col items-center justify-center group"
+                className="h-16 sm:h-[68px] rounded-2xl bg-white/5 hover:bg-white/10 active:bg-amber-500 active:text-slate-950 border border-white/10 text-slate-100 transition-all duration-100 active:scale-[0.92] shadow-sm flex flex-col items-center justify-center group"
               >
                 <span className="text-2xl sm:text-3xl font-bold font-mono group-active:text-slate-950 leading-none">
                   0
@@ -384,7 +403,7 @@ export const AppLockScreen: React.FC = () => {
                 type="button"
                 onClick={handleDelete}
                 disabled={pinInput.length === 0}
-                className="h-16 sm:h-17 rounded-2xl bg-white/5 hover:bg-rose-500/20 active:bg-rose-500 active:text-white disabled:opacity-20 border border-white/10 text-slate-400 hover:text-white transition-all duration-100 active:scale-92 shadow-sm flex flex-col items-center justify-center gap-1"
+                className="h-16 sm:h-[68px] rounded-2xl bg-white/5 hover:bg-rose-500/20 active:bg-rose-500 active:text-white disabled:opacity-20 border border-white/10 text-slate-400 hover:text-white transition-all duration-100 active:scale-[0.92] shadow-sm flex flex-col items-center justify-center gap-1"
                 aria-label="Hapus Digit"
               >
                 <Delete className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -397,4 +416,3 @@ export const AppLockScreen: React.FC = () => {
     </div>
   );
 };
-

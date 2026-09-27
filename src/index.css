@@ -397,22 +397,47 @@ button:active:not(:disabled),
   animation: lightburstShockwave 0.8s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
 }
 
-/* 🌌 Keypad Neon Wandering Laser Border */
-@keyframes neonBorderWander {
+/* 🌌 BUG-12 FIX: Keypad Neon Laser Border — conic-gradient spin so the laser
+   actually travels around the perimeter of the keypad, not just left-to-right */
+@keyframes neonBorderSpin {
   0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
+    --angle: 0deg;
   }
   100% {
-    background-position: 0% 50%;
+    --angle: 360deg;
   }
+}
+
+@property --angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
 }
 
 .animate-neon-border {
-  background-size: 300% 300%;
-  animation: neonBorderWander 5s ease infinite;
+  background: conic-gradient(
+    from var(--angle),
+    transparent 70%,
+    rgba(245, 158, 11, 0.9) 80%,
+    rgba(255, 235, 150, 1) 85%,
+    rgba(245, 158, 11, 0.9) 90%,
+    transparent 100%
+  );
+  animation: neonBorderSpin 3s linear infinite;
 }
 
+/* BUG-22 FIX: Missing animate-scale-up used by PinSetupModal entrance */
+@keyframes scaleUp {
+  0% {
+    opacity: 0;
+    transform: scale(0.88) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
 
+.animate-scale-up {
+  animation: scaleUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

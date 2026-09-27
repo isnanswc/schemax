@@ -227,7 +227,13 @@ export const AppCornerMenuModal: React.FC<AppCornerMenuModalProps> = ({
                 </span>
                 <span className="text-[10px] text-slate-500 dark:text-slate-400">
                   {secSettings.isPinEnabled
-                    ? `Aktif (Auto-Lock ${secSettings.autoLockSeconds > 0 ? `${secSettings.autoLockSeconds}d` : 'Segera'})`
+                    ? `Aktif (Auto-Lock ${
+                        secSettings.autoLockSeconds === 30 ? '30 Dtk' :
+                        secSettings.autoLockSeconds === 60 ? '1 Mnt' :
+                        secSettings.autoLockSeconds === 180 ? '3 Mnt' :
+                        secSettings.autoLockSeconds === 300 ? '5 Mnt' :
+                        `${secSettings.autoLockSeconds}d`
+                      })`
                     : 'Nonaktif'}
                 </span>
               </div>

@@ -53,9 +53,13 @@ export function App() {
 
   // Initialize seed data if database is empty on first boot
   useEffect(() => {
-    seedInitialDataIfNeeded().then(() => {
-      setRefreshTrigger((prev) => prev + 1);
-    });
+    seedInitialDataIfNeeded()
+      .then(() => {
+        setRefreshTrigger((prev) => prev + 1);
+      })
+      .catch((err) => {
+        console.error('Failed to seed initial data:', err);
+      });
   }, []);
 
   // Live queries from IndexedDB via Dexie
@@ -313,8 +317,8 @@ export function App() {
                     chapterCounts={chapterCounts}
                     onSelectBook={handleSelectBook}
                     onResumeChapter={(book, chapter) => {
-                      setCurrentBook(book);
-                      handleOpenChapterStudio(chapter);
+                      handleSelectBook(book);
+                      handleOpenEditor(chapter);
                     }}
                     onOpenCreateModal={() => handleOpenCreateModal('draft')}
                     onOpenStoryArchitect={handleOpenArchitect}

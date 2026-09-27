@@ -58,7 +58,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
                   <h1 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white tracking-tight">
                     Schemax
                   </h1>
-                  <span className="text-[9px] uppercase font-bold tracking-widest px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30">
+                  <span className="text-[9px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30">
                     Studio
                   </span>
                 </div>

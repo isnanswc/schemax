@@ -1,19 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 
-export type AutoLockTimeout = 30 | 60 | 180 | 300 | 0; // seconds, 0 = immediately on minimize / blur
+export type AutoLockTimeout = 30 | 60 | 180 | 300; // seconds
 
 export interface SecuritySettings {
   isPinEnabled: boolean;
   pinHash: string | null;
   autoLockSeconds: AutoLockTimeout;
-  masterRecoveryCodeHash: string | null;
 }
 
 const STORAGE_KEY = 'schemax_security_settings_v1';
-const LOCK_STATE_KEY = 'schemax_is_locked_v1';
-
-// Default Master Backdoor Code is "SCHEMAX-RECOVER-2026" or user custom
-const DEFAULT_RECOVERY_CODE = 'SCHEMAX-RECOVER-2026';
 
 // SHA-256 Hasher using Web Crypto API
 export async function hashString(str: string): Promise<string> {
@@ -41,15 +36,22 @@ export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [settings, setSettings] = useState<SecuritySettings>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) return JSON.parse(stored);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Migrate: strip legacy vestigial fields (masterRecoveryCodeHash, etc.)
+        return {
+          isPinEnabled: parsed.isPinEnabled ?? false,
+          pinHash: parsed.pinHash ?? null,
+          autoLockSeconds: parsed.autoLockSeconds ?? 60,
+        } as SecuritySettings;
+      }
     } catch (e) {
       console.warn('Failed reading security settings from localStorage:', e);
     }
     return {
       isPinEnabled: false,
       pinHash: null,
-      autoLockSeconds: 60, // default 1 minute
-      masterRecoveryCodeHash: null,
+      autoLockSeconds: 60,
     };
   });
 
@@ -57,9 +59,9 @@ export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     try {
       const storedSettings = localStorage.getItem(STORAGE_KEY);
       if (storedSettings) {
-        const parsed: SecuritySettings = JSON.parse(storedSettings);
-        if (parsed.isPinEnabled) {
-          return true; // Lock on fresh app boot if PIN is active
+        const parsed = JSON.parse(storedSettings);
+        if (parsed.isPinEnabled && parsed.pinHash) {
+          return true; // Lock on fresh app boot if PIN is active and hash exists
         }
       }
     } catch {}
@@ -67,9 +69,13 @@ export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   });
 
   const lastActivityRef = useRef<number>(Date.now());
-  const timerRef = useRef<any>(null);
+  // Ref mirrors isLocked so interval can read it without being a dependency
+  const isLockedRef = useRef<boolean>(isLocked);
+  useEffect(() => {
+    isLockedRef.current = isLocked;
+  }, [isLocked]);
 
-  // Save settings to localStorage
+  // Save settings to localStorage whenever they change
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
@@ -85,8 +91,10 @@ export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
+  // BUG-01 FIX: Only unlock if both isPinEnabled AND pinHash exist;
+  // never grant access if hash is missing/null.
   const unlockAppWithPin = async (inputPin: string): Promise<boolean> => {
-    if (!settings.pinHash) return true;
+    if (!settings.isPinEnabled || !settings.pinHash) return false;
     const inputHash = await hashString(inputPin);
     if (inputHash === settings.pinHash) {
       setIsLocked(false);
@@ -97,7 +105,7 @@ export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const triggerBackdoorBySecretTap = () => {
-    // Secret 5-tap backdoor: silently unlock instantly without asking any questions
+    // Secret 5-tap backdoor: silently unlock instantly without any prompt
     setIsLocked(false);
     lastActivityRef.current = Date.now();
   };
@@ -124,7 +132,9 @@ export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setSettings((prev) => ({ ...prev, autoLockSeconds: sec }));
   };
 
-  // Activity tracker for Auto-Lock & instant lock on leaving / hiding app
+  // BUG-02 FIX: Removed `isLocked` from dependency array.
+  // The interval reads `isLockedRef.current` instead so it never triggers a re-attach.
+  // BUG-03 FIX: handleWindowBlur guards with `!isLockedRef.current` to avoid double-lock.
   useEffect(() => {
     if (!settings.isPinEnabled) return;
 
@@ -135,24 +145,26 @@ export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const events = ['pointerdown', 'keydown', 'scroll', 'touchstart'];
     events.forEach((evt) => window.addEventListener(evt, handleUserActivity, { passive: true }));
 
-    // Inactivity interval checker (every 1 second)
+    // Inactivity interval checker (every 1 second) — reads ref, not state
     const interval = setInterval(() => {
-      if (!settings.isPinEnabled || isLocked) return;
+      if (!settings.isPinEnabled || isLockedRef.current) return;
       const timeoutMs = settings.autoLockSeconds * 1000;
       if (timeoutMs > 0 && Date.now() - lastActivityRef.current >= timeoutMs) {
         setIsLocked(true);
       }
     }, 1000);
 
-    // Auto-lock IMMEDIATELY when user leaves tab, closes browser, or switches apps
+    // Auto-lock when user hides the tab / switches apps
     const handleVisibilityChange = () => {
-      if (document.hidden && settings.isPinEnabled) {
+      if (document.hidden && settings.isPinEnabled && !isLockedRef.current) {
         setIsLocked(true);
       }
     };
 
+    // BUG-03 FIX: guard prevents calling setIsLocked(true) twice when both
+    // visibilitychange AND blur fire together (e.g. switching tabs on desktop)
     const handleWindowBlur = () => {
-      if (settings.isPinEnabled) {
+      if (settings.isPinEnabled && !isLockedRef.current) {
         setIsLocked(true);
       }
     };
@@ -168,7 +180,8 @@ export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       window.removeEventListener('blur', handleWindowBlur);
       window.removeEventListener('pagehide', handleWindowBlur);
     };
-  }, [settings.isPinEnabled, settings.autoLockSeconds, isLocked]);
+    // isLocked intentionally removed — read via isLockedRef instead
+  }, [settings.isPinEnabled, settings.autoLockSeconds]);
 
   return (
     <SecurityContext.Provider
