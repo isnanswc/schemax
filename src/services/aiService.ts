@@ -979,12 +979,18 @@ Tugas Analisis Mendalam:
       * visualPrompt: Text-to-Image prompt Bahasa Inggris: "Atmospheric wide establishing landscape shot of [nama lokasi], [deskripsi arsitektur, lingkungan, cuaca, dan pencahayaan dramatis], cinematic composition, unreal engine 5 render, hyper realistic, photorealistic, 8k resolution, vertical 9:16 aspect ratio".
       * condition: Status wilayah ("aktif" berpenghuni, "luka" hancur/rusak, "terkutuk", "hilang" terisolasi, "spesial").
 
-   D. SPESIFIKASI UNTUK LORE / FAKSI / HUKUM DUNIA (category: "lore"):
-      * shortDescription: Penjelasan aturan dunia, mitos, ordo rahasia, atau sekte/faksi.
-      * initialTraits / initialDescription: Doktrin awal, tujuan luhur pendirian faksi, atau asal usul legenda kuno.
-      * currentTraits / currentDescription: Status pergerakan faksi saat ini, reputasi di mata masyarakat, atau pengaruh hukum dunia di bab ini.
-      * physicalTraits: Lambang/panji faksi, seragam ciri khas anggota, segel magis, atau artefak simbolik faksi.
-      * visualPrompt: Text-to-Image prompt Bahasa Inggris: "Emblematic banner and heraldry of [nama lore/faksi], [deskripsi simbol, motif mitologi, lambang faksi], elegant dramatic lighting, high fantasy aesthetic, hyper realistic, 8k resolution, vertical 9:16 aspect ratio".
+   D. SPESIFIKASI UNTUK LORE / FAKSI / HUKUM DUNIA / KUTUKAN & PENYAKIT (category: "lore"):
+      * Termasuk: Faksi/klan, aturan dunia, mitos, ordo, serta KUTUKAN, WABAH, RACUN GAIB, atau PENYAKIT MISTIS.
+      * shortDescription: Penjelasan aturan dunia, mitos, ordo faksi, atau jenis kutukan/penyakit mistis.
+      * initialTraits / initialDescription: Doktrin awal/sejarah pendirian faksi, atau asal-usul kutukan/wabah (pencipta, riwayat kemunculan, pantangan kuno).
+      * currentTraits / currentDescription: Status faksi saat ini, atau bahaya/stadium penularan kutukan/penyakit di bab ini (gejala mematikan, durasi hidup, efek samping, penawar jika ada).
+      * physicalTraits: 
+        - Untuk Faksi/Lore: Lambang/panji faksi, seragam ciri khas, segel magis, simbol heraldry.
+        - Untuk Kutukan/Penyakit: Manifestasi fisik (urat menghitam menyala, mata merah berkabut, kulit bersisik racun, aura asap miasma gelap).
+      * visualPrompt: Text-to-Image prompt Bahasa Inggris:
+        - Untuk Faksi/Lore: "Emblematic banner and heraldry of [nama lore/faksi], [deskripsi simbol, motif mitologi, lambang faksi], elegant dramatic lighting, high fantasy aesthetic, hyper realistic, 8k resolution, vertical 9:16 aspect ratio".
+        - Untuk Kutukan/Penyakit: "Dark fantasy conceptual art depicting [nama kutukan/wabah], showing ominous glowing cursed veins, swirling purple and black miasma mist, eerie ethereal particles, hyperdetailed sinister atmosphere, cinematic lighting, 8k resolution, vertical 9:16 aspect ratio".
+      * condition: "aktif" jika sedang aktif/mewabah, "terkutuk" jika merupakan sihir laknat/terlarang, "spesial".
       * faction: Nama faksi jika entitas ini adalah faksi/organisasi.
 
 2. PEMBARUAN ENTITAS YANG SUDAH ADA (suggestedAction: "update_existing"):
