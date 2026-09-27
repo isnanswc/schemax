@@ -23,6 +23,7 @@ import { usePrivacy } from './contexts/PrivacyContext';
 import { AppLockScreen } from './components/security/AppLockScreen';
 import { PinSetupModal } from './components/security/PinSetupModal';
 import { AppCornerMenuModal } from './components/layout/AppCornerMenuModal';
+import { getStoredThemeMode, applyTheme, initThemeListener } from './services/themeService';
 
 export function App() {
   const { bindEmptyAreaLongPress } = usePrivacy();
@@ -41,6 +42,14 @@ export function App() {
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Initialize stored theme (dark, light, or auto) and system listener
+  useEffect(() => {
+    const savedTheme = getStoredThemeMode();
+    applyTheme(savedTheme);
+    const unbind = initThemeListener();
+    return () => unbind();
+  }, []);
 
   // Initialize seed data if database is empty on first boot
   useEffect(() => {

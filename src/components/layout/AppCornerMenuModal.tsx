@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { usePrivacy } from '../../contexts/PrivacyContext';
 import { useSecurity } from '../../contexts/SecurityContext';
+import { ThemeMode, getStoredThemeMode, applyTheme } from '../../services/themeService';
 
 interface AppCornerMenuModalProps {
   isOpen: boolean;
@@ -40,31 +41,20 @@ export const AppCornerMenuModal: React.FC<AppCornerMenuModalProps> = ({
   const { settings, updateSettings, togglePrivacyMode } = usePrivacy();
   const { settings: secSettings, lockApp } = useSecurity();
   const [showPrivacyDetails, setShowPrivacyDetails] = useState(false);
+  const [currentTheme, setCurrentTheme] = useState<ThemeMode>(() => getStoredThemeMode());
 
-  // Read current theme from html class
-  const isDark = document.documentElement.classList.contains('dark');
-  const [currentTheme, setCurrentTheme] = useState<'light' | 'dark' | 'auto'>(() => {
-    const saved = localStorage.getItem('schemax_theme');
-    if (saved === 'dark' || saved === 'light') return saved;
-    return 'auto';
-  });
+  // Synchronize currentTheme whenever modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentTheme(getStoredThemeMode());
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleSetTheme = (theme: 'light' | 'dark' | 'auto') => {
+  const handleSetTheme = (theme: ThemeMode) => {
     setCurrentTheme(theme);
-    localStorage.setItem('schemax_theme', theme);
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else if (theme === 'light') {
-      document.documentElement.classList.remove('dark');
-    } else {
-      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-    }
+    applyTheme(theme);
   };
 
   return (
