@@ -196,18 +196,18 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
       />
 
       {/* Main Container */}
-      <div className="relative w-full sm:max-w-3xl bg-white dark:bg-slate-900 border-t sm:border border-slate-200 dark:border-slate-800 rounded-t-3xl sm:rounded-3xl shadow-2xl z-10 max-h-[95vh] flex flex-col animate-in slide-in-from-bottom duration-250 safe-bottom">
+      <div className="relative w-full sm:max-w-4xl bg-white dark:bg-slate-900 border-t sm:border border-slate-200 dark:border-slate-800 rounded-t-3xl sm:rounded-3xl shadow-2xl z-10 max-h-[95vh] flex flex-col animate-in slide-in-from-bottom duration-250 safe-bottom">
         {/* Swipe Handle for Mobile */}
         <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700/80 rounded-full mx-auto mt-3 mb-1 sm:hidden flex-shrink-0" />
 
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-950/60 flex-shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center text-slate-950 font-black shadow-md shadow-amber-500/20">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 border-b border-slate-200 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-950/60 flex-shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center text-slate-950 font-black shadow-md shadow-amber-500/20 flex-shrink-0">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">
                   AI Story Architect
                 </h3>
@@ -215,7 +215,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                   Novel Engine
                 </span>
               </div>
-              <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400">
+              <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 truncate sm:whitespace-normal">
                 Tulis 1 ide premis kasar ➔ AI merancang Judul, Karakter, Latar, &amp; Story Plot Bab
               </p>
             </div>
@@ -223,7 +223,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition active:scale-95"
+            className="p-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition active:scale-95 flex-shrink-0 ml-2"
           >
             <X className="w-4 h-4" />
           </button>
@@ -239,16 +239,16 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                 <Feather className="w-4 h-4 text-amber-500" />
                 <span>Tuliskan Ide / Premis Ceritamu Bebas:</span>
               </label>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                 Ceritakan siapa tokohnya, apa yang dia temukan atau alami, konflik keluarga/dunianya, dan petaka apa yang terjadi. AI akan otomatis menganalisa relasi keluarga, ciri fisik, umur, watak, serta plot ceritanya.
               </p>
 
               <textarea
-                rows={6}
+                rows={8}
                 value={rawIdea}
                 onChange={(e) => setRawIdea(e.target.value)}
                 placeholder="Contoh: Menceritakan seorang pemuda yang bernama Agung, yang menemukan cincin misterius. Dia membawa pulang cincin dan malapetaka terjadi: seluruh keluarganya hilang ingatan dan membuat hubungan mereka berantakan, Santi istri Agung sampai mengira Agung adalah maling di rumahnya..."
-                className="w-full p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-amber-500 leading-relaxed resize-none shadow-inner"
+                className="w-full p-4 sm:p-5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-amber-500 leading-relaxed resize-y shadow-inner min-h-[190px] sm:min-h-[240px]"
               />
             </div>
 
@@ -346,14 +346,14 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                       key={i}
                       type="button"
                       onClick={() => updateBlueprint({ title: opt })}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 max-w-full text-left ${
                         blueprint.title === opt
                           ? 'bg-amber-500 text-slate-950 shadow-sm'
                           : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-amber-400'
                       }`}
                     >
-                      {blueprint.title === opt && <Check className="w-3 h-3" />}
-                      <span>{opt}</span>
+                      {blueprint.title === opt && <Check className="w-3 h-3 flex-shrink-0" />}
+                      <span className="break-words">{opt}</span>
                     </button>
                   ))}
                 </div>
@@ -365,16 +365,16 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                 value={blueprint.title}
                 onChange={(e) => updateBlueprint({ title: e.target.value })}
                 placeholder="Judul Buku..."
-                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-bold text-slate-900 dark:text-white focus:outline-none focus:border-amber-500 shadow-sm"
+                className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-bold text-slate-900 dark:text-white focus:outline-none focus:border-amber-500 shadow-sm"
               />
             </div>
 
-            {/* Review Navigation Segmented Tabs */}
-            <div className="grid grid-cols-5 gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-2xl border border-slate-200 dark:border-slate-800 text-[10px] sm:text-xs">
+            {/* Review Navigation Segmented Tabs - Horizontal scrollable to prevent mobile text truncation */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar p-1.5 bg-slate-100 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs">
               <button
                 type="button"
                 onClick={() => setActiveReviewTab('overview')}
-                className={`py-1.5 px-1 sm:px-2 rounded-xl font-bold transition truncate text-center ${
+                className={`py-2 px-3.5 sm:px-4 rounded-xl font-bold transition whitespace-nowrap flex-shrink-0 text-center ${
                   activeReviewTab === 'overview'
                     ? 'bg-amber-500 text-slate-950 shadow-sm'
                     : 'text-slate-600 dark:text-slate-400 hover:text-white'
@@ -385,7 +385,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
               <button
                 type="button"
                 onClick={() => setActiveReviewTab('characters')}
-                className={`py-1.5 px-1 sm:px-2 rounded-xl font-bold transition truncate text-center ${
+                className={`py-2 px-3.5 sm:px-4 rounded-xl font-bold transition whitespace-nowrap flex-shrink-0 text-center ${
                   activeReviewTab === 'characters'
                     ? 'bg-pink-500 text-white shadow-sm'
                     : 'text-slate-600 dark:text-slate-400 hover:text-white'
@@ -396,7 +396,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
               <button
                 type="button"
                 onClick={() => setActiveReviewTab('world')}
-                className={`py-1.5 px-1 sm:px-2 rounded-xl font-bold transition truncate text-center ${
+                className={`py-2 px-3.5 sm:px-4 rounded-xl font-bold transition whitespace-nowrap flex-shrink-0 text-center ${
                   activeReviewTab === 'world'
                     ? 'bg-cyan-500 text-slate-950 shadow-sm'
                     : 'text-slate-600 dark:text-slate-400 hover:text-white'
@@ -407,7 +407,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
               <button
                 type="button"
                 onClick={() => setActiveReviewTab('chapters')}
-                className={`py-1.5 px-1 sm:px-2 rounded-xl font-bold transition truncate text-center ${
+                className={`py-2 px-3.5 sm:px-4 rounded-xl font-bold transition whitespace-nowrap flex-shrink-0 text-center ${
                   activeReviewTab === 'chapters'
                     ? 'bg-indigo-500 text-white shadow-sm'
                     : 'text-slate-600 dark:text-slate-400 hover:text-white'
@@ -418,7 +418,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
               <button
                 type="button"
                 onClick={() => setActiveReviewTab('style')}
-                className={`py-1.5 px-1 sm:px-2 rounded-xl font-bold transition truncate text-center ${
+                className={`py-2 px-3.5 sm:px-4 rounded-xl font-bold transition whitespace-nowrap flex-shrink-0 text-center ${
                   activeReviewTab === 'style'
                     ? 'bg-purple-600 text-white shadow-sm'
                     : 'text-slate-600 dark:text-slate-400 hover:text-white'
@@ -439,10 +439,10 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                     Sinopsis Cerita Inti:
                   </span>
                   <textarea
-                    rows={4}
+                    rows={5}
                     value={blueprint.synopsis}
                     onChange={(e) => updateBlueprint({ synopsis: e.target.value })}
-                    className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 leading-relaxed focus:outline-none focus:border-amber-400 resize-none"
+                    className="w-full p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed focus:outline-none focus:border-amber-400 resize-y min-h-[110px]"
                   />
                 </div>
 
@@ -518,36 +518,44 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                     key={i}
                     className="bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 space-y-2.5"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <span className="w-6 h-6 rounded-lg bg-pink-500/20 text-pink-600 dark:text-pink-400 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-200/60 dark:border-slate-800/80">
+                      <div className="flex items-center gap-2 w-full sm:flex-1 min-w-0">
+                        <span className="w-7 h-7 rounded-xl bg-pink-500/20 text-pink-600 dark:text-pink-400 flex items-center justify-center font-black text-xs flex-shrink-0">
                           {i + 1}
                         </span>
-                        <input
-                          type="text"
-                          value={char.name}
-                          onChange={(e) => handleUpdateCharacter(i, 'name', e.target.value)}
-                          placeholder="Nama Karakter"
-                          className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 px-1 py-0.5 focus:outline-none focus:border-pink-500 flex-1 min-w-0"
-                        />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[9px] font-extrabold text-pink-600 dark:text-pink-400 uppercase block sm:hidden">
+                            Nama Tokoh:
+                          </span>
+                          <input
+                            type="text"
+                            value={char.name}
+                            onChange={(e) => handleUpdateCharacter(i, 'name', e.target.value)}
+                            placeholder="Nama Karakter"
+                            className="w-full font-black text-sm sm:text-base text-slate-900 dark:text-white bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 px-1 py-1 focus:outline-none focus:border-pink-500"
+                          />
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <input
-                          type="text"
-                          value={char.role || ''}
-                          onChange={(e) => handleUpdateCharacter(i, 'role', e.target.value)}
-                          placeholder="Peran (misal: Suami/Istri)"
-                          className="text-[10px] font-bold text-pink-600 dark:text-pink-400 bg-pink-500/10 px-2 py-0.5 rounded-md border border-pink-500/20 focus:outline-none max-w-[120px]"
-                        />
+                      <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto pt-1 sm:pt-0">
+                        <div className="flex items-center gap-1.5 flex-1 sm:flex-initial">
+                          <span className="text-[10px] text-slate-400 sm:hidden">Peran:</span>
+                          <input
+                            type="text"
+                            value={char.role || ''}
+                            onChange={(e) => handleUpdateCharacter(i, 'role', e.target.value)}
+                            placeholder="Peran (misal: Suami/Istri)"
+                            className="w-full sm:w-auto text-xs font-bold text-pink-600 dark:text-pink-400 bg-pink-500/10 px-2.5 py-1 rounded-lg border border-pink-500/20 focus:outline-none sm:max-w-[150px]"
+                          />
+                        </div>
                         {blueprint.characters.length > 1 && (
                           <button
                             type="button"
                             onClick={() => handleDeleteCharacter(i)}
-                            className="p-1 text-slate-400 hover:text-red-500 transition"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-500/10 transition flex-shrink-0"
                             title="Hapus Karakter"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         )}
                       </div>
@@ -564,7 +572,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                           value={char.age || ''}
                           onChange={(e) => handleUpdateCharacter(i, 'age', e.target.value)}
                           placeholder="Contoh: 28 Tahun"
-                          className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-pink-400"
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-pink-400"
                         />
                       </div>
 
@@ -578,7 +586,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                           value={char.shortDescription || ''}
                           onChange={(e) => handleUpdateCharacter(i, 'shortDescription', e.target.value)}
                           placeholder="Contoh: Kepala keluarga yang mengalami musibah cincin"
-                          className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-pink-400"
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-pink-400"
                         />
                       </div>
                     </div>
@@ -589,11 +597,11 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                         👤 Ciri-Ciri Fisik (Wajah, Postur, Rambut &amp; Busana):
                       </label>
                       <textarea
-                        rows={2}
+                        rows={3}
                         value={char.physicalTraits || ''}
                         onChange={(e) => handleUpdateCharacter(i, 'physicalTraits', e.target.value)}
                         placeholder="Contoh: Pria berwajah ramah khas nusantara, kulit sawo matang, rambut pendek ikal, mengenakan jaket katun lusuh..."
-                        className="w-full p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-amber-400 resize-none leading-relaxed"
+                        className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-amber-400 resize-y leading-relaxed min-h-[64px]"
                       />
                     </div>
 
@@ -603,11 +611,11 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                         ⚡ Sifat &amp; Watak Kepribadian:
                       </label>
                       <textarea
-                        rows={2}
+                        rows={3}
                         value={char.traits || ''}
                         onChange={(e) => handleUpdateCharacter(i, 'traits', e.target.value)}
                         placeholder="Contoh: Penyayang, pekerja keras, mudah cemas, keras kepala saat mempertahankan kebenaran..."
-                        className="w-full p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-400 resize-none leading-relaxed"
+                        className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-400 resize-y leading-relaxed min-h-[64px]"
                       />
                     </div>
                   </div>
@@ -656,11 +664,11 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                         </button>
                       </div>
                       <textarea
-                        rows={2}
+                        rows={3}
                         value={itm.shortDescription}
                         onChange={(e) => handleUpdateItem(i, 'shortDescription', e.target.value)}
                         placeholder="Efek, kutukan, atau dampak artefak terhadap cerita..."
-                        className="w-full p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 resize-none focus:outline-none focus:border-amber-400"
+                        className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 resize-y min-h-[60px] focus:outline-none focus:border-amber-400 leading-relaxed"
                       />
                     </div>
                   ))}
@@ -691,7 +699,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                           value={loc.name}
                           onChange={(e) => handleUpdateLocation(i, 'name', e.target.value)}
                           placeholder="Nama Lokasi"
-                          className="font-bold text-xs text-slate-900 dark:text-white bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 px-1 py-0.5 focus:outline-none focus:border-cyan-500 flex-1"
+                          className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 px-1 py-0.5 focus:outline-none focus:border-cyan-500 flex-1"
                         />
                         <button
                           type="button"
@@ -702,11 +710,11 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                         </button>
                       </div>
                       <textarea
-                        rows={2}
+                        rows={3}
                         value={loc.shortDescription}
                         onChange={(e) => handleUpdateLocation(i, 'shortDescription', e.target.value)}
                         placeholder="Deskripsi suasana dan detail lokasi..."
-                        className="w-full p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 resize-none focus:outline-none focus:border-cyan-400"
+                        className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 resize-y min-h-[60px] focus:outline-none focus:border-cyan-400 leading-relaxed"
                       />
                     </div>
                   ))}
@@ -747,11 +755,11 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                         Alur Story Plot Adegan:
                       </label>
                       <textarea
-                        rows={3}
+                        rows={4}
                         value={chap.premise}
                         onChange={(e) => handleUpdateChapter(i, 'premise', e.target.value)}
                         placeholder="Poin-poin kejadian yang terjadi di bab ini..."
-                        className="w-full p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 leading-relaxed resize-none focus:outline-none focus:border-indigo-400"
+                        className="w-full p-2.5 sm:p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed resize-y min-h-[85px] focus:outline-none focus:border-indigo-400"
                       />
                     </div>
                   </div>

@@ -1915,12 +1915,12 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
                     key={sc.id || idx}
                     className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-2.5"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1.5 border-b border-slate-100 dark:border-slate-800/80">
+                      <div className="flex items-start sm:items-center gap-2 min-w-0 flex-1">
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 flex-shrink-0 mt-0.5 sm:mt-0">
                           Adegan #{sc.sceneNumber || idx + 1}
                         </span>
-                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white break-words leading-snug">
                           {sc.title}
                         </h4>
                       </div>
@@ -1928,23 +1928,55 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
                       <button
                         type="button"
                         onClick={() => handleCopyPrompt(sc.imagePrompt || '', sc.id)}
-                        className="flex items-center gap-1 py-1 px-2.5 rounded-xl bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-700 text-xs font-bold active:scale-95 transition flex-shrink-0"
+                        className="w-full sm:w-auto flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-700 text-xs font-bold active:scale-95 transition flex-shrink-0 shadow-xs"
                       >
                         {copiedPromptId === sc.id ? (
                           <>
-                            <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                             <span>Tersalin!</span>
                           </>
                         ) : (
                           <>
-                            <Copy className="w-3 h-3" />
+                            <Copy className="w-3.5 h-3.5" />
                             <span>Salin Prompt</span>
                           </>
                         )}
                       </button>
                     </div>
 
-                    <p className="text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 font-mono leading-relaxed">
+                    {/* Character Photo Attachment Reference Warning */}
+                    {sc.characterReferences && sc.characterReferences.length > 0 && (
+                      <div className="p-2.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-500/20 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2">
+                        <Camera className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                        <div className="space-y-0.5">
+                          <span className="font-extrabold text-[11px] block">
+                            📸 Lampirkan Foto / Gambar Referensi Tokoh Saat Men-Generate:
+                          </span>
+                          <div className="flex flex-wrap gap-1 pt-0.5">
+                            {sc.characterReferences.map((ref, rIdx) => (
+                              <span
+                                key={rIdx}
+                                className="px-2 py-0.5 rounded-md bg-amber-200/60 dark:bg-amber-900/50 font-semibold text-[10px]"
+                              >
+                                {ref}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Image Prompt Explanation if available */}
+                    {sc.imagePromptExplanation && (
+                      <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200/60 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                        <span className="font-bold text-purple-600 dark:text-purple-400 mr-1">
+                          Gambaran Prompt:
+                        </span>
+                        {sc.imagePromptExplanation}
+                      </div>
+                    )}
+
+                    <p className="text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 font-mono leading-relaxed break-words overflow-x-auto">
                       {sc.imagePrompt}
                     </p>
                   </div>

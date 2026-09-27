@@ -148,13 +148,26 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
         .map((c) => {
           const state = getLatestEntityState(c, chapter, earlierDesc);
           let detail = `• ${c.name} (${c.shortDescription || 'Karakter'})\n`;
-          detail += `  - Status & Kondisi Terkini: ${state.condition.toUpperCase()}${state.conditionDetails ? ` (${state.conditionDetails})` : ''} [Sumber: ${state.source}]\n`;
+          detail += `  - Status & Kondisi Terkini: ${state.condition.toUpperCase()}${state.conditionDetails ? ` (${state.conditionDetails})` : ''}\n`;
           detail += `  - Ciri-Ciri Fisik: ${c.physicalTraits || '(Belum ada catatan fisik spesifik)'}\n`;
           detail += `  - Sifat & Watak Terkini: ${c.currentTraits || c.initialTraits || '(Belum ada catatan sifat)'}${c.evolutionSummary ? ` [Perkembangan: ${c.evolutionSummary}]` : ''}\n`;
           if (c.detailedNotes) {
-            detail += `  - Catatan Lore/Peran: ${c.detailedNotes.slice(0, 160)}...`;
+            detail += `  - Profil & Motivasi:\n${c.detailedNotes
+              .split('\n')
+              .filter(Boolean)
+              .map((line) => `    ${line.trim()}`)
+              .join('\n')}\n`;
           }
-          return detail;
+          if (c.attributes && c.attributes.length > 0) {
+            const extraAttrs = c.attributes
+              .filter((a) => a.label !== 'Peran' && a.label !== 'Usia')
+              .map((a) => `    • ${a.label}: ${a.value}`)
+              .join('\n');
+            if (extraAttrs) {
+              detail += `  - Atribut Lainnya:\n${extraAttrs}\n`;
+            }
+          }
+          return detail.trimEnd();
         })
         .join('\n\n');
       setCharactersText(charsStr);
@@ -425,7 +438,7 @@ INSTRUKSI PENULISAN:
   ];
 
   return (
-    <div className="space-y-4 pb-28 max-w-3xl mx-auto animate-fade-in-up px-1 sm:px-2">
+    <div className="space-y-4 pb-28 max-w-4xl mx-auto animate-fade-in-up px-1 sm:px-2">
       {/* Top Header Card */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
         <div className="flex items-center justify-between gap-2">
@@ -609,10 +622,24 @@ INSTRUKSI PENULISAN:
 
               {/* Textarea */}
               <textarea
-                rows={pt.id === 'chapter_plot_draft' ? 6 : 4}
+                rows={
+                  pt.id === 'chapter_plot_draft'
+                    ? 12
+                    : pt.id === 'characters'
+                    ? 10
+                    : pt.id === 'setting_item_lore' || pt.id === 'story_plot'
+                    ? 8
+                    : 5
+                }
                 value={pt.text}
                 onChange={(e) => pt.setText?.(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-amber-500 transition leading-relaxed font-sans"
+                className={`w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 sm:p-4 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-amber-500 transition leading-relaxed font-sans resize-y shadow-inner ${
+                  pt.id === 'chapter_plot_draft'
+                    ? 'min-h-[260px] sm:min-h-[320px]'
+                    : pt.id === 'characters'
+                    ? 'min-h-[220px] sm:min-h-[260px]'
+                    : 'min-h-[140px] sm:min-h-[170px]'
+                }`}
                 placeholder={`Isi untuk ${pt.title}...`}
               />
             </div>
