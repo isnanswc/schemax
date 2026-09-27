@@ -461,22 +461,37 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
         audio.onerror = async (e) => {
           console.warn('Audio stream error on chunk:', chunkIdx, e);
           setIsLoadingAudio(false);
+          // Hentikan dan hapus audio lama agar tidak terus bersuara
+          audio.pause();
+          audio.src = '';
+          audio.onended = null;
+          audio.onerror = null;
+          if (htmlAudioRef.current === audio) {
+            htmlAudioRef.current = null;
+          }
+
+          if (playbackSessionIdRef.current !== currentSession || !isPlayingRef.current) return;
+
           // Jika gagal saat memutar gemini/groq, beralih ke WASM dulu
           if (ttsEngine === 'gemini' || ttsEngine === 'groq') {
             setEngineNotice('Suara AI gagal diputar. Mengalihkan ke WASM Free...');
             setTtsEngine('wasm');
             try {
               const wasmRes = await generateWasmSpeechAudio(rawText);
-              await playChunksSequence(wasmRes.audioUrls);
+              if (playbackSessionIdRef.current === currentSession && isPlayingRef.current) {
+                await playChunksSequence(wasmRes.audioUrls);
+              }
               return;
             } catch (wasmErr) {
               console.warn('Fallback WASM gagal:', wasmErr);
             }
           }
           // Jika WASM juga gagal, pilihan terakhir adalah browser offline
-          setEngineNotice('Suara AI dialihkan ke Suara Bawaan HP / Browser...');
-          setTtsEngine('browser');
-          speakWithBrowser(index);
+          if (playbackSessionIdRef.current === currentSession && isPlayingRef.current) {
+            setEngineNotice('Suara AI dialihkan ke Suara Bawaan HP / Browser...');
+            setTtsEngine('browser');
+            speakWithBrowser(index);
+          }
         };
 
         try {
@@ -499,22 +514,37 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
             isPlayingRef.current = false;
             setIsPaused(false);
           } else {
+            // Hentikan dan bersihkan audio jika gagal play
+            audio.pause();
+            audio.src = '';
+            audio.onended = null;
+            audio.onerror = null;
+            if (htmlAudioRef.current === audio) {
+              htmlAudioRef.current = null;
+            }
+
+            if (playbackSessionIdRef.current !== currentSession || !isPlayingRef.current) return;
+
             // Jika gagal saat memutar gemini/groq, beralih ke WASM dulu
             if (ttsEngine === 'gemini' || ttsEngine === 'groq') {
               setEngineNotice('Gagal memutar audio AI. Mengalihkan ke WASM Free...');
               setTtsEngine('wasm');
               try {
                 const wasmRes = await generateWasmSpeechAudio(rawText);
-                await playChunksSequence(wasmRes.audioUrls);
+                if (playbackSessionIdRef.current === currentSession && isPlayingRef.current) {
+                  await playChunksSequence(wasmRes.audioUrls);
+                }
                 return;
               } catch (wasmErr) {
                 console.warn('Fallback WASM gagal:', wasmErr);
               }
             }
             // Pilihan terakhir: browser offline
-            setEngineNotice('Gagal memutar audio AI. Dialihkan ke Suara Bawaan HP / Browser...');
-            setTtsEngine('browser');
-            speakWithBrowser(index);
+            if (playbackSessionIdRef.current === currentSession && isPlayingRef.current) {
+              setEngineNotice('Gagal memutar audio AI. Dialihkan ke Suara Bawaan HP / Browser...');
+              setTtsEngine('browser');
+              speakWithBrowser(index);
+            }
           }
         }
       };

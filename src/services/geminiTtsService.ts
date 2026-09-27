@@ -440,8 +440,20 @@ export async function generateGeminiSpeechAudio(
           throw new Error(msg);
         }
 
-        const data = await response.json();
-        const candidate = data.candidates?.[0];
+        // Jika respon tidak memiliki kandidat
+        if (!data.candidates || data.candidates.length === 0) {
+          const promptFeedback = data.promptFeedback ? JSON.stringify(data.promptFeedback) : '';
+          throw new Error(
+            `Gemini menolak memproses audio (tidak ada kandidat balasan). ${promptFeedback || 'Periksa apakah teks melanggar filter konten atau ganti model.'}`
+          );
+        }
+
+        const candidate = data.candidates[0];
+        const finishReason = candidate.finishReason;
+        if (finishReason && finishReason !== 'STOP') {
+          throw new Error(`Gemini menghentikan respon dengan status: ${finishReason}`);
+        }
+
         const parts = candidate?.content?.parts || [];
 
         // 1. Cari part yang berisi inlineData audio
@@ -464,18 +476,18 @@ export async function generateGeminiSpeechAudio(
         if (textPart?.text) {
           console.warn(`[Gemini TTS] Model ${targetModel} mengembalikan teks alih-alih audio:`, textPart.text);
           throw new Error(
-            `Model "${targetModel}" mengembalikan teks ("${textPart.text.slice(0, 60)}..."). Pastikan Anda memilih model yang mendukung output audio seperti "gemini-3.1-flash-tts-preview" atau gunakan WASM Free.`
+            `Model "${targetModel}" adalah model teks (menjawab: "${textPart.text.slice(0, 60)}..."). Untuk TTS, pilih model yang mendukung audio seperti "gemini-3.1-flash-tts-preview" atau gunakan WASM Free.`
           );
         }
 
-        throw new Error(`Respon model "${targetModel}" tidak memuat data audio. Pilih model khusus TTS (seperti gemini-3.1-flash-tts-preview) atau beralih ke WASM.`);
+        throw new Error(`Respon model "${targetModel}" tidak memuat data audio. Pilih model khusus TTS (seperti gemini-3.1-flash-tts-preview) atau gunakan WASM Free.`);
       } catch (err: any) {
         lastError = err;
         console.warn(`[Gemini TTS] Gagal dengan model ${targetModel}:`, err.message);
       }
   }
 
-  throw lastError || new Error('Gagal menghasilkan audio suara AI dari Google AI Studio.');
+  throw lastError || new Error(`Gagal menghasilkan audio suara AI dari model "${targetModel}".`);
 }
 
 
