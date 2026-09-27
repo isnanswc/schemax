@@ -21,6 +21,10 @@ export interface AITTSModelOption {
 
 export interface TTSExtraConfig {
   dedicatedGeminiApiKey: string;
+  selectedGeminiModel?: string;
+  selectedGroqModel?: string;
+  selectedVoice?: string;
+  selectedEngine?: TTSEngineMode;
 }
 
 export function loadTTSExtraConfig(): TTSExtraConfig {
@@ -48,7 +52,7 @@ export const AUTO_TTS_MODELS: AITTSModelOption[] = [
     id: 'auto-pipeline',
     name: '✨ Auto-Fallback (Pintar)',
     provider: 'auto',
-    description: 'Prioritas: Gemini TTS (Kunci Mandiri) ➔ WASM Mobile Free (100% Gratis Bebas Kuota)',
+    description: 'Prioritas: Model AI Pilihan ➔ WASM (Bebas Kuota) ➔ Suara Browser Offline',
   },
 ];
 
@@ -81,37 +85,11 @@ export const WASM_VOICES: AIVoiceOption[] = [
   },
 ];
 
-// 5. Available TTS Models for Google Gemini
-export const GEMINI_TTS_MODELS: AITTSModelOption[] = [
-  {
-    id: 'gemini-2.0-flash',
-    name: 'Gemini 2.0 Flash Audio (Resmi Google)',
-    provider: 'gemini',
-    description: 'Model Text-To-Speech resmi Google AI Studio berkualitas studio',
-  },
-  {
-    id: 'gemini-2.0-flash-exp',
-    name: 'Gemini 2.0 Flash Exp Audio',
-    provider: 'gemini',
-    description: 'Model audio eksperimental multimodal Google AI',
-  },
-];
+// 5. Default TTS Models for Google Gemini (Kosong tanpa pembatasan, diambil dari live API)
+export const GEMINI_TTS_MODELS: AITTSModelOption[] = [];
 
-// 6. Available TTS Models for Groq Cloud
-export const GROQ_TTS_MODELS: AITTSModelOption[] = [
-  {
-    id: 'canopylabs/orpheus-v1-english',
-    name: 'Orpheus v1 English (Groq Cloud)',
-    provider: 'groq',
-    description: 'Model Text-To-Speech resmi Groq kecepatan ultra-tinggi',
-  },
-  {
-    id: 'canopylabs/orpheus-arabic-saudi',
-    name: 'Orpheus Arabic (Groq Cloud)',
-    provider: 'groq',
-    description: 'Model Suara Dialek Arab Saudi dari Canopy Labs',
-  },
-];
+// 6. Default TTS Models for Groq Cloud (Kosong tanpa pembatasan, diambil dari live API)
+export const GROQ_TTS_MODELS: AITTSModelOption[] = [];
 
 // Available Voices for Google Gemini
 export const GEMINI_VOICES: AIVoiceOption[] = [
@@ -406,11 +384,13 @@ export async function generateGeminiSpeechAudio(
     );
   }
 
+  // Gunakan model yang dipilih user secara spesifik tanpa paksaan model default lama
   const modelsToTry = [
     modelName,
-    'gemini-2.0-flash',
-    'gemini-2.0-flash-exp',
-  ].filter((v, idx, arr) => arr.indexOf(v) === idx && Boolean(v) && !v.includes('3.8'));
+    extraConfig.selectedGeminiModel,
+    ...geminiSlots.map((s) => s.model),
+    ...(aiConfig.geminiConfig?.cachedModels || []).map((m) => m.id),
+  ].filter((v, idx, arr) => arr.indexOf(v) === idx && Boolean(v && v.trim()));
 
   let lastError: Error | null = null;
 
@@ -652,11 +632,11 @@ export async function generateUnifiedSpeechAudio(
     return { ...res, usedEngine: 'wasm' };
   }
 
-  // --- AUTO-FALLBACK PIPELINE (Gemini ➔ WASM Mobile Free) ---
+  // --- AUTO-FALLBACK PIPELINE (Gemini / Groq ➔ WASM Mobile Free) ---
   const extraConfig = loadTTSExtraConfig();
   const aiConfig = loadAISettings();
 
-  // 1. Try Gemini (if dedicated key or active gemini slot configured)
+  // 1. Coba Gemini jika kunci tersedia
   const hasGeminiKey = Boolean(
     (extraConfig.dedicatedGeminiApiKey && extraConfig.dedicatedGeminiApiKey.trim()) ||
     aiConfig.slots.some((s) => s.provider === 'gemini' && s.isActive && s.apiKey && s.apiKey.trim())
@@ -664,19 +644,41 @@ export async function generateUnifiedSpeechAudio(
 
   if (hasGeminiKey) {
     try {
+      const activeGeminiModel = modelName || extraConfig.selectedGeminiModel || 'gemini-3.8-flash-preview';
       const res = await generateGeminiSpeechAudio(
         text,
-        modelName || 'gemini-2.0-flash',
-        voiceName || 'Aoede',
+        activeGeminiModel,
+        voiceName || extraConfig.selectedVoice || 'Aoede',
         emotionTag
       );
       return { ...res, usedEngine: 'gemini' };
     } catch (e: any) {
-      console.warn('[Auto-Fallback] Gemini gagal atau limit, beralih ke WASM Mobile Free:', e.message);
+      console.warn('[Auto-Fallback] Gemini gagal, mencoba beralih ke WASM:', e.message);
     }
   }
 
-  // 2. Guaranteed Ultimate Fallback: WASM Mobile Free Natural Stream (100% Free, 0 Limits)
+  // 2. Coba Groq jika pengguna mengonfigurasi Groq dan tidak ada Gemini
+  const hasGroqKey = Boolean(
+    aiConfig.slots.some((s) => s.provider === 'groq' && s.isActive && s.apiKey && s.apiKey.trim())
+  );
+  if (!hasGeminiKey && hasGroqKey) {
+    try {
+      const activeGroqModel = modelName || extraConfig.selectedGroqModel;
+      if (activeGroqModel) {
+        const res = await generateGroqSpeechAudio(
+          text,
+          activeGroqModel,
+          voiceName || 'autumn',
+          emotionTag
+        );
+        return { ...res, usedEngine: 'groq' };
+      }
+    } catch (e: any) {
+      console.warn('[Auto-Fallback] Groq gagal, mencoba beralih ke WASM:', e.message);
+    }
+  }
+
+  // 3. Fallback utama: WASM Mobile Free Natural Stream (100% Free, 0 Limits)
   const res = await generateWasmSpeechAudio(text);
   return { ...res, usedEngine: 'wasm' };
 }
@@ -721,21 +723,15 @@ export function getModelsForEngine(engine: TTSEngineMode): AITTSModelOption[] {
         }
       });
 
-      // 3. Recommended Gemini models as fallback
-      const fallbackList: AITTSModelOption[] = [
-        { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'gemini', description: 'Model Cepat & Multimodal Rekomendasi' },
-        { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash Audio', provider: 'gemini', description: 'Model Audio Resmi Google AI' },
-        { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash Exp', provider: 'gemini', description: 'Model Multimodal Eksperimental' },
-        { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', provider: 'gemini', description: 'Model Ringan & Efisien' },
-        { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'gemini', description: 'Model Penalaran Tinggi' },
-      ];
-
-      fallbackList.forEach((m) => {
-        if (!seen.has(m.id)) {
-          seen.add(m.id);
-          dynamicModels.push(m);
-        }
-      });
+      // 3. Fallback jika belum pernah klik muat api dan belum ada model di slot
+      if (dynamicModels.length === 0) {
+        dynamicModels.push({
+          id: '',
+          name: '(Klik tombol "muat api" untuk mengambil daftar model)',
+          provider: 'gemini',
+          description: 'Model akan diambil langsung dari API Key Anda tanpa batasan',
+        });
+      }
 
       return dynamicModels;
     }
@@ -770,12 +766,14 @@ export function getModelsForEngine(engine: TTSEngineMode): AITTSModelOption[] {
         }
       });
 
-      GROQ_TTS_MODELS.forEach((m) => {
-        if (!seen.has(m.id)) {
-          seen.add(m.id);
-          dynamicModels.push(m);
-        }
-      });
+      if (dynamicModels.length === 0) {
+        dynamicModels.push({
+          id: '',
+          name: '(Klik tombol "muat api" untuk mengambil daftar model)',
+          provider: 'groq',
+          description: 'Model akan diambil langsung dari API Key Groq Anda tanpa batasan',
+        });
+      }
 
       return dynamicModels;
     }

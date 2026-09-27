@@ -29,6 +29,7 @@ import {
   getModelsForEngine,
   getVoicesForEngine,
   generateUnifiedSpeechAudio,
+  generateWasmSpeechAudio,
   WASM_VOICES,
   WASM_TTS_MODELS,
   GEMINI_VOICES,
@@ -37,6 +38,7 @@ import {
   GROQ_TTS_MODELS,
   AUTO_TTS_MODELS,
   loadTTSExtraConfig,
+  saveTTSExtraConfig,
 } from '../../../services/geminiTtsService';
 import {
   fetchLiveGeminiModels,
@@ -74,12 +76,19 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
   const [baseRate, setBaseRate] = useState<number>(1.0);
   const [isContinuous, setIsContinuous] = useState(true);
 
-  // Engine selection: 'auto' | 'azure' | 'google-cloud' | 'wasm' | 'gemini' | 'groq' | 'browser'
-  const [ttsEngine, setTtsEngine] = useState<FullTTSEngine>('auto');
+  const savedExtra = loadTTSExtraConfig();
+
+  // Engine selection: 'auto' | 'wasm' | 'gemini' | 'groq' | 'browser'
+  const [ttsEngine, setTtsEngine] = useState<FullTTSEngine>(savedExtra.selectedEngine || 'auto');
 
   // Unified engine model & voice state
-  const [selectedModel, setSelectedModel] = useState<string>('auto-pipeline');
-  const [selectedVoice, setSelectedVoice] = useState<string>('id-free-natural');
+  const [selectedModel, setSelectedModel] = useState<string>(() => {
+    if (savedExtra.selectedEngine === 'gemini') return savedExtra.selectedGeminiModel || '';
+    if (savedExtra.selectedEngine === 'groq') return savedExtra.selectedGroqModel || '';
+    if (savedExtra.selectedEngine === 'wasm') return 'wasm-mobile-free';
+    return 'auto-pipeline';
+  });
+  const [selectedVoice, setSelectedVoice] = useState<string>(savedExtra.selectedVoice || 'id-free-natural');
 
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [engineNotice, setEngineNotice] = useState<string | null>(null);
@@ -176,12 +185,25 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
   const handleEngineChange = (newEngine: FullTTSEngine) => {
     handleStop();
     setTtsEngine(newEngine);
+    const cfg = loadTTSExtraConfig();
+    cfg.selectedEngine = newEngine !== 'browser' ? newEngine : undefined;
+
     if (newEngine !== 'browser') {
       const models = getModelsForEngine(newEngine);
       const voices = getVoicesForEngine(newEngine);
-      setSelectedModel(models[0]?.id || '');
-      setSelectedVoice(voices[0]?.id || '');
+
+      let modelToUse = models[0]?.id || '';
+      if (newEngine === 'gemini' && cfg.selectedGeminiModel) {
+        modelToUse = cfg.selectedGeminiModel;
+      } else if (newEngine === 'groq' && cfg.selectedGroqModel) {
+        modelToUse = cfg.selectedGroqModel;
+      }
+
+      const voiceToUse = cfg.selectedVoice || voices[0]?.id || '';
+      setSelectedModel(modelToUse);
+      setSelectedVoice(voiceToUse);
     }
+    saveTTSExtraConfig(cfg);
   };
 
   // Compute emotion modulation parameters based on current paragraph's tension score
@@ -418,10 +440,23 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
           }
         };
 
-        audio.onerror = (e) => {
+        audio.onerror = async (e) => {
           console.warn('Audio stream error on chunk:', chunkIdx, e);
           setIsLoadingAudio(false);
-          setEngineNotice('Audio AI dialihkan ke Suara Bawaan HP...');
+          // Jika gagal saat memutar gemini/groq, beralih ke WASM dulu
+          if (ttsEngine === 'gemini' || ttsEngine === 'groq') {
+            setEngineNotice('Suara AI gagal diputar. Mengalihkan ke WASM Free...');
+            setTtsEngine('wasm');
+            try {
+              const wasmRes = await generateWasmSpeechAudio(rawText);
+              await playChunksSequence(wasmRes.audioUrls);
+              return;
+            } catch (wasmErr) {
+              console.warn('Fallback WASM gagal:', wasmErr);
+            }
+          }
+          // Jika WASM juga gagal, pilihan terakhir adalah browser offline
+          setEngineNotice('Suara AI dialihkan ke Suara Bawaan HP / Browser...');
           setTtsEngine('browser');
           speakWithBrowser(index);
         };
@@ -446,7 +481,20 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
             isPlayingRef.current = false;
             setIsPaused(false);
           } else {
-            setEngineNotice('Gagal memutar audio AI. Dialihkan ke Suara Bawaan HP...');
+            // Jika gagal saat memutar gemini/groq, beralih ke WASM dulu
+            if (ttsEngine === 'gemini' || ttsEngine === 'groq') {
+              setEngineNotice('Gagal memutar audio AI. Mengalihkan ke WASM Free...');
+              setTtsEngine('wasm');
+              try {
+                const wasmRes = await generateWasmSpeechAudio(rawText);
+                await playChunksSequence(wasmRes.audioUrls);
+                return;
+              } catch (wasmErr) {
+                console.warn('Fallback WASM gagal:', wasmErr);
+              }
+            }
+            // Pilihan terakhir: browser offline
+            setEngineNotice('Gagal memutar audio AI. Dialihkan ke Suara Bawaan HP / Browser...');
             setTtsEngine('browser');
             speakWithBrowser(index);
           }
@@ -484,9 +532,25 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
       const urls = res.audioUrls && res.audioUrls.length > 0 ? res.audioUrls : [res.audioUrl];
       await playChunksSequence(urls);
     } catch (err: any) {
-      console.warn('Gagal memutar audio AI:', err);
+      console.warn('Gagal memanggil API AI TTS:', err);
+      // Jika error pada engine Gemini atau Groq, coba beralih ke WASM
+      if (ttsEngine === 'gemini' || ttsEngine === 'groq') {
+        setEngineNotice(`Gagal Suara AI (${err.message || 'Error'}). Beralih ke WASM Free...`);
+        setTtsEngine('wasm');
+        try {
+          const wasmRes = await generateWasmSpeechAudio(rawText);
+          if (isPlayingRef.current) {
+            await playChunksSequence(wasmRes.audioUrls);
+          }
+          return;
+        } catch (wasmErr: any) {
+          console.warn('Fallback WASM juga gagal:', wasmErr);
+        }
+      }
+
+      // Jika WASM juga error, pilihan terakhir adalah browser bawaan HP
       setIsLoadingAudio(false);
-      setEngineNotice(`Gagal Suara AI (${err.message || 'Error'}). Dialihkan ke Suara Bawaan HP...`);
+      setEngineNotice(`Gagal Suara AI (${err.message || 'Error'}). Dialihkan ke Suara Bawaan Browser HP...`);
       setTtsEngine('browser');
       speakWithBrowser(index);
     } finally {
@@ -600,10 +664,17 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
         const liveModels = await fetchLiveGeminiModels(key);
         aiConfig.geminiConfig.cachedModels = liveModels;
         saveAISettings(aiConfig);
-        if (liveModels.length > 0 && !liveModels.some((m) => m.id === selectedModel)) {
-          setSelectedModel(liveModels[0].id);
+
+        const currentChosen = extraConfig.selectedGeminiModel || selectedModel;
+        if (liveModels.length > 0) {
+          const match = liveModels.find((m) => m.id === currentChosen);
+          const nextModel = match ? match.id : liveModels[0].id;
+          setSelectedModel(nextModel);
+          extraConfig.selectedGeminiModel = nextModel;
+          saveTTSExtraConfig(extraConfig);
         }
       } else if (ttsEngine === 'groq') {
+        const extraConfig = loadTTSExtraConfig();
         const aiConfig = loadAISettings();
         const key = aiConfig.slots.find((s) => s.provider === 'groq' && s.apiKey)?.apiKey || '';
         if (!key) {
@@ -612,8 +683,14 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
         const liveModels = await fetchLiveGroqModels(key);
         aiConfig.groqConfig.cachedModels = liveModels;
         saveAISettings(aiConfig);
-        if (liveModels.length > 0 && !liveModels.some((m) => m.id === selectedModel)) {
-          setSelectedModel(liveModels[0].id);
+
+        const currentChosen = extraConfig.selectedGroqModel || selectedModel;
+        if (liveModels.length > 0) {
+          const match = liveModels.find((m) => m.id === currentChosen);
+          const nextModel = match ? match.id : liveModels[0].id;
+          setSelectedModel(nextModel);
+          extraConfig.selectedGroqModel = nextModel;
+          saveTTSExtraConfig(extraConfig);
         }
       }
     } catch (err: any) {
@@ -871,7 +948,12 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
                           className="w-full bg-transparent text-[10px] px-1.5 py-0.5 outline-hidden text-slate-800 dark:text-slate-200 font-mono"
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && customModelInput.trim()) {
-                              setSelectedModel(customModelInput.trim());
+                              const chosen = customModelInput.trim();
+                              setSelectedModel(chosen);
+                              const cfg = loadTTSExtraConfig();
+                              if (ttsEngine === 'gemini') cfg.selectedGeminiModel = chosen;
+                              if (ttsEngine === 'groq') cfg.selectedGroqModel = chosen;
+                              saveTTSExtraConfig(cfg);
                               setIsModelPickerOpen(false);
                               setCustomModelInput('');
                             }
@@ -881,7 +963,12 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
                           type="button"
                           onClick={() => {
                             if (customModelInput.trim()) {
-                              setSelectedModel(customModelInput.trim());
+                              const chosen = customModelInput.trim();
+                              setSelectedModel(chosen);
+                              const cfg = loadTTSExtraConfig();
+                              if (ttsEngine === 'gemini') cfg.selectedGeminiModel = chosen;
+                              if (ttsEngine === 'groq') cfg.selectedGroqModel = chosen;
+                              saveTTSExtraConfig(cfg);
                               setIsModelPickerOpen(false);
                               setCustomModelInput('');
                             }
@@ -898,10 +985,18 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
                         const isSel = selectedModel === m.id;
                         return (
                           <button
-                            key={m.id}
+                            key={m.id || m.name}
                             type="button"
                             onClick={() => {
+                              if (!m.id) {
+                                handleRefreshModels();
+                                return;
+                              }
                               setSelectedModel(m.id);
+                              const cfg = loadTTSExtraConfig();
+                              if (ttsEngine === 'gemini') cfg.selectedGeminiModel = m.id;
+                              if (ttsEngine === 'groq') cfg.selectedGroqModel = m.id;
+                              saveTTSExtraConfig(cfg);
                               setIsModelPickerOpen(false);
                             }}
                             className={`w-full text-left px-2.5 py-1.5 rounded-xl transition flex flex-col text-xs ${
@@ -954,6 +1049,9 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
                           type="button"
                           onClick={() => {
                             setSelectedVoice(v.id);
+                            const cfg = loadTTSExtraConfig();
+                            cfg.selectedVoice = v.id;
+                            saveTTSExtraConfig(cfg);
                             setIsVoicePickerOpen(false);
                             if (isPlaying) speakParagraph(activeParagraphIndex);
                           }}

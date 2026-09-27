@@ -17,9 +17,11 @@ import {
   RelationshipType,
 } from '../types';
 
-// Modern baseline defaults (Gemini 3.1 / 3.0 series & Groq current lineup)
+// Modern baseline defaults (Gemini 3.8 / 3.1 / 3.0 series & Groq current lineup)
 export const DEFAULT_GEMINI_MODELS: AIModelOption[] = [
-  { id: 'gemini-3.1-flash', name: 'Gemini 3.1 Flash (Rekomendasi Utama)', description: 'Generasi 3.1: Super Cepat, Cerdas, Konteks Masif untuk Naskah Panjang' },
+  { id: 'gemini-3.8-flash-preview', name: 'Gemini 3.8 Flash Preview (Terbaru & Rekomendasi Utama)', description: 'Generasi 3.8: Generasi Paling Cerdas, Responsif, Audio & Teks Generasi Terbaru' },
+  { id: 'gemini-3.8-pro-preview', name: 'Gemini 3.8 Pro Preview', description: 'Generasi 3.8: Penalaran Mutakhir, Analisis Sastra Mendalam & Audio Ultra-Ekspresif' },
+  { id: 'gemini-3.1-flash', name: 'Gemini 3.1 Flash', description: 'Generasi 3.1: Super Cepat, Cerdas, Konteks Masif untuk Naskah Panjang' },
   { id: 'gemini-3.1-pro', name: 'Gemini 3.1 Pro', description: 'Generasi 3.1: Penalaran Mendalam & Analisis Sastra Luas' },
   { id: 'gemini-3.0-flash', name: 'Gemini 3.0 Flash', description: 'Generasi 3.0: Kecepatan Tinggi & Efisiensi Kuota' },
   { id: 'gemini-3.0-pro', name: 'Gemini 3.0 Pro', description: 'Generasi 3.0: Analisis Struktur Plot Kompleks' },
@@ -150,7 +152,7 @@ export function saveAISettings(config: AISettingsConfig): void {
   }
 }
 
-// Fetch Live Models Directly from Google Gemini API
+// Fetch Live Models Directly from Google Gemini API (Semua model yang tersedia di API tanpa batasan)
 export async function fetchLiveGeminiModels(apiKey: string): Promise<AIModelOption[]> {
   if (!apiKey || !apiKey.trim()) {
     throw new Error('Masukkan API Key Gemini untuk mengambil daftar model.');
@@ -167,29 +169,26 @@ export async function fetchLiveGeminiModels(apiKey: string): Promise<AIModelOpti
   const data = await response.json();
   const rawList: any[] = data.models || [];
 
-  // Filter models that support generateContent and are chat-capable
+  // Ambil semua model tanpa memfilter atau membatasi versi
   const models: AIModelOption[] = rawList
-    .filter((m: any) => {
-      const methods: string[] = m.supportedGenerationMethods || [];
-      return methods.includes('generateContent') && !m.name.includes('embedding') && !m.name.includes('aqa');
-    })
     .map((m: any) => {
-      const cleanId = m.name.replace(/^models\//, '');
+      const cleanId = m.name ? m.name.replace(/^models\//, '') : '';
       return {
         id: cleanId,
         name: m.displayName || cleanId,
-        description: m.description ? m.description.slice(0, 80) + '...' : 'Model Gemini Aktif',
+        description: m.description ? m.description.slice(0, 100) : 'Model Google Gemini AI',
       };
-    });
+    })
+    .filter((m) => Boolean(m.id));
 
   if (models.length === 0) {
-    throw new Error('Tidak ada model Gemini yang mendukung generasi teks ditemukan.');
+    throw new Error('Tidak ada model Gemini yang ditemukan dari API.');
   }
 
   return models;
 }
 
-// Fetch Live Models Directly from Groq API
+// Fetch Live Models Directly from Groq API (Semua model yang tersedia di API tanpa batasan)
 export async function fetchLiveGroqModels(apiKey: string): Promise<AIModelOption[]> {
   if (!apiKey || !apiKey.trim()) {
     throw new Error('Masukkan API Key Groq untuk mengambil daftar model.');
@@ -210,25 +209,18 @@ export async function fetchLiveGroqModels(apiKey: string): Promise<AIModelOption
   const data = await response.json();
   const rawList: any[] = data.data || [];
 
-  // Filter out whisper / audio / non-llm models
+  // Ambil seluruh model Groq tanpa batasan
   const models: AIModelOption[] = rawList
-    .filter((m: any) => !m.id.includes('whisper') && !m.id.includes('embed'))
     .map((m: any) => ({
       id: m.id,
       name: m.id,
-      description: `Groq Model (Aktif)`,
-    }));
+      description: `Groq Model (${m.owned_by || 'Aktif'})`,
+    }))
+    .filter((m) => Boolean(m.id));
 
   if (models.length === 0) {
-    throw new Error('Tidak ada model teks Groq yang ditemukan.');
+    throw new Error('Tidak ada model Groq yang ditemukan dari API.');
   }
-
-  // Sort: Llama 3 first, then Mixtral, then others
-  models.sort((a, b) => {
-    if (a.id.includes('llama-3.3')) return -1;
-    if (b.id.includes('llama-3.3')) return 1;
-    return a.id.localeCompare(b.id);
-  });
 
   return models;
 }
