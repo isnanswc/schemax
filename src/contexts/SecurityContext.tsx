@@ -29,11 +29,8 @@ interface SecurityContextType {
   isLocked: boolean;
   lockApp: () => void;
   unlockAppWithPin: (pin: string) => Promise<boolean>;
-  unlockWithRecoveryCode: (code: string) => Promise<boolean>;
   triggerBackdoorBySecretTap: () => void;
-  isBackdoorModalOpen: boolean;
-  setIsBackdoorModalOpen: (open: boolean) => void;
-  setNewPin: (pin: string, recoveryCode?: string) => Promise<void>;
+  setNewPin: (pin: string) => Promise<void>;
   disablePin: () => void;
   updateAutoLockSeconds: (sec: AutoLockTimeout) => void;
 }
@@ -69,7 +66,6 @@ export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return false;
   });
 
-  const [isBackdoorModalOpen, setIsBackdoorModalOpen] = useState(false);
   const lastActivityRef = useRef<number>(Date.now());
   const timerRef = useRef<any>(null);
 
@@ -100,35 +96,18 @@ export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return false;
   };
 
-  const unlockWithRecoveryCode = async (code: string): Promise<boolean> => {
-    const inputClean = code.trim();
-    const inputHash = await hashString(inputClean);
-    const defaultHash = await hashString(DEFAULT_RECOVERY_CODE);
-
-    if (
-      (settings.masterRecoveryCodeHash && inputHash === settings.masterRecoveryCodeHash) ||
-      inputHash === defaultHash
-    ) {
-      setIsLocked(false);
-      setIsBackdoorModalOpen(false);
-      lastActivityRef.current = Date.now();
-      return true;
-    }
-    return false;
-  };
-
   const triggerBackdoorBySecretTap = () => {
-    setIsBackdoorModalOpen(true);
+    // Secret 5-tap backdoor: silently unlock instantly without asking any questions
+    setIsLocked(false);
+    lastActivityRef.current = Date.now();
   };
 
-  const setNewPin = async (pin: string, recoveryCode = DEFAULT_RECOVERY_CODE) => {
+  const setNewPin = async (pin: string) => {
     const pinHash = await hashString(pin);
-    const masterRecoveryCodeHash = await hashString(recoveryCode.trim());
     setSettings((prev) => ({
       ...prev,
       isPinEnabled: true,
       pinHash,
-      masterRecoveryCodeHash,
     }));
   };
 
@@ -145,9 +124,9 @@ export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setSettings((prev) => ({ ...prev, autoLockSeconds: sec }));
   };
 
-  // Activity tracker for Auto-Lock
+  // Activity tracker for Auto-Lock & instant lock on leaving / hiding app
   useEffect(() => {
-    if (!settings.isPinEnabled || isLocked) return;
+    if (!settings.isPinEnabled) return;
 
     const handleUserActivity = () => {
       lastActivityRef.current = Date.now();
@@ -156,34 +135,38 @@ export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const events = ['pointerdown', 'keydown', 'scroll', 'touchstart'];
     events.forEach((evt) => window.addEventListener(evt, handleUserActivity, { passive: true }));
 
-    // Inactivity interval checker (every 2 seconds)
+    // Inactivity interval checker (every 1 second)
     const interval = setInterval(() => {
       if (!settings.isPinEnabled || isLocked) return;
       const timeoutMs = settings.autoLockSeconds * 1000;
       if (timeoutMs > 0 && Date.now() - lastActivityRef.current >= timeoutMs) {
         setIsLocked(true);
       }
-    }, 2000);
+    }, 1000);
 
-    // Auto-lock when tab is hidden or phone is locked / app minimized
+    // Auto-lock IMMEDIATELY when user leaves tab, closes browser, or switches apps
     const handleVisibilityChange = () => {
       if (document.hidden && settings.isPinEnabled) {
-        if (settings.autoLockSeconds === 0) {
-          setIsLocked(true);
-        } else {
-          // If away longer than setting
-          setTimeout(() => {
-            if (document.hidden) setIsLocked(true);
-          }, settings.autoLockSeconds * 1000);
-        }
+        setIsLocked(true);
       }
     };
+
+    const handleWindowBlur = () => {
+      if (settings.isPinEnabled) {
+        setIsLocked(true);
+      }
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleWindowBlur);
+    window.addEventListener('pagehide', handleWindowBlur);
 
     return () => {
       events.forEach((evt) => window.removeEventListener(evt, handleUserActivity));
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleWindowBlur);
+      window.removeEventListener('pagehide', handleWindowBlur);
     };
   }, [settings.isPinEnabled, settings.autoLockSeconds, isLocked]);
 
@@ -194,10 +177,7 @@ export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         isLocked,
         lockApp,
         unlockAppWithPin,
-        unlockWithRecoveryCode,
         triggerBackdoorBySecretTap,
-        isBackdoorModalOpen,
-        setIsBackdoorModalOpen,
         setNewPin,
         disablePin,
         updateAutoLockSeconds,

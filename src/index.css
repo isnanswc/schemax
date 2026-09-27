@@ -332,3 +332,34 @@ button:active:not(:disabled),
   background-image: linear-gradient(to right, transparent, rgba(245, 158, 11, 0.5), transparent);
   margin: 2rem 0;
 }
+
+/* Vault Typewriter Matrix Stream Animation */
+@keyframes typewriterFloat {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-50%);
+  }
+}
+
+.animate-typewriter-stream {
+  animation: typewriterFloat 40s linear infinite;
+}
+
+/* Keypad pulse breathing loop */
+@keyframes keypadBreathing {
+  0%, 100% {
+    border-color: rgba(245, 158, 11, 0.15);
+    box-shadow: 0 0 15px rgba(245, 158, 11, 0.05);
+  }
+  50% {
+    border-color: rgba(245, 158, 11, 0.35);
+    box-shadow: 0 0 25px rgba(245, 158, 11, 0.15);
+  }
+}
+
+.animate-keypad-glow {
+  animation: keypadBreathing 4s ease-in-out infinite;
+}
+

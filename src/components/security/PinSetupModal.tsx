@@ -12,7 +12,6 @@ export const PinSetupModal: React.FC<PinSetupModalProps> = ({ isOpen, onClose })
 
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
-  const [recoveryCode, setRecoveryCode] = useState('');
   const [step, setStep] = useState<'status' | 'create_pin' | 'confirm_pin'>('status');
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -22,15 +21,14 @@ export const PinSetupModal: React.FC<PinSetupModalProps> = ({ isOpen, onClose })
   const handleStartSetup = () => {
     setPin('');
     setConfirmPin('');
-    setRecoveryCode('');
     setError(null);
     setSuccessMsg(null);
     setStep('create_pin');
   };
 
   const handleProceedToConfirm = () => {
-    if (pin.length < 4 || pin.length > 6 || !/^\d+$/.test(pin)) {
-      setError('PIN harus berupa 4 hingga 6 digit angka.');
+    if (pin.length !== 6 || !/^\d{6}$/.test(pin)) {
+      setError('PIN harus berupa 6 digit angka.');
       return;
     }
     setError(null);
@@ -38,12 +36,16 @@ export const PinSetupModal: React.FC<PinSetupModalProps> = ({ isOpen, onClose })
   };
 
   const handleSaveNewPin = async () => {
+    if (confirmPin.length !== 6) {
+      setError('Masukkan 6 digit angka.');
+      return;
+    }
     if (pin !== confirmPin) {
       setError('Konfirmasi PIN tidak cocok. Silakan coba lagi.');
       return;
     }
-    await setNewPin(pin, recoveryCode.trim() || undefined);
-    setSuccessMsg('Kunci PIN berhasil diaktifkan!');
+    await setNewPin(pin);
+    setSuccessMsg('Kunci PIN 6-Digit berhasil diaktifkan!');
     setTimeout(() => {
       setStep('status');
       setSuccessMsg(null);
@@ -188,9 +190,9 @@ export const PinSetupModal: React.FC<PinSetupModalProps> = ({ isOpen, onClose })
 
         {/* STEP: CREATE PIN */}
         {step === 'create_pin' && (
-          <div className="space-y-3 text-xs">
+          <div className="space-y-4 text-xs">
             <p className="text-slate-600 dark:text-slate-400">
-              Masukkan <strong>4 hingga 6 digit angka</strong> sebagai PIN pengaman brankas Schemax:
+              Masukkan <strong>6 digit angka</strong> sebagai PIN pengaman brankas Schemax:
             </p>
 
             <input
@@ -198,25 +200,9 @@ export const PinSetupModal: React.FC<PinSetupModalProps> = ({ isOpen, onClose })
               maxLength={6}
               value={pin}
               onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-              placeholder="Ketik 4-6 digit PIN..."
-              className="w-full py-2.5 px-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-center text-lg tracking-widest font-mono text-slate-900 dark:text-white focus:outline-none focus:border-amber-500 shadow-inner"
+              placeholder="••••••"
+              className="w-full py-3 px-3 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-center text-2xl tracking-[0.5em] font-mono text-slate-900 dark:text-white focus:outline-none focus:border-amber-500 shadow-inner"
             />
-
-            <div className="space-y-1 pt-1">
-              <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                Kunci Pemulihan Darurat (Backdoor Pribadi - Opsional):
-              </label>
-              <input
-                type="text"
-                value={recoveryCode}
-                onChange={(e) => setRecoveryCode(e.target.value)}
-                placeholder="Misal: RahasiaKu2026 (Default: SCHEMAX-RECOVER-2026)"
-                className="w-full py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-xs font-mono text-amber-600 dark:text-amber-400 focus:outline-none focus:border-amber-500"
-              />
-              <span className="text-[10px] text-slate-400 block">
-                Jika lupa PIN, ketuk ikon gembok 5x di layar kunci dan masukkan kunci ini.
-              </span>
-            </div>
 
             {error && <p className="text-xs text-rose-500 font-bold">{error}</p>}
 
@@ -224,15 +210,15 @@ export const PinSetupModal: React.FC<PinSetupModalProps> = ({ isOpen, onClose })
               <button
                 type="button"
                 onClick={() => setStep('status')}
-                className="py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold"
+                className="py-2.5 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold"
               >
                 Batal
               </button>
               <button
                 type="button"
                 onClick={handleProceedToConfirm}
-                disabled={pin.length < 4}
-                className="py-2 px-4 rounded-xl bg-amber-500 text-slate-950 font-bold disabled:opacity-50"
+                disabled={pin.length !== 6}
+                className="py-2.5 px-5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold disabled:opacity-40 transition"
               >
                 Lanjut ➔
               </button>
@@ -242,9 +228,9 @@ export const PinSetupModal: React.FC<PinSetupModalProps> = ({ isOpen, onClose })
 
         {/* STEP: CONFIRM PIN */}
         {step === 'confirm_pin' && (
-          <div className="space-y-3 text-xs">
+          <div className="space-y-4 text-xs">
             <p className="text-slate-600 dark:text-slate-400">
-              Ketik ulang PIN untuk memastikan tidak ada kesalahan ketik:
+              Ketik ulang <strong>6 digit PIN</strong> untuk konfirmasi:
             </p>
 
             <input
@@ -252,8 +238,8 @@ export const PinSetupModal: React.FC<PinSetupModalProps> = ({ isOpen, onClose })
               maxLength={6}
               value={confirmPin}
               onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
-              placeholder="Konfirmasi PIN..."
-              className="w-full py-2.5 px-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-center text-lg tracking-widest font-mono text-slate-900 dark:text-white focus:outline-none focus:border-amber-500 shadow-inner"
+              placeholder="••••••"
+              className="w-full py-3 px-3 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-center text-2xl tracking-[0.5em] font-mono text-slate-900 dark:text-white focus:outline-none focus:border-amber-500 shadow-inner"
             />
 
             {error && <p className="text-xs text-rose-500 font-bold">{error}</p>}
@@ -268,15 +254,15 @@ export const PinSetupModal: React.FC<PinSetupModalProps> = ({ isOpen, onClose })
               <button
                 type="button"
                 onClick={() => setStep('create_pin')}
-                className="py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold"
+                className="py-2.5 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold"
               >
                 Kembali
               </button>
               <button
                 type="button"
                 onClick={handleSaveNewPin}
-                disabled={confirmPin.length < 4}
-                className="py-2 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black disabled:opacity-50 transition active:scale-95"
+                disabled={confirmPin.length !== 6}
+                className="py-2.5 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black disabled:opacity-40 transition active:scale-95 shadow-md shadow-emerald-600/20"
               >
                 Simpan &amp; Aktifkan
               </button>
