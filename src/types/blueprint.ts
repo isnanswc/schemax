@@ -4,6 +4,7 @@ export interface BlueprintCharacter {
   age?: string;
   physicalTraits?: string;
   traits?: string;
+  visualPrompt?: string;
   shortDescription: string;
   want?: string;
   need?: string;

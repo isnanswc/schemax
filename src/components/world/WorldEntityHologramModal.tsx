@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { WorldEntity, WorldCategory } from '../../types';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { getConditionMeta } from './entityConditionMeta';
 import { EntityImagePickerModal } from './EntityImagePickerModal';
 import { ChapterSceneChronologyAccordion } from './ChapterSceneChronologyAccordion';
+import { db } from '../../db';
+import { generateSmartCharacterVisualPrompt } from '../../services/aiService';
 import {
   X,
   User,
@@ -13,7 +15,10 @@ import {
   Tag,
   Sparkles,
   Info,
-  Camera
+  Camera,
+  Loader2,
+  Check,
+  Copy
 } from 'lucide-react';
 
 interface WorldEntityHologramModalProps {
@@ -31,6 +36,7 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
 }) => {
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
   const [currentEntity, setCurrentEntity] = useState<WorldEntity | null>(entity);
+  const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
 
   // Sync internal entity when prop changes
   React.useEffect(() => {
@@ -48,14 +54,62 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
     setTimeout(() => setCopyFeedback(null), 2000);
   };
 
+  // Filter out any automated placeholder text like "Dideteksi otomatis dari Bab X: ..."
+  const cleanDetailedNotes = useMemo(() => {
+    if (!activeEntity?.detailedNotes) return '';
+    const filtered = activeEntity.detailedNotes
+      .split('\n')
+      .filter((line) => !line.toLowerCase().includes('dideteksi otomatis dari bab'))
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .join('\n');
+    return filtered;
+  }, [activeEntity?.detailedNotes]);
+
   const getEffectiveVisualPrompt = () => {
     if (!activeEntity) return '';
     if (activeEntity.visualPrompt) return activeEntity.visualPrompt;
-    const genderTerm = activeEntity.tags?.some((t) => t.toLowerCase() === 'wanita' || t.toLowerCase() === 'perempuan')
-      ? 'Indonesian woman'
-      : 'Indonesian character';
-    const physicalDesc = activeEntity.physicalTraits || activeEntity.shortDescription || 'standing upright, natural appearance';
-    return `Full body portrait standing upright, centered, ${genderTerm}, ${physicalDesc}, hyper realistic, 8k resolution, cinematic lighting, photorealistic textures, 9:16 aspect ratio`;
+    const isFemale = activeEntity.tags?.some((t) =>
+      ['wanita', 'perempuan', 'female', 'gadis', 'istri', 'ibu'].includes(t.toLowerCase())
+    );
+    const genderTerm = isFemale ? 'Indonesian woman' : 'Indonesian man';
+    const physicalDesc = activeEntity.physicalTraits || activeEntity.shortDescription || 'authentic natural appearance';
+    const demeanor =
+      activeEntity.currentTraits || activeEntity.initialTraits
+        ? `, facial expression reflecting ${activeEntity.currentTraits || activeEntity.initialTraits}`
+        : '';
+    return `Full body portrait standing upright, centered, ${genderTerm}, ${physicalDesc}${demeanor}, neutral cinematic studio lighting, photorealistic skin textures, 8k resolution, hyper realistic, vertical mobile phone screen aspect ratio 9:16 --ar 9:16`;
+  };
+
+  const handleGenerateAIPrompt = async () => {
+    if (!activeEntity) return;
+    setIsGeneratingPrompt(true);
+    try {
+      const generated = await generateSmartCharacterVisualPrompt({
+        name: activeEntity.name,
+        role: activeEntity.shortDescription,
+        physicalTraits: activeEntity.physicalTraits,
+        traits: activeEntity.currentTraits || activeEntity.initialTraits,
+        shortDescription: activeEntity.currentDescription || activeEntity.shortDescription,
+      });
+
+      const updated = {
+        ...activeEntity,
+        visualPrompt: generated,
+        updatedAt: Date.now(),
+      };
+      await db.worldEntities.update(activeEntity.id, {
+        visualPrompt: generated,
+        updatedAt: Date.now(),
+      });
+      setCurrentEntity(updated);
+      onEntityUpdated?.(updated);
+    } catch (err: any) {
+      console.error('Gagal generate prompt visual karakter:', err);
+      alert('Gagal menghasilkan prompt: ' + (err.message || 'Error'));
+    } finally {
+      setIsGeneratingPrompt(false);
+    }
   };
 
   if (!isOpen || !activeEntity) return null;
@@ -246,13 +300,13 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
               )}
 
               {/* Detailed Notes */}
-              {activeEntity.detailedNotes && (
+              {cleanDetailedNotes && (
                 <div>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400/90 block mb-1">
                     Catatan Lore &amp; Rahasia
                   </span>
                   <div className="max-h-36 overflow-y-auto no-scrollbar text-xs text-slate-700 dark:text-slate-300 bg-amber-50/50 dark:bg-slate-950/40 p-2.5 rounded-xl border border-amber-200/60 dark:border-slate-800/60 leading-relaxed italic">
-                    {activeEntity.detailedNotes}
+                    {cleanDetailedNotes}
                   </div>
                 </div>
               )}
@@ -353,30 +407,64 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
 
               {/* Text-to-Image Visual Prompt Generator Box */}
               <div className="p-3.5 rounded-2xl bg-gradient-to-br from-purple-500/10 via-pink-500/5 to-transparent border border-purple-500/30 space-y-2.5">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5">
                     <Sparkles className="w-4 h-4 text-purple-500" />
                     <span className="text-xs font-bold text-slate-900 dark:text-white">
-                      Prompt Generator Visual (HP 9:16)
+                      Prompt Karakter Text-to-Image (English 9:16)
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(getEffectiveVisualPrompt(), 'Prompt Visual')}
-                    className="px-2.5 py-1 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-[11px] flex items-center gap-1 active:scale-95 transition shadow-sm"
-                  >
-                    <span>{copyFeedback === 'Prompt Visual' ? 'Tersalin!' : 'Salin Prompt'}</span>
-                  </button>
+
+                  <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                    <button
+                      type="button"
+                      onClick={handleGenerateAIPrompt}
+                      disabled={isGeneratingPrompt}
+                      className="flex-1 sm:flex-initial px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 text-white font-bold text-[11px] flex items-center justify-center gap-1.5 active:scale-95 transition shadow-sm disabled:opacity-50"
+                      title="Generate prompt karakter objektif dalam Bahasa Inggris menggunakan AI"
+                    >
+                      {isGeneratingPrompt ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Generating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                          <span>Auto-Generate Prompt AI</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(getEffectiveVisualPrompt(), 'Prompt Visual')}
+                      className="px-2.5 py-1.5 rounded-xl bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/40 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 font-bold text-[11px] flex items-center justify-center gap-1 active:scale-95 transition border border-purple-500/20"
+                    >
+                      {copyFeedback === 'Prompt Visual' ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-500" />
+                          <span>Tersalin!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Salin</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="p-3 rounded-xl bg-white dark:bg-slate-950/80 border border-purple-500/20 font-mono text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed max-h-36 overflow-y-auto select-all">
                   {getEffectiveVisualPrompt()}
                 </div>
 
-                <div className="flex items-center gap-2 flex-wrap text-[10px] text-purple-700 dark:text-purple-300 font-medium">
+                <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-purple-700 dark:text-purple-300 font-medium">
                   <span className="px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20">📱 Rasio: 9:16 (Layar HP)</span>
                   <span className="px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20">🧍 Berdiri Tegap Sentral</span>
                   <span className="px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20">🇮🇩 Etnis: Nusantara / Indonesia</span>
+                  <span className="px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20">👔 Busana Cerita</span>
                   <span className="px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20">✨ Hyper Realistic 8k</span>
                 </div>
               </div>

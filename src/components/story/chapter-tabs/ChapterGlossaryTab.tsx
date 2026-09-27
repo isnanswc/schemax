@@ -64,6 +64,45 @@ interface ChapterGlossaryTabProps {
   onInsertTextToManuscript: (text: string) => void;
 }
 
+// Helper to render prompt with color-coded bracketed character labels
+// RED for wanita / female, BLUE for pria / male
+function renderBracketedPrompt(text: string) {
+  if (!text) return null;
+  // Matches [pria1], [wanita1], pria1, wanita1, [pria], [wanita] etc.
+  const regex = /(\[(?:pria\d*|wanita\d*|man\d*|woman\d*|person\d*)\]|\b(?:pria\d+|wanita\d+|man\d+|woman\d+)\b)/gi;
+  const parts = text.split(regex);
+
+  return parts.map((part, index) => {
+    const lower = part.toLowerCase();
+    const isPria = lower.includes('pria') || lower.includes('man');
+    const isWanita = lower.includes('wanita') || lower.includes('woman');
+
+    if (isPria) {
+      const display = part.startsWith('[') && part.endsWith(']') ? part : `[${part}]`;
+      return (
+        <span
+          key={index}
+          className="inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded font-black font-mono text-blue-600 dark:text-blue-400 bg-blue-500/15 border border-blue-500/30 text-xs shadow-xs"
+        >
+          {display}
+        </span>
+      );
+    }
+    if (isWanita) {
+      const display = part.startsWith('[') && part.endsWith(']') ? part : `[${part}]`;
+      return (
+        <span
+          key={index}
+          className="inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded font-black font-mono text-rose-600 dark:text-rose-400 bg-rose-500/15 border border-rose-500/30 text-xs shadow-xs"
+        >
+          {display}
+        </span>
+      );
+    }
+    return part;
+  });
+}
+
 export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
   chapter,
   bookTitle,
@@ -358,10 +397,12 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
         initialTraits: candidate.initialTraits || '',
         currentDescription: candidate.currentDescription || candidate.shortDescription,
         currentTraits: candidate.currentTraits || candidate.initialTraits || '',
+        physicalTraits: candidate.physicalTraits || undefined,
+        visualPrompt: candidate.visualPrompt || undefined,
         evolutionSummary: candidate.evolutionSummary || '',
         condition: candidate.condition || 'aktif',
         conditionDetails: candidate.conditionDetails || '',
-        detailedNotes: `Dideteksi otomatis dari Bab ${chapter.order}: ${chapter.title}.`,
+        detailedNotes: '',
         tags: [candidate.category],
         galleryMediaIds: [],
         attributes: [],
@@ -599,10 +640,12 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
         initialTraits: c.initialTraits || '',
         currentDescription: c.currentDescription || c.shortDescription,
         currentTraits: c.currentTraits || c.initialTraits || '',
+        physicalTraits: c.physicalTraits || undefined,
+        visualPrompt: c.visualPrompt || undefined,
         evolutionSummary: c.evolutionSummary || '',
         condition: c.condition || 'aktif',
         conditionDetails: c.conditionDetails || '',
-        detailedNotes: `Dideteksi otomatis dari Bab ${chapter.order}: ${chapter.title}.`,
+        detailedNotes: '',
         tags: [c.category],
         galleryMediaIds: [],
         attributes: [],
@@ -1504,24 +1547,16 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
                       </p>
                     </div>
 
-                    {/* Quick Insert & Hologram Buttons */}
-                    <div className="flex items-center gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
-                      <button
-                        type="button"
-                        onClick={() => handleInsert(ent.name)}
-                        className="flex-1 py-1 px-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-slate-700 dark:text-slate-300 text-[10px] font-bold transition active:scale-95 text-center truncate"
-                        title="Sisipkan nama tokoh/latar ke kursor naskah"
-                      >
-                        {insertedName === ent.name ? 'Tersisip!' : '+ Sisip ke Naskah'}
-                      </button>
-
+                    {/* Detail Entitas Button */}
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
                       <button
                         type="button"
                         onClick={() => setHologramEntity(ent)}
-                        className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-white hover:bg-slate-700 transition active:scale-95"
-                        title="Lihat Hologram Lengkap"
+                        className="w-full py-1.5 px-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/25 text-xs font-bold transition active:scale-95 flex items-center justify-center gap-1.5 shadow-xs"
+                        title="Buka Detail & Profil Entitas"
                       >
-                        <Eye className="w-3.5 h-3.5" />
+                        <Eye className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                        <span>Detail Entitas</span>
                       </button>
                     </div>
                   </div>
@@ -1966,19 +2001,64 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
                       </div>
                     )}
 
-                    {/* Image Prompt Explanation if available */}
-                    {sc.imagePromptExplanation && (
-                      <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200/60 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
-                        <span className="font-bold text-purple-600 dark:text-purple-400 mr-1">
-                          Gambaran Prompt:
-                        </span>
-                        {sc.imagePromptExplanation}
+                    {/* Image Prompt Explanation with Character Mapping */}
+                    {(sc.imagePromptExplanation || (sc.characterReferences && sc.characterReferences.length > 0)) && (
+                      <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/70 dark:border-slate-800 text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed space-y-2">
+                        {/* Mapping Karakter: Misal Udin [pria1], Tasya [wanita1] */}
+                        {sc.characterReferences && sc.characterReferences.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1.5 pb-2 border-b border-slate-200/50 dark:border-slate-800/80">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mr-1">
+                              Pemetaan Karakter:
+                            </span>
+                            {sc.characterReferences.map((refName, rIdx) => {
+                              const ent = entities.find(
+                                (e) => e.name.toLowerCase() === refName.toLowerCase()
+                              );
+                              const isFemale =
+                                ent?.tags?.some((t) =>
+                                  ['wanita', 'perempuan', 'female', 'istri', 'ibu', 'gadis'].includes(t.toLowerCase())
+                                ) ||
+                                /^(santi|ani|wati|dewi|putri|ratna|maya|siti|ayu|sarah|tari|rani)/i.test(refName);
+
+                              const tagLabel = isFemale ? `[wanita${rIdx + 1}]` : `[pria${rIdx + 1}]`;
+
+                              return (
+                                <span
+                                  key={rIdx}
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-bold border shadow-xs ${
+                                    isFemale
+                                      ? 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30'
+                                      : 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30'
+                                  }`}
+                                >
+                                  <span>{refName}</span>
+                                  <span
+                                    className={`font-mono text-[10px] px-1 py-0.2 rounded font-black ${
+                                      isFemale ? 'bg-rose-500 text-white' : 'bg-blue-600 text-white'
+                                    }`}
+                                  >
+                                    {tagLabel}
+                                  </span>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {sc.imagePromptExplanation && (
+                          <div>
+                            <span className="font-bold text-purple-600 dark:text-purple-400 mr-1.5">
+                              Gambaran Adegan:
+                            </span>
+                            <span>{renderBracketedPrompt(sc.imagePromptExplanation)}</span>
+                          </div>
+                        )}
                       </div>
                     )}
 
-                    <p className="text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 font-mono leading-relaxed break-words overflow-x-auto">
-                      {sc.imagePrompt}
-                    </p>
+                    <div className="text-xs text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 font-mono leading-relaxed break-words overflow-x-auto select-all">
+                      {renderBracketedPrompt(sc.imagePrompt)}
+                    </div>
                   </div>
                 ))}
             </div>

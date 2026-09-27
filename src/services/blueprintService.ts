@@ -26,8 +26,8 @@ KECERDASAN ANALISA KONTEKS:
 5. LOKASI & ITEM/RELIK:
    - Lokasi relevan (misal: Rumah Keluarga, Tempat Penemuan Barang Misterius, dsb.).
    - Item misterius dengan dampak/aturan supranaturalnya.
-6. BAB PEMBUKA LENGKAP:
-   - Rancang minimal 3 bab pertama dengan "title", "premise" (alur adegan berurutan yang detail), dan "notes".
+6. BAB PEMBUKA (HANYA BAB 1 SAJA):
+   - Rancang HANYA BAB 1 (Bab Pembuka) secara mendalam dengan "title", "premise" (alur ketukan adegan berurutan yang spesifik), dan "notes". Jangan buat bab lain, cukup Bab 1 saja!
 
 WAJIB MERESPON HANYA DENGAN FORMAT JSON VALID:
 {
@@ -65,6 +65,7 @@ WAJIB MERESPON HANYA DENGAN FORMAT JSON VALID:
       "age": "28 Tahun",
       "physicalTraits": "Pria berwajah teduh namun lelah, tinggi 172 cm, kulit sawo matang, rambut ikal pendek agak berantakan, mengenakan jaket katun lusuh.",
       "traits": "Penyayang, pekerja keras, keras kepala, mudah cemas saat keluarga dalam bahaya.",
+      "visualPrompt": "Full body portrait standing upright, centered, Indonesian man in his late 20s, tan skin, short wavy black hair, exhausted and anxious gaze reflecting emotional turmoil, wearing a weathered brown cotton jacket over a plain t-shirt and dark jeans, neutral cinematic studio lighting, photorealistic skin textures, 8k resolution, vertical mobile phone aspect ratio 9:16",
       "shortDescription": "Pemuda yang menemukan benda misterius dan menjadi orang asing di rumahnya sendiri.",
       "want": "Mengembalikan ingatan keluarganya agar mengenalinya kembali.",
       "need": "Menerima bahwa kebahagiaan keluarga tidak bisa dibangun di atas kebohongan atau jalan pintas.",
@@ -81,6 +82,7 @@ WAJIB MERESPON HANYA DENGAN FORMAT JSON VALID:
       "age": "26 Tahun",
       "physicalTraits": "Wanita berparas manis khas nusantara, rambut sebahu diikat sederhana, tatapan mata waspada dan defensif, daster batik rapi.",
       "traits": "Tegas, protektif terhadap rumah, curigaan terhadap orang asing, sebenarnya rapuh di dalam batin.",
+      "visualPrompt": "Full body portrait standing upright, centered, Indonesian woman in her mid 20s, light brown skin, shoulder-length black hair tied in a simple ponytail, guarded defensive facial expression with sharp suspicious eyes, wearing a tidy traditional patterned batik homedress (daster batik), soft cinematic lighting, 8k resolution, photorealistic textures, vertical mobile phone aspect ratio 9:16",
       "shortDescription": "Istri yang kehilangan ingatan tentang suaminya dan mengiranya sebagai penyusup.",
       "want": "Melindungi rumah dan ketenangannya dari pria asing yang mengaku suaminya.",
       "need": "Mengingat kembali ikatan cinta tulus yang pernah ada.",
@@ -119,21 +121,7 @@ WAJIB MERESPON HANYA DENGAN FORMAT JSON VALID:
       "order": 1,
       "premise": "1. Protagonis pulang ke rumah membawa benda misterius yang ia temukan siang tadi.\\n2. Sang istri menyambut di pintu dengan wajah ketakutan dan berteriak memanggil tetangga mengira ia adalah maling.\\n3. Protagonis syok melihat seluruh foto pernikahan dan jejak keberadaannya di rumah tiba-tiba lenyap.",
       "notes": "Hadirkan atmosfer kebingungan yang mencekam dan luka emosional yang mendalam.",
-      "targetWordCount": 1600
-    },
-    {
-      "title": "Bab 2: Jejak yang Dihapus",
-      "order": 2,
-      "premise": "1. Protagonis terpaksa melarikan diri dari kejaran warga sekitar.\\n2. Mengamati cincin di bawah sinar lampu jalan dan menyadari anomali hawa dingin yang keluar dari batu cincin.\\n3. Menemui sahabat dekatnya untuk meminta bantuan, namun sahabatnya pun tidak mengenalinya sama sekali.",
-      "notes": "Eskalasi rasa kesepian dan konfirmasi bahwa anomali ini bersifat menyeluruh.",
       "targetWordCount": 1800
-    },
-    {
-      "title": "Bab 3: Bisikan di Balik Logam Kuno",
-      "order": 3,
-      "premise": "1. Mencari informasi ke pedagang barang antik tempat ia menemukan cincin.\\n2. Menemukan petunjuk asal-usul cincin dan pantangan berat yang telah dilanggar.\\n3. Mengetahui batas waktu sebelum ingatan keluarganya terkunci selamanya.",
-      "notes": "Hadirkan batas waktu (ticking clock) untuk menaikkan ketegangan cerita.",
-      "targetWordCount": 2000
     }
   ]
 }`;
@@ -145,7 +133,7 @@ Instruksi Analisa Cerdas:
 - Pahami relasi karakter dalam ide tersebut secara mendalam (misal keluarga, pasangan, sahabat, dsb.).
 - Buat karakter lengkap dengan usia, ciri fisik konkret, dan watak/sifat.
 - Buat 3 opsi kelanjutan alur yang memikat.
-- Rancang alur 3 bab pembuka yang langsung siap dipakai sebagai Story Plot.
+- Rancang alur bab pembuka (Bab 1) secara mendalam dan siap dipakai sebagai Story Plot.
 - Respon HANYA teks JSON valid.`;
 
   const response = await generateWithSmartFallback(userPrompt, systemPrompt);
@@ -246,6 +234,7 @@ export async function seedBlueprintToDatabase(blueprint: StoryBlueprint): Promis
         shortDescription: `${char.role ? `[${char.role}] ` : ''}${char.shortDescription || ''}`,
         detailedNotes,
         physicalTraits: char.physicalTraits || undefined,
+        visualPrompt: char.visualPrompt || undefined,
         initialTraits: char.traits || undefined,
         currentTraits: char.traits || undefined,
         condition: 'aktif',

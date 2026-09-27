@@ -736,11 +736,11 @@ Instruksi Analisis Tiap Adegan:
    - Format: Rasio layar HP vertical (9:16), 4K hyper realistic, photorealistic cinematic lighting.
    - PENTING: User akan melampirkan gambar referensi karakter langsung berdampingan dengan prompt!
    - JANGAN deskripsikan wajah, tubuh, atau warna kulit karakter! Cukup gunakan reference dari referensi gambar.
-   - JANGAN sebut nama karakter di dalam prompt. Gunakan label "pria" atau "wanita". Jika ada lebih dari 1 entitas sejenis, beri nomor (contoh: "pria1", "wanita1", "pria2").
+   - JANGAN sebut nama karakter di dalam prompt. Gunakan label dalam kurung siku seperti "[pria1]" atau "[wanita1]". Jika ada lebih dari 1 entitas sejenis, beri nomor (contoh: "[pria1]", "[wanita1]", "[pria2]").
    - JANGAN ubah bentuk atau model pakaian asli karakter. HANYA boleh perubahan minor realistis sesuai konteks adegan (misal: "baju agak terbuka", "kusut", "robek sedikit di bahu", "terlepas dari satu bahu", "basah oleh keringat atau air hujan").
    - Jelaskan secara detail: POSE, EKSPRESI WAJAH/EMOSI, LATAR TEMPAT, PENCAHAYAAN, dan SUASANA dramatis adegan.
    - Berikan juga "characterReferences": Daftar nama karakter yang WAJIB dilampirkan gambarnya (contoh: ["Budi", "Ani"]).
-   - Berikan juga "imagePromptExplanation": Penjelasan ringkas apa yang digambarkan oleh prompt ini dalam Bahasa Indonesia yang santai dan mudah dimengerti.
+   - Berikan juga "imagePromptExplanation": Penjelasan ringkas apa yang digambarkan oleh prompt ini dalam Bahasa Indonesia. Pada penjelasan ini, sebutkan nama karakter yang dimaksud beserta labelnya, misal: Udin [pria1], Tasya [wanita1].
 
 Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
 [
@@ -758,8 +758,8 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
       { "name": "Nama Karakter 1", "category": "character", "entityId": "" }
     ],
     "characterReferences": ["Nama Karakter 1"],
-    "imagePrompt": "Vertical mobile phone screen 9:16, 4k hyper realistic, photorealistic cinematic, dramatic soft mist lighting. pria1 standing at the edge of the foggy wooden pier at dawn, gaze filled with intense sorrow and determination, clenched fists at his sides. Original clothing slightly soaked and clinging from sea spray, wrinkled at the hem. Volumetric morning haze, cold blue hour ambience, cinematic depth of field --ar 9:16",
-    "imagePromptExplanation": "Foto vertikal layar HP (9:16) menampilkan pria1 di ujung dermaga berkabut saat fajar. Ekspresinya penuh tekad bercampur duka dengan tangan mengepal. Pakaian aslinya agak basah oleh percikan air laut dan kusut di bagian bawah. Suasana dingin berkabut dengan pencahayaan sinematik 4K."
+    "imagePrompt": "Vertical mobile phone screen 9:16, 4k hyper realistic, photorealistic cinematic, dramatic soft mist lighting. [pria1] standing at the edge of the foggy wooden pier at dawn, gaze filled with intense sorrow and determination, clenched fists at his sides. Original clothing slightly soaked and clinging from sea spray, wrinkled at the hem. Volumetric morning haze, cold blue hour ambience, cinematic depth of field --ar 9:16",
+    "imagePromptExplanation": "Foto vertikal layar HP (9:16) menampilkan Udin [pria1] di ujung dermaga berkabut saat fajar. Ekspresinya penuh tekad bercampur duka dengan tangan mengepal. Pakaian aslinya agak basah oleh percikan air laut dan kusut di bagian bawah. Suasana dingin berkabut dengan pencahayaan sinematik 4K."
   }
 ]`;
 
@@ -850,18 +850,18 @@ Ringkasan Kejadian: ${scene.summary}
 ATURAN WAJIB & SANGAT KETAT:
 1. User selalu melampirkan gambar referensi karakter di sebelah prompt.
 2. JANGAN sebut atau deskripsikan bentuk wajah, warna kulit, atau postur tubuh karakter! Gunakan referensi visual yang dilampirkan.
-3. JANGAN sebut nama karakter di dalam prompt. Ganti dengan sebutan "pria" atau "wanita". Jika ada lebih dari satu, beri nomor (contoh: "pria1", "wanita1", "pria2").
+3. JANGAN sebut nama karakter di dalam prompt. Ganti dengan label dalam kurung siku seperti "[pria1]" atau "[wanita1]". Jika ada lebih dari satu, beri nomor (contoh: "[pria1]", "[wanita1]", "[pria2]").
 4. JANGAN ubah bentuk atau model pakaian asli karakter. HANYA boleh perubahan minor realistis sesuai konteks kejadian (misal: "baju agak terbuka", "kusut", "robek sedikit di bahu", "terlepas dari satu bahu", "basah oleh keringat / air").
 5. Jelaskan secara sangat mendalam: POSE KARAKTER, EKSPRESI EMOSI, LATAR LINGKUNGAN, PENCAHAYAAN (lighting), dan ATMOSFER dramatis adegan.
 6. Format teknis: "Vertical mobile phone screen (9:16), 4k hyper realistic, photorealistic cinematic, [deskripsi pose, ekspresi, interaksi, pakaian minor change, latar, lighting] --ar 9:16".
 7. Berikan daftar "characterReferences": Nama-nama karakter asli yang gambarnya harus dilampirkan oleh user.
-8. Berikan "explanation": Penjelasan isi prompt dalam Bahasa Indonesia yang santai, jelas, dan mudah dimengerti.
+8. Berikan "explanation": Penjelasan isi prompt dalam Bahasa Indonesia yang santai, jelas, dan sebutkan nama karakter yang dimaksud beserta label bracketnya, misal: Udin [pria1], Tasya [wanita1].
 
 Keluarkan HANYA JSON object valid:
 {
   "characterReferences": ["${scene.characters[0] || 'Nama Karakter'}"],
-  "prompt": "Vertical mobile phone screen 9:16, 4k hyper realistic, photorealistic cinematic...",
-  "explanation": "Penjelasan gambaran isi prompt..."
+  "prompt": "Vertical mobile phone screen 9:16, 4k hyper realistic, photorealistic cinematic, [pria1]...",
+  "explanation": "Foto vertikal layar HP menampilkan Udin [pria1]..."
 }`;
 
   const systemPrompt =
@@ -1513,4 +1513,37 @@ Berikan output HANYA berupa JSON valid persis dengan struktur ini:
     factions,
     mappedEntities: sanitizedMappedEntities,
   };
+}
+
+// 8. Smart Character Visual Prompt Generator (Text-to-Image English 9:16)
+export async function generateSmartCharacterVisualPrompt(character: {
+  name: string;
+  role?: string;
+  age?: string;
+  physicalTraits?: string;
+  traits?: string;
+  shortDescription?: string;
+  genderOrTag?: string;
+}): Promise<string> {
+  const prompt = `You are a world-class concept artist and AI text-to-image prompt engineer (Midjourney v6, Flux, Stable Diffusion).
+Create a highly objective, photorealistic character concept art prompt in ENGLISH for the following novel character:
+
+Character Name: "${character.name}"
+Role / Identity: "${character.role || character.shortDescription || 'Main Character'}"
+Estimated Age: "${character.age || 'Adult'}"
+Physical Traits: "${character.physicalTraits || 'Indonesian / Southeast Asian appearance, natural skin tone, authentic build'}"
+Personality & Demeanor: "${character.traits || 'Natural, expressive'}"
+
+STRICT OBJECTIVE PROMPT REQUIREMENTS:
+1. Format: Vertical mobile phone aspect ratio (9:16), full body standing upright, centered composition.
+2. Subject Description: State exact ethnicity (default to Indonesian / Southeast Asian unless story states otherwise), age, skin tone (tan, light brown, olive), facial features, hairstyle, and body posture standing straight.
+3. Authentic Clothing & Attire: Describe the specific everyday or cultural clothing faithfully according to the character's role and story setting.
+4. Emotional Expression: The facial expression and posture MUST objectively reflect the character's internal personality traits (e.g. cautious, warm, exhausted, resolute).
+5. Photography & Quality keywords: 8k resolution, photorealistic skin textures, neutral cinematic lighting, shallow depth of field, hyper realistic, vertical mobile phone aspect ratio 9:16, --ar 9:16.
+6. OUTPUT RULE: Output ONLY the English prompt string. Do NOT add preamble, quotes, or markdown codeblocks.`;
+
+  const systemPrompt =
+    'You are an expert AI prompt engineer. Output strictly the single final English text-to-image prompt without markdown or quotes.';
+  const res = await generateWithSmartFallback(prompt, systemPrompt);
+  return res.text.replace(/^["'`]|["'`]$/g, '').trim();
 }

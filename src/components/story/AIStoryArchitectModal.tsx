@@ -48,6 +48,26 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
 
   // Review Tabs: 'overview' | 'characters' | 'world' | 'chapters' | 'style'
   const [activeReviewTab, setActiveReviewTab] = useState<'overview' | 'characters' | 'world' | 'chapters' | 'style'>('overview');
+  const [loadingPhaseIndex, setLoadingPhaseIndex] = useState(0);
+
+  const loadingPhases = [
+    { title: 'Membedah Premis & Inti Konflik...', subtitle: 'Mengekstrak dinamika keluarga, taruhan emosional, dan tema sentral cerita.' },
+    { title: 'Merumuskan Karakter & Watak Batin...', subtitle: 'Menyusun usia, kelemahan masa lalu (wound), dan kebutuhan batin tokoh.' },
+    { title: 'Menyusun Ciri Fisik & Prompt Visual...', subtitle: 'Merancang penampilan otentik, gaya busana, dan prompt AI Bahasa Inggris.' },
+    { title: 'Memetakan Artefak & Aturan Dunia...', subtitle: 'Menghubungkan benda misterius, latar tempat, dan konsistensi cerita.' },
+    { title: 'Merancang Story Plot Bab 1 (Pembuka)...', subtitle: 'Menyusun ketukan adegan bab pembuka yang menghentak dan sarat misteri.' },
+  ];
+
+  React.useEffect(() => {
+    if (!isLoading) {
+      setLoadingPhaseIndex(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setLoadingPhaseIndex((prev) => (prev + 1) % loadingPhases.length);
+    }, 2400);
+    return () => clearInterval(interval);
+  }, [isLoading]);
 
   if (!isOpen) return null;
 
@@ -234,82 +254,124 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
         {/* ========================================================================= */}
         {step === 'input' && (
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 no-scrollbar">
-            <div className="space-y-2">
-              <label className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
-                <Feather className="w-4 h-4 text-amber-500" />
-                <span>Tuliskan Ide / Premis Ceritamu Bebas:</span>
-              </label>
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                Ceritakan siapa tokohnya, apa yang dia temukan atau alami, konflik keluarga/dunianya, dan petaka apa yang terjadi. AI akan otomatis menganalisa relasi keluarga, ciri fisik, umur, watak, serta plot ceritanya.
-              </p>
-
-              <textarea
-                rows={8}
-                value={rawIdea}
-                onChange={(e) => setRawIdea(e.target.value)}
-                placeholder="Contoh: Menceritakan seorang pemuda yang bernama Agung, yang menemukan cincin misterius. Dia membawa pulang cincin dan malapetaka terjadi: seluruh keluarganya hilang ingatan dan membuat hubungan mereka berantakan, Santi istri Agung sampai mengira Agung adalah maling di rumahnya..."
-                className="w-full p-4 sm:p-5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-amber-500 leading-relaxed resize-y shadow-inner min-h-[190px] sm:min-h-[240px]"
-              />
-            </div>
-
-            {/* Quick Inspiration Templates */}
-            <div className="space-y-1.5">
-              <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1">
-                <span>💡 Contoh Ide Siap Coba:</span>
-              </span>
-              <div className="flex flex-col gap-1.5">
-                {examplePrompts.map((ex, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => setRawIdea(ex)}
-                    className="text-left text-[11px] text-slate-600 dark:text-slate-300 hover:text-amber-800 dark:hover:text-amber-300 bg-slate-100/80 dark:bg-slate-950/60 hover:bg-amber-500/10 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 transition line-clamp-2"
-                  >
-                    "{ex}"
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Error Notification */}
-            {error && (
-              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-2xl text-xs text-red-600 dark:text-red-300 space-y-1 animate-in fade-in">
-                <div className="flex items-center gap-1.5 font-bold text-red-600 dark:text-red-400">
-                  <AlertTriangle className="w-4 h-4" />
-                  <span>Gagal Menganalisa Premis</span>
+            {isLoading ? (
+              <div className="py-10 px-4 flex flex-col items-center justify-center text-center space-y-6 animate-in fade-in zoom-in-95 duration-300">
+                {/* Visual Orb with Concentric Waves */}
+                <div className="relative w-24 h-24 flex items-center justify-center">
+                  <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-amber-500 to-indigo-600 blur-xl opacity-40 animate-pulse" />
+                  <div className="absolute -inset-3 rounded-full border border-amber-500/30 animate-ping opacity-30" />
+                  <div className="absolute inset-0 rounded-full border-2 border-dashed border-amber-500/50 animate-spin" style={{ animationDuration: '8s' }} />
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-500 via-amber-600 to-indigo-600 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-amber-500/30 relative z-10">
+                    <Feather className="w-8 h-8 text-white animate-bounce" />
+                  </div>
                 </div>
-                <p className="text-[11px]">{error}</p>
-                <button
-                  type="button"
-                  onClick={onOpenAISettings}
-                  className="text-amber-700 dark:text-amber-400 underline font-semibold text-[11px] block mt-1"
-                >
-                  Periksa API Key di Pengaturan AI ➔
-                </button>
-              </div>
-            )}
 
-            {/* Action Button */}
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={handleGenerate}
-                disabled={isLoading || !rawIdea.trim()}
-                className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-indigo-600 hover:opacity-95 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-amber-500/20 active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {isLoading ? (
-                  <>
-                    <Zap className="w-4 h-4 animate-spin text-slate-950" />
-                    <span>Menganalisa Cerita, Karakter &amp; Plot...</span>
-                  </>
-                ) : (
-                  <>
+                {/* Loading Status Text & Stage Indicator */}
+                <div className="space-y-2 max-w-md mx-auto">
+                  <span className="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30 inline-flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                    <span>Story Architect Engine Active</span>
+                  </span>
+
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white transition-all duration-300">
+                    {loadingPhases[loadingPhaseIndex].title}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                    {loadingPhases[loadingPhaseIndex].subtitle}
+                  </p>
+                </div>
+
+                {/* Animated Steps Progress Bar */}
+                <div className="w-full max-w-xs space-y-2 pt-2">
+                  <div className="flex items-center justify-between gap-1.5">
+                    {loadingPhases.map((_, idx) => (
+                      <div
+                        key={idx}
+                        className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
+                          idx <= loadingPhaseIndex
+                            ? 'bg-gradient-to-r from-amber-500 to-indigo-500 shadow-sm'
+                            : 'bg-slate-200 dark:bg-slate-800'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold px-0.5">
+                    <span>Fase {loadingPhaseIndex + 1} dari {loadingPhases.length}</span>
+                    <span className="text-amber-500 font-bold">Menganalisa...</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <label className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <Feather className="w-4 h-4 text-amber-500" />
+                    <span>Tuliskan Ide / Premis Ceritamu Bebas:</span>
+                  </label>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                    Ceritakan siapa tokohnya, apa yang dia temukan atau alami, konflik keluarga/dunianya, dan petaka apa yang terjadi. AI akan otomatis menganalisa relasi keluarga, ciri fisik, umur, watak, serta plot ceritanya.
+                  </p>
+
+                  <textarea
+                    rows={8}
+                    value={rawIdea}
+                    onChange={(e) => setRawIdea(e.target.value)}
+                    placeholder="Contoh: Menceritakan seorang pemuda yang bernama Agung, yang menemukan cincin misterius. Dia membawa pulang cincin dan malapetaka terjadi: seluruh keluarganya hilang ingatan dan membuat hubungan mereka berantakan, Santi istri Agung sampai mengira Agung adalah maling di rumahnya..."
+                    className="w-full p-4 sm:p-5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-amber-500 leading-relaxed resize-y shadow-inner min-h-[190px] sm:min-h-[240px]"
+                  />
+                </div>
+
+                {/* Quick Inspiration Templates */}
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1">
+                    <span>💡 Contoh Ide Siap Coba:</span>
+                  </span>
+                  <div className="flex flex-col gap-1.5">
+                    {examplePrompts.map((ex, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setRawIdea(ex)}
+                        className="text-left text-[11px] text-slate-600 dark:text-slate-300 hover:text-amber-800 dark:hover:text-amber-300 bg-slate-100/80 dark:bg-slate-950/60 hover:bg-amber-500/10 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 transition line-clamp-2"
+                      >
+                        "{ex}"
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Error Notification */}
+                {error && (
+                  <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-2xl text-xs text-red-600 dark:text-red-300 space-y-1 animate-in fade-in">
+                    <div className="flex items-center gap-1.5 font-bold text-red-600 dark:text-red-400">
+                      <AlertTriangle className="w-4 h-4" />
+                      <span>Gagal Menganalisa Premis</span>
+                    </div>
+                    <p className="text-[11px]">{error}</p>
+                    <button
+                      type="button"
+                      onClick={onOpenAISettings}
+                      className="text-amber-700 dark:text-amber-400 underline font-semibold text-[11px] block mt-1"
+                    >
+                      Periksa API Key di Pengaturan AI ➔
+                    </button>
+                  </div>
+                )}
+
+                {/* Action Button */}
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={handleGenerate}
+                    disabled={isLoading || !rawIdea.trim()}
+                    className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-indigo-600 hover:opacity-95 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-amber-500/20 active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
                     <Sparkles className="w-4 h-4 text-slate-950" />
                     <span>Analisa &amp; Rancang Cerita Lengkap ✨</span>
-                  </>
-                )}
-              </button>
-            </div>
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -413,7 +475,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                     : 'text-slate-600 dark:text-slate-400 hover:text-white'
                 }`}
               >
-                Bab ({blueprint.chapters.length})
+                Bab 1: Plot
               </button>
               <button
                 type="button"
@@ -576,17 +638,17 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                         />
                       </div>
 
-                      {/* Deskripsi Singkat */}
+                      {/* Deskripsi Singkat / Peran */}
                       <div>
                         <label className="text-[10px] font-bold uppercase text-slate-500 block mb-0.5">
                           Peran / Hubungan:
                         </label>
-                        <input
-                          type="text"
+                        <textarea
+                          rows={2}
                           value={char.shortDescription || ''}
                           onChange={(e) => handleUpdateCharacter(i, 'shortDescription', e.target.value)}
-                          placeholder="Contoh: Kepala keluarga yang mengalami musibah cincin"
-                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-pink-400"
+                          placeholder="Contoh: Kepala keluarga yang mengalami musibah cincin..."
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-pink-400 resize-y min-h-[50px] leading-relaxed"
                         />
                       </div>
                     </div>
@@ -616,6 +678,23 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                         onChange={(e) => handleUpdateCharacter(i, 'traits', e.target.value)}
                         placeholder="Contoh: Penyayang, pekerja keras, mudah cemas, keras kepala saat mempertahankan kebenaran..."
                         className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-400 resize-y leading-relaxed min-h-[64px]"
+                      />
+                    </div>
+
+                    {/* Visual Prompt (English Text-to-Image 9:16) */}
+                    <div>
+                      <div className="flex items-center justify-between mb-0.5">
+                        <label className="text-[10px] font-bold uppercase text-indigo-600 dark:text-indigo-400 block">
+                          🎨 Visual Prompt (English - Text-to-Image 9:16):
+                        </label>
+                        <span className="text-[9px] text-slate-400">Photorealistic, English</span>
+                      </div>
+                      <textarea
+                        rows={3}
+                        value={char.visualPrompt || ''}
+                        onChange={(e) => handleUpdateCharacter(i, 'visualPrompt', e.target.value)}
+                        placeholder="Full body portrait standing upright, centered, Indonesian person, authentic everyday attire, natural expression, cinematic lighting, 8k resolution, vertical 9:16..."
+                        className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-400 resize-y leading-relaxed min-h-[68px]"
                       />
                     </div>
                   </div>
@@ -723,43 +802,84 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
             )}
 
             {/* ========================================================================= */}
-            {/* TAB 4: RANCANGAN BAB & STORY PLOT AWAL                                    */}
+            {/* TAB 4: RANCANGAN BAB 1 & STORY PLOT AWAL                                  */}
             {/* ========================================================================= */}
             {activeReviewTab === 'chapters' && (
-              <div className="space-y-3 animate-in fade-in text-xs">
-                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block px-1">
-                  Rencana Bab Pembuka (Plot otomatis terisi saat buku dibuat):
-                </span>
+              <div className="space-y-3.5 animate-in fade-in text-xs">
+                <div>
+                  <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block px-1">
+                    Rancangan Bab Pembuka (Bab 1) &amp; Story Plot:
+                  </span>
+                  <span className="text-[10px] text-slate-500 block px-1">
+                    Plot ini akan menjadi acuan naskah dan digunakan oleh AI untuk menyusun bab pertama.
+                  </span>
+                </div>
 
-                {blueprint.chapters.map((chap, i) => (
-                  <div key={i} className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 space-y-2">
+                {blueprint.chapters.slice(0, 1).map((chap, i) => (
+                  <div key={i} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-700 dark:text-indigo-300">
-                        Bab {chap.order || i + 1}
+                      <span className="text-[11px] font-extrabold uppercase px-2.5 py-1 rounded-lg bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30">
+                        Bab 1 (Bab Pembuka)
                       </span>
-                      <span className="text-[10px] text-slate-400">
+                      <span className="text-[10px] text-slate-400 font-medium">
                         Target {chap.targetWordCount || 1800} kata
                       </span>
                     </div>
 
-                    <input
-                      type="text"
-                      value={chap.title}
-                      onChange={(e) => handleUpdateChapter(i, 'title', e.target.value)}
-                      placeholder="Judul Bab..."
-                      className="w-full font-bold text-xs sm:text-sm text-slate-900 dark:text-white bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 shadow-sm"
-                    />
+                    {/* Pilihan Judul Bab 1 */}
+                    {blueprint.firstChapterTitleOptions && blueprint.firstChapterTitleOptions.length > 0 && (
+                      <div className="space-y-1.5 pt-1">
+                        <label className="text-[10px] font-bold uppercase text-indigo-600 dark:text-indigo-400 block">
+                          Pilihan Alternatif Judul Bab 1:
+                        </label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {blueprint.firstChapterTitleOptions.map((opt, optIdx) => (
+                            <button
+                              key={optIdx}
+                              type="button"
+                              onClick={() => handleUpdateChapter(0, 'title', opt)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 text-left ${
+                                chap.title === opt
+                                  ? 'bg-indigo-600 text-white shadow-sm'
+                                  : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-indigo-400'
+                              }`}
+                            >
+                              {chap.title === opt && <Check className="w-3 h-3 flex-shrink-0" />}
+                              <span className="break-words">{opt}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
+                    {/* Judul Bab Input */}
                     <div>
-                      <label className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 block mb-0.5">
-                        Alur Story Plot Adegan:
+                      <label className="text-[10px] font-bold uppercase text-slate-500 block mb-1">
+                        Judul Bab 1:
                       </label>
+                      <input
+                        type="text"
+                        value={chap.title}
+                        onChange={(e) => handleUpdateChapter(0, 'title', e.target.value)}
+                        placeholder="Judul Bab 1..."
+                        className="w-full font-bold text-xs sm:text-sm text-slate-900 dark:text-white bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-500 shadow-sm"
+                      />
+                    </div>
+
+                    {/* Story Plot Luas */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[10px] font-bold uppercase text-indigo-600 dark:text-indigo-400 block">
+                          📝 Alur Story Plot Bab 1 (Poin-Poin Adegan &amp; Bahan AI):
+                        </label>
+                        <span className="text-[9px] text-slate-400">Dapat diperluas</span>
+                      </div>
                       <textarea
-                        rows={4}
+                        rows={7}
                         value={chap.premise}
-                        onChange={(e) => handleUpdateChapter(i, 'premise', e.target.value)}
-                        placeholder="Poin-poin kejadian yang terjadi di bab ini..."
-                        className="w-full p-2.5 sm:p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed resize-y min-h-[85px] focus:outline-none focus:border-indigo-400"
+                        onChange={(e) => handleUpdateChapter(0, 'premise', e.target.value)}
+                        placeholder="1. Adegan pembuka...\n2. Titik balik dan kemunculan konflik...\n3. Ketegangan akhir bab..."
+                        className="w-full p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed resize-y min-h-[140px] focus:outline-none focus:border-indigo-400 shadow-inner"
                       />
                     </div>
                   </div>
