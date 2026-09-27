@@ -389,11 +389,22 @@ export async function generateWithSmartFallback(
 
   // Iterate over Slots
   for (const slot of activeSlots) {
-    // Determine the 3 fallback models: inherit from provider's global config, or use slot custom override
+    // Determine fallback models: slot override, providerGlobal fallbackModels, cachedModels, or sensible default
     const providerGlobal = slot.provider === 'gemini' ? config.geminiConfig : config.groqConfig;
-    const fallbackModels = slot.models && slot.models.length > 0
+    let fallbackModels = (slot.models && slot.models.length > 0
       ? slot.models
-      : providerGlobal.fallbackModels;
+      : providerGlobal.fallbackModels || []).filter(Boolean);
+
+    // If no models were explicitly set or all were empty strings, fallback to cached models or known reliable defaults
+    if (fallbackModels.length === 0) {
+      if (providerGlobal.cachedModels && providerGlobal.cachedModels.length > 0) {
+        fallbackModels = providerGlobal.cachedModels.map((m) => m.id);
+      } else {
+        fallbackModels = slot.provider === 'gemini'
+          ? ['gemini-3.8-flash-preview', 'gemini-2.5-flash', 'gemini-1.5-flash']
+          : ['llama-3.3-70b-versatile', 'llama3-8b-8192'];
+      }
+    }
 
     for (let modelIndex = 0; modelIndex < fallbackModels.length; modelIndex++) {
       const model = fallbackModels[modelIndex];
@@ -721,13 +732,15 @@ Instruksi Analisis Tiap Adegan:
    Sebutkan semua entitas (tokoh/karakter, latar tempat, benda/senjata pusaka, lore/faksi) yang hadir atau berperan penting di dalam adegan ini.
    Jika cocok dengan entitas di daftar glosarium yang sudah ada, cantumkan entityId-nya.
 3. Prompt Gambar Adegan (imagePrompt):
-   Buatkan prompt visual text-to-image (untuk Midjourney/Flux/SD) untuk memvisualisasikan momen paling dramatis dari adegan ini dengan aturan:
-   - Rasio Aspek: ${aspectRatio}
-   - Gaya Visual: ${style}
-   - Penggambaran Karakter: Gunakan label [person1], [person2], dst untuk karakter utama di adegan (sesuai urutan tokoh) agar dapat dicocokkan dengan referensi foto karakter yang dilampirkan.
-   - Suasana & Komposisi: Natural scene, pencahayaan alami/sinematik, deskripsi latar yang kaya.
-   - Kata Kunci Tambahan: ${extraKeywords}
-   - Bahasa Prompt Gambar: ${promptLang}.
+   Buatkan prompt visual text-to-image (Midjourney/Flux/SD) untuk memvisualisasikan adegan ini dengan ATURAN KETAT:
+   - Format: Rasio layar HP vertical (9:16), 4K hyper realistic, photorealistic cinematic lighting.
+   - PENTING: User akan melampirkan gambar referensi karakter langsung berdampingan dengan prompt!
+   - JANGAN deskripsikan wajah, tubuh, atau warna kulit karakter! Cukup gunakan reference dari referensi gambar.
+   - JANGAN sebut nama karakter di dalam prompt. Gunakan label "pria" atau "wanita". Jika ada lebih dari 1 entitas sejenis, beri nomor (contoh: "pria1", "wanita1", "pria2").
+   - JANGAN ubah bentuk atau model pakaian asli karakter. HANYA boleh perubahan minor realistis sesuai konteks adegan (misal: "baju agak terbuka", "kusut", "robek sedikit di bahu", "terlepas dari satu bahu", "basah oleh keringat atau air hujan").
+   - Jelaskan secara detail: POSE, EKSPRESI WAJAH/EMOSI, LATAR TEMPAT, PENCAHAYAAN, dan SUASANA dramatis adegan.
+   - Berikan juga "characterReferences": Daftar nama karakter yang WAJIB dilampirkan gambarnya (contoh: ["Budi", "Ani"]).
+   - Berikan juga "imagePromptExplanation": Penjelasan ringkas apa yang digambarkan oleh prompt ini dalam Bahasa Indonesia yang santai dan mudah dimengerti.
 
 Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
 [
@@ -735,18 +748,18 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
     "sceneNumber": 1,
     "title": "Judul Singkat Adegan",
     "setting": "Latar tempat & waktu adegan",
-    "characters": ["Nama Tokoh 1", "Nama Tokoh 2"],
+    "characters": ["Nama Karakter 1", "Nama Karakter 2"],
     "summary": "Rangkuman kejadian dalam adegan ini secara detail",
     "goalConflict": "Tujuan tokoh atau konflik yang terjadi di adegan",
     "timelineType": "linear",
     "timeMarker": "Pagi hari di Dermaga",
     "branchGroup": "Garis Waktu Utama",
     "entitiesPresent": [
-      { "name": "Nama Tokoh 1", "category": "character", "entityId": "" },
-      { "name": "Dermaga", "category": "location", "entityId": "" },
-      { "name": "Pedang Giok", "category": "item", "entityId": "" }
+      { "name": "Nama Karakter 1", "category": "character", "entityId": "" }
     ],
-    "imagePrompt": "Hyper-realistic natural scene photo of [person1] standing at the foggy wooden pier in the morning, holding an ancient jade blade, cinematic soft morning sunlight, 8k resolution, authentic textures, phone wallpaper aspect ratio 9:16 --ar 9:16"
+    "characterReferences": ["Nama Karakter 1"],
+    "imagePrompt": "Vertical mobile phone screen 9:16, 4k hyper realistic, photorealistic cinematic, dramatic soft mist lighting. pria1 standing at the edge of the foggy wooden pier at dawn, gaze filled with intense sorrow and determination, clenched fists at his sides. Original clothing slightly soaked and clinging from sea spray, wrinkled at the hem. Volumetric morning haze, cold blue hour ambience, cinematic depth of field --ar 9:16",
+    "imagePromptExplanation": "Foto vertikal layar HP (9:16) menampilkan pria1 di ujung dermaga berkabut saat fajar. Ekspresinya penuh tekad bercampur duka dengan tangan mengepal. Pakaian aslinya agak basah oleh percikan air laut dan kusut di bagian bawah. Suasana dingin berkabut dengan pencahayaan sinematik 4K."
   }
 ]`;
 
@@ -778,7 +791,13 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
             entityId: e.entityId || undefined,
           }))
         : [],
+      characterReferences: Array.isArray(item.characterReferences)
+        ? item.characterReferences
+        : Array.isArray(item.characters)
+        ? item.characters
+        : [],
       imagePrompt: item.imagePrompt || '',
+      imagePromptExplanation: item.imagePromptExplanation || '',
     }));
   }
 
@@ -796,7 +815,9 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
       timeMarker: 'Awal Bab',
       branchGroup: 'Garis Waktu Utama',
       entitiesPresent: [],
+      characterReferences: [],
       imagePrompt: '',
+      imagePromptExplanation: '',
     },
   ];
 }
@@ -812,48 +833,49 @@ export async function generateSingleSceneImagePrompt(
   },
   bookTitle: string,
   chapterTitle: string,
-  promptSettings?: ImagePromptSettings
-): Promise<string> {
-  const aspectRatio = promptSettings?.aspectRatio || '9:16 (Layar HP)';
-  const style =
-    promptSettings?.style ||
-    'Hyper realistic, natural scene, 8k resolution, cinematic lighting, photorealistic textures';
-  const charNaming =
-    promptSettings?.characterNaming ||
-    'person1, person2 (sesuai foto/referensi karakter yang dilampirkan)';
-  const extraKeywords =
-    promptSettings?.additionalKeywords ||
-    'candid scene photography, authentic emotions, high detail, volumetric lighting';
-  const promptLang =
-    promptSettings?.language === 'id' ? 'Bahasa Indonesia' : 'English (standard image prompt)';
+  _promptSettings?: ImagePromptSettings
+): Promise<{ prompt: string; explanation: string; characterReferences: string[] }> {
+  const charactersList = scene.characters.length > 0 ? scene.characters.join(', ') : 'Karakter utama';
 
-  const prompt = `Anda adalah AI Prompt Engineer spesialis pembuatan prompt gambar sinematik untuk Midjourney, Flux, Stable Diffusion, dan DALL-E 3.
+  const prompt = `Anda adalah AI Prompt Engineer spesialis prompt gambar sinematik Text-to-Image (Midjourney, Flux, SD).
 
-Tugas Anda: Buat SATU prompt teks-ke-gambar (Text-to-Image Prompt) untuk adegan cerita berikut:
-
+Buatkan prompt gambar untuk adegan berikut:
 Judul Buku: "${bookTitle}"
 Judul Bab: "${chapterTitle}"
 Adegan: "${scene.title}"
-Latar: ${scene.setting || 'Sesuai konteks adegan'}
-Tokoh Terlibat: ${scene.characters.join(', ') || 'Karakter utama'}
-Ringkasan Kejadian Adegan:
-${scene.summary}
+Latar Tempat: ${scene.setting || 'Sesuai adegan'}
+Tokoh Hadir: ${charactersList}
+Ringkasan Kejadian: ${scene.summary}
 
-Aturan Pembuatan Prompt:
-1. Rasio Aspek: ${aspectRatio} (tambahkan penanda --ar 9:16 jika relevan)
-2. Gaya Visual: ${style}
-3. Penggambaran Karakter: Wajib gunakan sebutan [person1], [person2] dst untuk merepresentasikan karakter yang hadir sesuai urutan tokoh (${charNaming}), sertakan deskripsi pakaian, postur, dan ekspresi emosional mereka.
-4. Suasana Adegan: Natural scene, pencahayaan alami/sinematik, kedalaman ruang (depth of field), detail lingkungan latar.
-5. Modifiers Tambahan: ${extraKeywords}
-6. Bahasa: ${promptLang}.
+ATURAN WAJIB & SANGAT KETAT:
+1. User selalu melampirkan gambar referensi karakter di sebelah prompt.
+2. JANGAN sebut atau deskripsikan bentuk wajah, warna kulit, atau postur tubuh karakter! Gunakan referensi visual yang dilampirkan.
+3. JANGAN sebut nama karakter di dalam prompt. Ganti dengan sebutan "pria" atau "wanita". Jika ada lebih dari satu, beri nomor (contoh: "pria1", "wanita1", "pria2").
+4. JANGAN ubah bentuk atau model pakaian asli karakter. HANYA boleh perubahan minor realistis sesuai konteks kejadian (misal: "baju agak terbuka", "kusut", "robek sedikit di bahu", "terlepas dari satu bahu", "basah oleh keringat / air").
+5. Jelaskan secara sangat mendalam: POSE KARAKTER, EKSPRESI EMOSI, LATAR LINGKUNGAN, PENCAHAYAAN (lighting), dan ATMOSFER dramatis adegan.
+6. Format teknis: "Vertical mobile phone screen (9:16), 4k hyper realistic, photorealistic cinematic, [deskripsi pose, ekspresi, interaksi, pakaian minor change, latar, lighting] --ar 9:16".
+7. Berikan daftar "characterReferences": Nama-nama karakter asli yang gambarnya harus dilampirkan oleh user.
+8. Berikan "explanation": Penjelasan isi prompt dalam Bahasa Indonesia yang santai, jelas, dan mudah dimengerti.
 
-Format Keluaran:
-Tulis HANYA teks prompt gambar akhir siap salin tanpa kata pengantar, tanpa tanda kutip pembuka/penutup, dan tanpa format markdown.`;
+Keluarkan HANYA JSON object valid:
+{
+  "characterReferences": ["${scene.characters[0] || 'Nama Karakter'}"],
+  "prompt": "Vertical mobile phone screen 9:16, 4k hyper realistic, photorealistic cinematic...",
+  "explanation": "Penjelasan gambaran isi prompt..."
+}`;
 
   const systemPrompt =
-    'Anda adalah world-class AI Image Prompt Engineer untuk novel visual. Keluarkan HANYA teks prompt murni siap pakai.';
+    'Anda adalah visual director dan concept artist profesional. Keluarkan HANYA JSON object valid.';
   const res = await generateWithSmartFallback(prompt, systemPrompt);
-  return res.text.replace(/^["']|["']$/g, '').trim();
+  const parsed = resilientParseJsonObject(res.text);
+
+  return {
+    prompt: parsed.prompt || res.text.replace(/^```json|```$/g, '').trim(),
+    explanation: parsed.explanation || '',
+    characterReferences: Array.isArray(parsed.characterReferences)
+      ? parsed.characterReferences
+      : scene.characters,
+  };
 }
 
 // 4. Polish Raw Draft to Prose Engine
@@ -894,6 +916,7 @@ export async function detectEntitiesAndAliases(
     aliases?: string[];
     initialTraits?: string;
     currentTraits?: string;
+    physicalTraits?: string;
     condition?: string;
     evolutionSummary?: string;
   }>
@@ -905,8 +928,8 @@ export async function detectEntitiesAndAliases(
             (e) =>
               `- [ID: ${e.id}] [${e.category.toUpperCase()}] ${e.name}${
                 e.aliases && e.aliases.length > 0 ? ` (Alias: ${e.aliases.join(', ')})` : ''
-              }${e.initialTraits ? ` | Sifat Awal: ${e.initialTraits}` : ''}${
-                e.currentTraits ? ` | Sifat Terkini: ${e.currentTraits}` : ''
+              }${e.initialTraits ? ` | Sifat: ${e.initialTraits}` : ''}${
+                e.physicalTraits ? ` | Ciri Fisik: ${e.physicalTraits}` : ''
               }${e.condition ? ` | Status: ${e.condition}` : ''}`
           )
           .join('\n')
@@ -927,29 +950,30 @@ ${chapterText.slice(0, 60000)}
 Tugas Analisis Mendalam:
 1. DETEKSI ENTITAS BARU (suggestedAction: "register_new"):
    - Cari karakter, lokasi, item/senjata/relik, atau istilah lore penting yang muncul di naskah bab ini TAPI BELUM ADA di daftar entitas buku di atas.
-   - PENTING UNTUK KARAKTER (Contoh: Putri Shinta, putri bangsawan Asura, awalnya penyayang & penurut, namun setelah dirasuki jin pantai utara menjadi kasar & manipulatif):
+   - PENTING UNTUK KARAKTER:
      * initialDescription: Latar belakang asal-usul atau peran awalnya (misal: "Putri bangsawan di Kerajaan Asura").
      * initialTraits: Sifat & watak kepribadian dasar/awalnya (misal: "Penyayang, baik hati, penurut, santun").
      * currentDescription: Gambaran kondisi fisik/sosial/situasi saat ini di bab ini.
-     * currentTraits: Sifat & watak kepribadian saat ini di bab ini. Jika belum berubah, samakan dengan sifat awal. Jika telah berubah karena suatu peristiwa traumatis/kerasukan/pengkhianatan, tulis sifat terkininya (misal: "Kasar, manipulatif, dingin, penuh kebencian").
-     * evolutionSummary: Ringkasan titik balik atau penyebab perubahannya (misal: "Dirasuki oleh jin dari pantai utara").
+     * currentTraits: Sifat & watak kepribadian saat ini di bab ini.
+     * physicalTraits: CIRI-CIRI FISIK LENGKAP & SPESIFIK (perawakan tubuh, wajah, rambut, warna kulit, pakaian/kostum khas, aksesoris, tanda lahir/luka parut). Jika naskah berlatar Nusantara/lokal, default fisik adalah orang Indonesia/Asia Tenggara kecuali naskah menyatakan lain.
+     * visualPrompt: Text-to-Image Prompt siap pakai dalam Bahasa Inggris dengan spesifikasi: "Full body portrait standing upright, centered, Indonesian/Southeast Asian ethnicity (sesuaikan dengan naskah), [deskripsi fisik detail, pakaian, dan rambut], hyper realistic, 8k resolution, cinematic lighting, photorealistic textures, 9:16 aspect ratio".
+     * evolutionSummary: Ringkasan titik balik atau penyebab perubahannya jika ada.
      * condition: Status kondisi saat ini ("aktif", "luka", "gugur", "hilang", "berkhianat", "terkutuk", "ditawan", "pelarian", "koma", atau "spesial").
      * conditionDetails: Detail singkat kondisinya jika ada.
 
 2. PEMBARUAN ENTITAS YANG SUDAH ADA (suggestedAction: "update_existing"):
-   - Jika entitas SUDAH ADA di daftar Glosarium di atas, lalu di naskah bab ini (baik karena cerita berlanjut atau naskah ditulis ulang/direvisi) mengalami:
-     * Perubahan sifat/watak/kepribadian baru dibanding data sebelumnya.
-     * Perubahan kondisi fisik/mental/status (misal: dirasuki, terluka parah, berkhianat, dikutuk, menjadi buronan, koma, dsb.).
-     * Peristiwa penting/titik balik yang mengubah arah karakter.
-   - Maka sertakan entitas tersebut dengan:
+   - Jika entitas SUDAH ADA di daftar Glosarium di atas, lalu di naskah bab ini mengalami perubahan sifat, ciri fisik baru (misal: mendapat bekas luka baru, potong rambut, ganti pakaian perang), atau perubahan kondisi status.
+   - Sertakan dengan:
      * suggestedAction: "update_existing"
      * isExisting: true
      * existingEntityId: ID entitas dari daftar di atas
      * name: Nama entitas asli
-     * initialTraits: Pertahankan sifat awal yang sudah tercatat (atau perjelas jika dulu kosong)
-     * currentTraits: Sifat & kepribadian terkini di bab ini yang mengalami perubahan
+     * initialTraits: Pertahankan sifat awal yang sudah tercatat
+     * currentTraits: Sifat & kepribadian terkini di bab ini
+     * physicalTraits: Ciri fisik terkini (termasuk luka/perubahan pakaian jika ada)
+     * visualPrompt: Prompt gambar terbaru sesuai perubahan fisik
      * currentDescription: Deskripsi kondisi terkini di bab ini
-     * evolutionSummary: Penjelasan mengapa sifat/kondisi berubah di bab ini (contoh: "Setelah dirasuki oleh jin dari pantai utara, sifatnya berubah drastis menjadi...")
+     * evolutionSummary: Penjelasan mengapa sifat/kondisi berubah di bab ini
      * condition: Status kondisi terkini
      * conditionDetails: Rincian kondisi terkini
 
@@ -965,8 +989,10 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
     "initialDescription": "Deskripsi atau latar belakang awal",
     "initialTraits": "Sifat & kepribadian awal (misal: penyayang, baik hati, penurut)",
     "currentDescription": "Deskripsi kondisi saat ini",
-    "currentTraits": "Sifat & kepribadian saat ini (misal: kasar, manipulatif, penuh kebencian)",
-    "evolutionSummary": "Titik balik / penyebab perubahan sifat (misal: dirasuki oleh jin pantai utara)",
+    "currentTraits": "Sifat & kepribadian saat ini",
+    "physicalTraits": "Perawakan tegap, tinggi 172cm, kulit sawo matang khas Indonesia, rambut ikal hitam sebahu, mengenakan jubah tenun lurik gelap dengan selempang pedang kuningan",
+    "visualPrompt": "Full body portrait standing upright, centered, Indonesian man in his late 20s, tan skin, wavy black shoulder-length hair, determined gaze, wearing dark traditional woven lurik robe with a brass scabbard sling, photorealistic textures, 8k resolution, cinematic lighting, hyper realistic, 9:16 aspect ratio",
+    "evolutionSummary": "",
     "condition": "aktif",
     "conditionDetails": "",
     "isExisting": false,
@@ -997,17 +1023,29 @@ Aturan:
             ? 'update_existing'
             : 'register_new';
 
+        const rawCat = String(item.category || '').toLowerCase().trim();
+        let normalizedCat: 'character' | 'location' | 'item' | 'lore' = 'character';
+        if (['location', 'tempat', 'lokasi', 'daerah', 'wilayah'].includes(rawCat)) {
+          normalizedCat = 'location';
+        } else if (['item', 'senjata', 'benda', 'barang', 'pusaka'].includes(rawCat)) {
+          normalizedCat = 'item';
+        } else if (['lore', 'faksi', 'istilah', 'mitos', 'sejarah', 'organisasi'].includes(rawCat)) {
+          normalizedCat = 'lore';
+        } else if (['character', 'karakter', 'tokoh', 'orang', 'sosok'].includes(rawCat)) {
+          normalizedCat = 'character';
+        }
+
         return {
           id: 'det_' + Math.random().toString(36).substring(2, 9),
           name: item.name || '',
-          category: ['character', 'location', 'item', 'lore'].includes(item.category)
-            ? item.category
-            : 'character',
+          category: normalizedCat,
           shortDescription: item.shortDescription || '',
           initialDescription: item.initialDescription || undefined,
           initialTraits: item.initialTraits || undefined,
           currentDescription: item.currentDescription || undefined,
           currentTraits: item.currentTraits || undefined,
+          physicalTraits: item.physicalTraits || undefined,
+          visualPrompt: item.visualPrompt || undefined,
           evolutionSummary: item.evolutionSummary || undefined,
           condition: item.condition || undefined,
           conditionDetails: item.conditionDetails || undefined,

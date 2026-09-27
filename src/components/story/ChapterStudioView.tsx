@@ -574,14 +574,21 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
     setRegeneratingPromptSceneId(scene.id);
     setAiStudioError(null);
     try {
-      const newPrompt = await generateSingleSceneImagePrompt(
+      const res = await generateSingleSceneImagePrompt(
         scene,
         book.title,
         chapter.title,
         imagePromptSettings
       );
       const updatedScenes = (chapter.aiScenes || []).map((s) =>
-        s.id === scene.id ? { ...s, imagePrompt: newPrompt } : s
+        s.id === scene.id
+          ? {
+              ...s,
+              imagePrompt: res.prompt,
+              imagePromptExplanation: res.explanation,
+              characterReferences: res.characterReferences,
+            }
+          : s
       );
       await updateChapterField('aiScenes', updatedScenes);
     } catch (err: any) {
@@ -633,6 +640,8 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
         initialTraits: candidate.initialTraits || undefined,
         currentDescription: candidate.currentDescription || candidate.shortDescription,
         currentTraits: candidate.currentTraits || candidate.initialTraits || undefined,
+        physicalTraits: candidate.physicalTraits || undefined,
+        visualPrompt: candidate.visualPrompt || undefined,
         evolutionSummary: candidate.evolutionSummary || undefined,
         condition: (candidate.condition as any) || 'aktif',
         conditionDetails: candidate.conditionDetails || `Terdaftar pertama kali di Bab ${chapter.order}`,
@@ -673,12 +682,14 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
       );
 
       if (target) {
-        // 1. Update Ensiklopedia WorldEntity with latest evolution
+        // 1. Update Ensiklopedia WorldEntity with latest evolution & physical changes
         const updatePayload: Partial<WorldEntity> = {
           updatedAt: Date.now(),
         };
         if (candidate.currentTraits) updatePayload.currentTraits = candidate.currentTraits;
         if (candidate.currentDescription) updatePayload.currentDescription = candidate.currentDescription;
+        if (candidate.physicalTraits) updatePayload.physicalTraits = candidate.physicalTraits;
+        if (candidate.visualPrompt) updatePayload.visualPrompt = candidate.visualPrompt;
         if (candidate.evolutionSummary) updatePayload.evolutionSummary = candidate.evolutionSummary;
         if (candidate.condition) updatePayload.condition = candidate.condition as any;
         if (candidate.conditionDetails) updatePayload.conditionDetails = candidate.conditionDetails;
@@ -1861,8 +1872,33 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
                                 </div>
                               </div>
                             ) : scene.imagePrompt ? (
-                              <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-[11px] font-mono text-slate-300 leading-relaxed whitespace-pre-wrap select-all">
-                                {scene.imagePrompt}
+                              <div className="space-y-2.5">
+                                {/* Character References Requirement Notification */}
+                                {scene.characterReferences && scene.characterReferences.length > 0 && (
+                                  <div className="p-2 rounded-lg bg-purple-950/60 border border-purple-800/60 flex items-center gap-2 text-[11px] text-purple-200">
+                                    <span className="font-bold text-purple-400">📎 Lampirkan Referensi:</span>
+                                    <span>
+                                      Lampirkan foto/gambar karakter: <strong>{scene.characterReferences.join(' & ')}</strong>
+                                    </span>
+                                  </div>
+                                )}
+
+                                {/* Copyable Raw Prompt Box */}
+                                <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-[11px] font-mono text-slate-300 leading-relaxed whitespace-pre-wrap select-all">
+                                  {scene.imagePrompt}
+                                </div>
+
+                                {/* Easy-to-understand Explanation in Indonesian */}
+                                {scene.imagePromptExplanation && (
+                                  <div className="p-2.5 rounded-xl bg-slate-800/70 border border-slate-700/60 text-xs text-slate-300 space-y-1">
+                                    <span className="font-bold text-slate-200 flex items-center gap-1 text-[11px]">
+                                      💡 Gambaran Isi Prompt:
+                                    </span>
+                                    <p className="leading-relaxed text-[11px] text-slate-300">
+                                      {scene.imagePromptExplanation}
+                                    </p>
+                                  </div>
+                                )}
                               </div>
                             ) : (
                               <div className="text-[11px] text-slate-400 italic">
@@ -2003,6 +2039,31 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
                             <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
                               {item.shortDescription}
                             </p>
+
+                            {/* Physical Traits Preview if exists */}
+                            {item.physicalTraits && (
+                              <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] space-y-1">
+                                <p className="text-amber-900 dark:text-amber-200">
+                                  <strong className="text-amber-700 dark:text-amber-300">👤 Ciri Fisik:</strong> {item.physicalTraits}
+                                </p>
+                                {item.visualPrompt && (
+                                  <div className="pt-1 mt-1 border-t border-amber-500/20 flex items-center justify-between gap-2">
+                                    <span className="text-[10px] text-amber-700 dark:text-amber-300 font-mono truncate">
+                                      Prompt: {item.visualPrompt.slice(0, 45)}...
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => copyToClipboard(item.visualPrompt!, 'Prompt Gambar')}
+                                      className="px-2 py-0.5 rounded-lg bg-amber-500 text-slate-950 font-bold text-[10px] hover:bg-amber-400 active:scale-95 transition flex items-center gap-1 flex-shrink-0"
+                                      title="Salin Prompt Text-to-Image"
+                                    >
+                                      <Copy className="w-3 h-3" />
+                                      <span>{copyFeedback === 'Prompt Gambar' ? 'Tersalin!' : 'Salin Prompt'}</span>
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
 
                             {/* Evolution / Dynamic Traits Preview if exists */}
                             {(item.currentTraits || item.evolutionSummary) && (

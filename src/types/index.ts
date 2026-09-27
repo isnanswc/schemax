@@ -49,6 +49,8 @@ export interface ChapterSceneItem {
   branchGroup?: string;
   entitiesPresent?: SceneGlosariumItem[];
   imagePrompt?: string;
+  imagePromptExplanation?: string;
+  characterReferences?: string[];
 }
 
 export interface ImagePromptSettings {
@@ -68,6 +70,8 @@ export interface DetectedEntityCandidate {
   initialTraits?: string;
   currentDescription?: string;
   currentTraits?: string;
+  physicalTraits?: string;
+  visualPrompt?: string;
   evolutionSummary?: string;
   condition?: EntityCondition | string;
   conditionDetails?: string;
@@ -244,6 +248,8 @@ export interface WorldEntity {
   initialTraits?: string;
   currentDescription?: string;
   currentTraits?: string;
+  physicalTraits?: string;
+  visualPrompt?: string;
   evolutionSummary?: string;
   // Kondisi Status Terkini
   condition?: EntityCondition | string;
