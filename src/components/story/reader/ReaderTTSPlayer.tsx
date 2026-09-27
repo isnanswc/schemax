@@ -113,6 +113,9 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
   const prefetchedAudiosRef = useRef<Map<number, string[]>>(new Map());
   const isPrefetchingRef = useRef<Set<number>>(new Set());
 
+  // Unique session token to prevent race conditions & overlapping dual playback
+  const playbackSessionIdRef = useRef<number>(0);
+
   isPlayingRef.current = isPlaying;
   isContinuousRef.current = isContinuous;
 
@@ -320,8 +323,14 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
       return;
     }
 
+    const currentSession = ++playbackSessionIdRef.current;
+
     if (htmlAudioRef.current) {
       htmlAudioRef.current.pause();
+      htmlAudioRef.current.src = '';
+      htmlAudioRef.current.onended = null;
+      htmlAudioRef.current.onerror = null;
+      htmlAudioRef.current = null;
     }
     window.speechSynthesis.cancel();
 
@@ -355,6 +364,7 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
     }
 
     utterance.onend = () => {
+      if (playbackSessionIdRef.current !== currentSession) return;
       if (isPlayingRef.current) {
         if (index + 1 < paragraphs.length && isContinuousRef.current) {
           onParagraphChange(index + 1);
@@ -367,6 +377,7 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
     };
 
     utterance.onerror = (e) => {
+      if (playbackSessionIdRef.current !== currentSession) return;
       console.warn('Browser TTS playback error:', e);
       setIsPlaying(false);
     };
@@ -377,7 +388,7 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
     setIsPaused(false);
   };
 
-  // Speak with Unified AI TTS Engine (Auto-Fallback, Azure, Google Cloud, WASM, Gemini, Groq)
+  // Speak with Unified AI TTS Engine (Auto-Fallback, WASM, Gemini, Groq)
   const speakWithUnifiedEngine = async (index: number) => {
     const rawText = paragraphs[index]?.trim();
     if (!rawText) {
@@ -390,9 +401,15 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
       return;
     }
 
+    const currentSession = ++playbackSessionIdRef.current;
+
+    // Bersihkan audio sebelumnya secara tuntas sebelum memulai
     if (htmlAudioRef.current) {
       htmlAudioRef.current.pause();
       htmlAudioRef.current.src = '';
+      htmlAudioRef.current.onended = null;
+      htmlAudioRef.current.onerror = null;
+      htmlAudioRef.current = null;
     }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
@@ -406,8 +423,8 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
 
     const playChunksSequence = async (audioUrls: string[]) => {
       const playChunk = async (chunkIdx: number) => {
-        // If user stopped or paused, abort
-        if (!isPlayingRef.current) {
+        // If session expired or user stopped/paused, abort
+        if (playbackSessionIdRef.current !== currentSession || !isPlayingRef.current) {
           setIsLoadingAudio(false);
           return;
         }
@@ -423,6 +440,7 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
         htmlAudioRef.current = audio;
 
         audio.onended = () => {
+          if (playbackSessionIdRef.current !== currentSession) return;
           if (isPlayingRef.current) {
             if (chunkIdx + 1 < audioUrls.length) {
               // Play next chunk within current paragraph
@@ -523,8 +541,8 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
         tag
       );
 
-      // If user stopped while fetch was underway, abort
-      if (!isPlayingRef.current) {
+      // If user stopped or new speak started while fetch was underway, abort
+      if (playbackSessionIdRef.current !== currentSession || !isPlayingRef.current) {
         setIsLoadingAudio(false);
         return;
       }
@@ -532,6 +550,7 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
       const urls = res.audioUrls && res.audioUrls.length > 0 ? res.audioUrls : [res.audioUrl];
       await playChunksSequence(urls);
     } catch (err: any) {
+      if (playbackSessionIdRef.current !== currentSession) return;
       console.warn('Gagal memanggil API AI TTS:', err);
       // Jika error pada engine Gemini atau Groq, coba beralih ke WASM
       if (ttsEngine === 'gemini' || ttsEngine === 'groq') {
@@ -539,7 +558,7 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
         setTtsEngine('wasm');
         try {
           const wasmRes = await generateWasmSpeechAudio(rawText);
-          if (isPlayingRef.current) {
+          if (playbackSessionIdRef.current === currentSession && isPlayingRef.current) {
             await playChunksSequence(wasmRes.audioUrls);
           }
           return;
@@ -549,12 +568,16 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
       }
 
       // Jika WASM juga error, pilihan terakhir adalah browser bawaan HP
-      setIsLoadingAudio(false);
-      setEngineNotice(`Gagal Suara AI (${err.message || 'Error'}). Dialihkan ke Suara Bawaan Browser HP...`);
-      setTtsEngine('browser');
-      speakWithBrowser(index);
+      if (playbackSessionIdRef.current === currentSession) {
+        setIsLoadingAudio(false);
+        setEngineNotice(`Gagal Suara AI (${err.message || 'Error'}). Dialihkan ke Suara Bawaan Browser HP...`);
+        setTtsEngine('browser');
+        speakWithBrowser(index);
+      }
     } finally {
-      setIsLoadingAudio(false);
+      if (playbackSessionIdRef.current === currentSession) {
+        setIsLoadingAudio(false);
+      }
     }
   };
 
@@ -605,9 +628,14 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
   };
 
   const handleStop = () => {
+    playbackSessionIdRef.current++;
     if (htmlAudioRef.current) {
       htmlAudioRef.current.pause();
       htmlAudioRef.current.currentTime = 0;
+      htmlAudioRef.current.src = '';
+      htmlAudioRef.current.onended = null;
+      htmlAudioRef.current.onerror = null;
+      htmlAudioRef.current = null;
     }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();

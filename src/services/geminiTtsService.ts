@@ -384,22 +384,20 @@ export async function generateGeminiSpeechAudio(
     );
   }
 
-  // Gunakan model yang dipilih user secara spesifik tanpa paksaan model default lama
-  const modelsToTry = [
-    modelName,
-    extraConfig.selectedGeminiModel,
-    ...geminiSlots.map((s) => s.model),
-    ...(aiConfig.geminiConfig?.cachedModels || []).map((m) => m.id),
-  ].filter((v, idx, arr) => arr.indexOf(v) === idx && Boolean(v && v.trim()));
+  // Hanya panggil 1 model spesifik yang dipilih pengguna (tidak melakukan loop ke seluruh cached models agar kuota hemat)
+  const targetModel = (
+    modelName ||
+    extraConfig.selectedGeminiModel ||
+    geminiSlots[0]?.model ||
+    'gemini-3.8-flash-preview'
+  ).trim();
 
   let lastError: Error | null = null;
 
-  // Try each Gemini API key slot if quota limit (429) is hit
+  // Coba slot API key yang tersedia jika slot sebelumnya habis kuota
   for (const slot of geminiSlots) {
     const apiKey = slot.apiKey.trim();
-
-    for (const model of modelsToTry) {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`;
 
       try {
         const response = await fetch(url, {
@@ -456,9 +454,8 @@ export async function generateGeminiSpeechAudio(
         throw new Error('Respon Gemini tidak memuat data audio.');
       } catch (err: any) {
         lastError = err;
-        console.warn(`[Gemini TTS] Gagal dengan model ${model}:`, err.message);
+        console.warn(`[Gemini TTS] Gagal dengan model ${targetModel}:`, err.message);
       }
-    }
   }
 
   throw lastError || new Error('Gagal menghasilkan audio suara AI dari Google AI Studio.');
