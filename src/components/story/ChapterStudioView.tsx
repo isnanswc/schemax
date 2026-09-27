@@ -149,6 +149,7 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
   );
   const [registeredEntityIds, setRegisteredEntityIds] = useState<Record<string, boolean>>({});
   const [registeredAliasIds, setRegisteredAliasIds] = useState<Record<string, boolean>>({});
+  const [registeredUpdatedIds, setRegisteredUpdatedIds] = useState<Record<string, boolean>>({});
 
   // Sync internal state when prop changes
   useEffect(() => {
@@ -617,16 +618,24 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
     setTempImageSettings(DEFAULT_IMAGE_SETTINGS);
   };
 
-  // Register New Entity to Glosarium
+  // Register New Entity to Glosarium & World Building
   const handleRegisterNewEntity = async (candidate: DetectedEntityCandidate) => {
     try {
+      const newEntityId = 'ent_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
       const newEntity: WorldEntity = {
-        id: 'ent_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36),
+        id: newEntityId,
         bookId: book.id,
         category: candidate.category,
         name: candidate.name,
         aliases: [],
         shortDescription: candidate.shortDescription,
+        initialDescription: candidate.initialDescription || candidate.shortDescription,
+        initialTraits: candidate.initialTraits || undefined,
+        currentDescription: candidate.currentDescription || candidate.shortDescription,
+        currentTraits: candidate.currentTraits || candidate.initialTraits || undefined,
+        evolutionSummary: candidate.evolutionSummary || undefined,
+        condition: (candidate.condition as any) || 'aktif',
+        conditionDetails: candidate.conditionDetails || `Terdaftar pertama kali di Bab ${chapter.order}`,
         detailedNotes: `Dideteksi otomatis dari Bab ${chapter.order}: ${chapter.title}.`,
         tags: [candidate.category],
         galleryMediaIds: [],
@@ -635,10 +644,67 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
         updatedAt: Date.now(),
       };
       await db.worldEntities.add(newEntity);
+
+      // Record chapter state history for this entity in this chapter
+      const nextStates = { ...(chapter.chapterEntityStates || {}) };
+      nextStates[newEntityId] = {
+        entityId: newEntityId,
+        entityName: candidate.name,
+        condition: candidate.condition || 'aktif',
+        conditionDetails: candidate.conditionDetails || `Pertama kali muncul di Bab ${chapter.order}`,
+      };
+      await updateChapterField('chapterEntityStates', nextStates);
+
       setRegisteredEntityIds((prev) => ({ ...prev, [candidate.id]: true }));
     } catch (err) {
       console.error('Gagal menambahkan ke glosarium:', err);
       alert('Gagal mendaftarkan entitas ke Glosarium.');
+    }
+  };
+
+  // Update Existing Entity Status & Evolution History
+  const handleUpdateExistingEntity = async (candidate: DetectedEntityCandidate) => {
+    try {
+      const existingEntities = await db.worldEntities.where('bookId').equals(book.id).toArray();
+      const target = existingEntities.find(
+        (e) =>
+          e.id === candidate.existingEntityId ||
+          e.name.toLowerCase() === candidate.name.toLowerCase()
+      );
+
+      if (target) {
+        // 1. Update Ensiklopedia WorldEntity with latest evolution
+        const updatePayload: Partial<WorldEntity> = {
+          updatedAt: Date.now(),
+        };
+        if (candidate.currentTraits) updatePayload.currentTraits = candidate.currentTraits;
+        if (candidate.currentDescription) updatePayload.currentDescription = candidate.currentDescription;
+        if (candidate.evolutionSummary) updatePayload.evolutionSummary = candidate.evolutionSummary;
+        if (candidate.condition) updatePayload.condition = candidate.condition as any;
+        if (candidate.conditionDetails) updatePayload.conditionDetails = candidate.conditionDetails;
+
+        await db.worldEntities.update(target.id, updatePayload);
+
+        // 2. Record this chapter's chronological state snapshot
+        const nextStates = { ...(chapter.chapterEntityStates || {}) };
+        nextStates[target.id] = {
+          entityId: target.id,
+          entityName: target.name,
+          condition: candidate.condition || target.condition || 'aktif',
+          conditionDetails:
+            candidate.conditionDetails ||
+            candidate.evolutionSummary ||
+            `Perubahan tercatat di Bab ${chapter.order}`,
+        };
+        await updateChapterField('chapterEntityStates', nextStates);
+
+        setRegisteredUpdatedIds((prev) => ({ ...prev, [candidate.id]: true }));
+      } else {
+        alert(`Entitas target "${candidate.name}" tidak ditemukan di database.`);
+      }
+    } catch (err) {
+      console.error('Gagal memperbarui status entitas:', err);
+      alert('Gagal memperbarui status entitas.');
     }
   };
 
@@ -1879,6 +1945,9 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
                       const catMeta = categoryBadgeMap[item.category] || categoryBadgeMap.character;
                       const CatIcon = catMeta.icon;
 
+                      const isUpdate = item.suggestedAction === 'update_existing';
+                      const isUpdatedSaved = registeredUpdatedIds[item.id];
+
                       return (
                         <div
                           key={item.id}
@@ -1898,6 +1967,10 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
                                 <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full">
                                   🆕 Entitas Baru
                                 </span>
+                              ) : isUpdate ? (
+                                <span className="text-[10px] font-bold text-purple-700 dark:text-purple-400 bg-purple-500/10 border border-purple-500/30 px-2 py-0.5 rounded-full">
+                                  🔄 Perubahan Karakter / Riwayat
+                                </span>
                               ) : (
                                 <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
                                   🔗 Alias Terdeteksi
@@ -1905,12 +1978,20 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
                               )}
                             </div>
 
-                            {/* Name & Detected Relation */}
+                            {/* Name & Detected Relation / Condition */}
                             <div>
-                              <h4 className="text-sm font-extrabold text-slate-900 dark:text-white">
-                                {item.name}
-                              </h4>
-                              {!isNew && item.detectedAliasOf && (
+                              <div className="flex items-center justify-between gap-2">
+                                <h4 className="text-sm font-extrabold text-slate-900 dark:text-white">
+                                  {item.name}
+                                </h4>
+                                {item.condition && (
+                                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold">
+                                    Status: {item.condition}
+                                  </span>
+                                )}
+                              </div>
+
+                              {!isNew && !isUpdate && item.detectedAliasOf && (
                                 <p className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1 mt-0.5">
                                   <Link2 className="w-3 h-3" />
                                   <span>Sebutan lain dari: <strong>{item.detectedAliasOf}</strong></span>
@@ -1922,6 +2003,22 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
                             <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
                               {item.shortDescription}
                             </p>
+
+                            {/* Evolution / Dynamic Traits Preview if exists */}
+                            {(item.currentTraits || item.evolutionSummary) && (
+                              <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/50 text-[11px] space-y-1">
+                                {item.currentTraits && (
+                                  <p className="text-purple-900 dark:text-purple-200">
+                                    <strong className="text-purple-700 dark:text-purple-300">Sifat di Bab Ini:</strong> {item.currentTraits}
+                                  </p>
+                                )}
+                                {item.evolutionSummary && (
+                                  <p className="text-purple-800/80 dark:text-purple-300/80 italic">
+                                    <strong>Pemicu/Titik Balik:</strong> {item.evolutionSummary}
+                                  </p>
+                                )}
+                              </div>
+                            )}
                           </div>
 
                           {/* Action CTA Button */}
@@ -1930,7 +2027,7 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
                               isRegistered ? (
                                 <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
                                   <CheckCheck className="w-4 h-4" />
-                                  <span>Terdaftar di Glosarium</span>
+                                  <span>Terdaftar di Ensiklopedia</span>
                                 </span>
                               ) : (
                                 <button
@@ -1940,6 +2037,22 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
                                 >
                                   <PlusCircle className="w-3.5 h-3.5" />
                                   <span>Daftarkan ke Glosarium (+)</span>
+                                </button>
+                              )
+                            ) : isUpdate ? (
+                              isUpdatedSaved ? (
+                                <span className="inline-flex items-center gap-1 text-xs font-bold text-purple-600 dark:text-purple-400">
+                                  <CheckCheck className="w-4 h-4" />
+                                  <span>Riwayat &amp; Status Diperbarui</span>
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateExistingEntity(item)}
+                                  className="py-1.5 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center gap-1.5 active:scale-95 transition shadow-sm"
+                                >
+                                  <Sparkles className="w-3.5 h-3.5" />
+                                  <span>Catat Perkembangan ke Ensiklopedia</span>
                                 </button>
                               )
                             ) : isAliasSaved ? (
