@@ -15,7 +15,9 @@ import {
   Sun,
   Moon,
   Monitor,
-  Search
+  Search,
+  Copy,
+  Check
 } from 'lucide-react';
 import { ChapterStatus } from '../../../types';
 import { ThemeMode, getStoredThemeMode, applyTheme } from '../../../services/themeService';
@@ -36,6 +38,7 @@ interface EditorCornerMenuProps {
   onOpenAIAssistant: () => void;
   onOpenAISettings: () => void;
   onOpenFindReplace?: () => void;
+  onCopyAllText?: () => void;
   onNavigateToTab: (tab: 'info' | 'raw' | 'glossary' | 'plot') => void;
 }
 
@@ -55,9 +58,11 @@ export const EditorCornerMenu: React.FC<EditorCornerMenuProps> = ({
   onOpenAIAssistant,
   onOpenAISettings,
   onOpenFindReplace,
+  onCopyAllText,
   onNavigateToTab,
 }) => {
   const [currentTheme, setCurrentTheme] = React.useState<ThemeMode>(getStoredThemeMode());
+  const [copied, setCopied] = React.useState(false);
 
   if (!isOpen) return null;
 
@@ -132,26 +137,57 @@ export const EditorCornerMenu: React.FC<EditorCornerMenuProps> = ({
             </div>
           </div>
 
-          {/* 2. Manual Save & Auto-save Status */}
-          <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-800 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  isSaved ? 'bg-emerald-500' : 'bg-amber-500 animate-ping'
-                }`}
-              />
-              <span className="text-xs text-slate-700 dark:text-slate-300 font-semibold">
-                {isSaved ? 'Tersimpan di IndexedDB' : 'Menyimpan...'}
-              </span>
+          {/* 2. Manual Save & Auto-save Status & Copy All Text */}
+          <div className="space-y-2">
+            <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    isSaved ? 'bg-emerald-500' : 'bg-amber-500 animate-ping'
+                  }`}
+                />
+                <span className="text-xs text-slate-700 dark:text-slate-300 font-semibold">
+                  {isSaved ? 'Tersimpan di IndexedDB' : 'Menyimpan...'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={onSaveManual}
+                className="py-1 px-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-white hover:bg-slate-50 shadow-xs transition active:scale-95 flex items-center gap-1"
+              >
+                <Save className="w-3 h-3 text-amber-500" />
+                <span>Simpan</span>
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={onSaveManual}
-              className="py-1 px-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-white hover:bg-slate-50 shadow-xs transition active:scale-95 flex items-center gap-1"
-            >
-              <Save className="w-3 h-3 text-amber-500" />
-              <span>Simpan</span>
-            </button>
+
+            {/* Tombol Salin Seluruh Naskah */}
+            {onCopyAllText && (
+              <button
+                type="button"
+                onClick={() => {
+                  onCopyAllText();
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                className={`w-full py-2 px-3 rounded-2xl border text-xs font-bold transition flex items-center justify-between active:scale-95 shadow-xs ${
+                  copied
+                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-400'
+                    : 'bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:border-amber-500'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  {copied ? (
+                    <Check className="w-4 h-4 text-emerald-500" />
+                  ) : (
+                    <Copy className="w-4 h-4 text-amber-500" />
+                  )}
+                  <span>{copied ? 'Seluruh Naskah Tersalin!' : 'Salin Seluruh Naskah'}</span>
+                </div>
+                <span className="text-[10px] text-slate-400 font-medium">
+                  {copied ? 'Tersimpan ke Clipboard' : '1-Klik Copy'}
+                </span>
+              </button>
+            )}
           </div>
 
           {/* 3. Gaya & Ukuran Huruf */}

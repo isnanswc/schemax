@@ -1098,6 +1098,12 @@ ${afterHtml}
         onOpenAIAssistant={handleOpenAIAssistant}
         onOpenAISettings={handleOpenAISettings}
         onOpenFindReplace={() => setIsFindReplaceOpen(true)}
+        onCopyAllText={() => {
+          const plainText = editorRef.current ? (editorRef.current.innerText || editorRef.current.textContent || '') : (currentChapter.contentHtml ? currentChapter.contentHtml.replace(/<[^>]*>/g, '') : '');
+          const fullText = `${title || `Bab ${currentChapter.order}`}\n\n${plainText.trim()}`;
+          navigator.clipboard.writeText(fullText);
+          showToast('Seluruh teks naskah berhasil disalin ke clipboard!');
+        }}
         onNavigateToTab={(tab) => {
           setIsCornerMenuOpen(false);
           handleTabChange(tab);
