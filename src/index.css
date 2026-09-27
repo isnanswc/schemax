@@ -350,16 +350,69 @@ button:active:not(:disabled),
 /* Keypad pulse breathing loop */
 @keyframes keypadBreathing {
   0%, 100% {
-    border-color: rgba(245, 158, 11, 0.15);
-    box-shadow: 0 0 15px rgba(245, 158, 11, 0.05);
+    border-color: rgba(245, 158, 11, 0.2);
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.08);
   }
   50% {
-    border-color: rgba(245, 158, 11, 0.35);
-    box-shadow: 0 0 25px rgba(245, 158, 11, 0.15);
+    border-color: rgba(245, 158, 11, 0.45);
+    box-shadow: 0 0 35px rgba(245, 158, 11, 0.2);
   }
 }
 
 .animate-keypad-glow {
   animation: keypadBreathing 4s ease-in-out infinite;
 }
+
+/* ⚡ Circuit Line Trace along Lock Vector */
+@keyframes circuitTrace {
+  0% {
+    stroke-dashoffset: 400;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-circuit-trace {
+  stroke-dasharray: 80 120;
+  animation: circuitTrace 4s linear infinite;
+}
+
+/* 💥 Lightburst Shockwave on Unlock */
+@keyframes lightburstShockwave {
+  0% {
+    transform: scale(0.2);
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+
+.animate-lightburst {
+  animation: lightburstShockwave 0.8s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+}
+
+/* 🌌 Keypad Neon Wandering Laser Border */
+@keyframes neonBorderWander {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-neon-border {
+  background-size: 300% 300%;
+  animation: neonBorderWander 5s ease infinite;
+}
+
 
