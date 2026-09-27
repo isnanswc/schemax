@@ -312,6 +312,7 @@ export function App() {
                 {activeTab === 'chapters' && (
                   <StoryPlannerView
                     bookId={currentBook.id}
+                    book={currentBook}
                     chapters={bookChapters}
                     onOpenEditor={handleOpenChapterStudio}
                     onOpenReader={handleOpenReader}

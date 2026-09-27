@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StoryChapter, ChapterStatus } from '../../types';
+import { Book, StoryChapter, ChapterStatus } from '../../types';
 import { AddPlannedStoryModal } from './AddPlannedStoryModal';
 import { ChapterCard } from './ChapterCard';
 import { ChapterActionSheet } from './ChapterActionSheet';
@@ -8,13 +8,18 @@ import {
   BookOpen,
   Filter,
   Sparkles,
-  Info
+  Info,
+  Maximize2
 } from 'lucide-react';
 import { db } from '../../db';
 import { navStack } from '../../services/backNavigationService';
+import { useMediaUrl } from '../../hooks/useMediaUrl';
+import { ImageViewerModal } from '../common/ImageViewerModal';
+import { usePrivacy } from '../../contexts/PrivacyContext';
 
 interface StoryPlannerViewProps {
   bookId: string;
+  book?: Book | null;
   chapters: StoryChapter[];
   onOpenEditor: (chapter: StoryChapter) => void;
   onOpenReader?: (chapter: StoryChapter) => void;
@@ -23,6 +28,7 @@ interface StoryPlannerViewProps {
 
 export const StoryPlannerView: React.FC<StoryPlannerViewProps> = ({
   bookId,
+  book,
   chapters,
   onOpenEditor,
   onOpenReader,
@@ -31,6 +37,9 @@ export const StoryPlannerView: React.FC<StoryPlannerViewProps> = ({
   const [filter, setFilter] = useState<'all' | ChapterStatus>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [activeSheetChapter, setActiveSheetChapter] = useState<{ chapter: StoryChapter; index: number } | null>(null);
+  const [isCoverViewerOpen, setIsCoverViewerOpen] = useState(false);
+  const { url: bookCoverUrl } = useMediaUrl(book?.coverMediaId);
+  const { getBlurImageClass, getBlurTitleClass, getBlurTextClass } = usePrivacy();
 
   const handleOpenAddModal = () => {
     navStack.push('modal-add-chapter', () => setIsAddModalOpen(false));
@@ -110,7 +119,54 @@ export const StoryPlannerView: React.FC<StoryPlannerViewProps> = ({
   };
 
   return (
-    <div className="space-y-3 pb-24">
+    <div className="space-y-4 pb-24">
+      {/* 🌟 Aesthetic Panoramic Book Banner (if book has cover) */}
+      {bookCoverUrl && (
+        <div
+          onClick={() => setIsCoverViewerOpen(true)}
+          className="relative h-44 sm:h-52 w-full rounded-3xl overflow-hidden border border-slate-200/80 dark:border-slate-800 shadow-md group/banner cursor-zoom-in transition-all duration-300 select-none"
+        >
+          {/* Background Blurred Ambient Glow */}
+          <div
+            className="absolute inset-0 bg-cover bg-center scale-110 filter blur-xl opacity-40 dark:opacity-30 pointer-events-none"
+            style={{ backgroundImage: `url(${bookCoverUrl})` }}
+          />
+
+          {/* Crisp Centered / Panoramic Image */}
+          <img
+            src={bookCoverUrl}
+            alt={book?.title || 'Sampul Buku'}
+            className={`w-full h-full object-cover object-center group-hover/banner:scale-105 transition-transform duration-500 ease-out ${getBlurImageClass()}`}
+          />
+
+          {/* Aesthetic Gradient & Blur Blend towards bottom */}
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/50 to-transparent pointer-events-none backdrop-blur-[1px]" />
+          <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-slate-950/90 to-transparent pointer-events-none" />
+
+          {/* Banner Overlay Content */}
+          <div className="absolute bottom-3 left-3 right-3 sm:bottom-4 sm:left-4 sm:right-4 flex items-end justify-between gap-3 text-white pointer-events-none">
+            <div className="min-w-0 pr-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-black/40 backdrop-blur-md border border-white/20 text-amber-300 mb-1.5">
+                <Sparkles className="w-3 h-3 text-amber-400" />
+                <span>{book?.genre || 'Cerita Lokal'}</span>
+              </span>
+              <h2 className={`text-base sm:text-xl font-black drop-shadow-md truncate leading-tight ${getBlurTitleClass()}`}>
+                {book?.title || 'Daftar Bab'}
+              </h2>
+              {book?.synopsis && (
+                <p className={`text-xs text-slate-300/90 drop-shadow line-clamp-1 max-w-lg mt-0.5 ${getBlurTextClass()}`}>
+                  {book.synopsis}
+                </p>
+              )}
+            </div>
+
+            <div className="p-2 rounded-2xl bg-black/50 backdrop-blur-md border border-white/20 text-white/90 group-hover/banner:scale-110 transition-transform shadow-lg flex-shrink-0">
+              <Maximize2 className="w-4 h-4" />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Stats Banner */}
       <div className="bg-gradient-to-r from-amber-50/70 via-indigo-50/40 to-slate-50 dark:from-slate-900 dark:via-indigo-950/30 dark:to-slate-900 border border-slate-200/90 dark:border-slate-800/90 rounded-2xl p-3 sm:p-4 flex items-center justify-between shadow-sm">
         <div>
@@ -253,6 +309,17 @@ export const StoryPlannerView: React.FC<StoryPlannerViewProps> = ({
           chapters.findIndex((c) => c.id === activeSheetChapter.chapter.id) < chapters.length - 1
         )}
       />
+
+      {/* Universal Image Viewer Modal for Book Cover */}
+      {bookCoverUrl && (
+        <ImageViewerModal
+          isOpen={isCoverViewerOpen}
+          imageUrl={bookCoverUrl}
+          title={book?.title || 'Sampul Buku'}
+          subtitle={book?.genre || 'Sampul Buku'}
+          onClose={() => setIsCoverViewerOpen(false)}
+        />
+      )}
     </div>
   );
 };

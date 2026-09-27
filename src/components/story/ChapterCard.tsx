@@ -9,8 +9,11 @@ import {
   Clock,
   Sparkles,
   CheckCircle2,
-  BookOpen
+  BookOpen,
+  Maximize2
 } from 'lucide-react';
+import { usePrivacy } from '../../contexts/PrivacyContext';
+import { ImageViewerModal } from '../common/ImageViewerModal';
 
 interface ChapterCardProps {
   chapter: StoryChapter;
@@ -30,8 +33,10 @@ export const ChapterCard: React.FC<ChapterCardProps> = ({
   onQuickStatusToggle,
 }) => {
   const [isPressing, setIsPressing] = useState(false);
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
   const { url: coverUrl } = useMediaUrl(chapter.coverMediaId);
   const effectiveCover = coverUrl || chapter.coverImageUrl;
+  const { getBlurImageClass, getBlurTitleClass, getBlurTextClass } = usePrivacy();
 
   const longPressEvents = useLongPress(
     () => {
@@ -86,13 +91,24 @@ export const ChapterCard: React.FC<ChapterCardProps> = ({
     >
       <div className="flex items-start gap-3">
         {effectiveCover && (
-          <div className="w-14 h-20 sm:w-16 sm:h-22 rounded-xl overflow-hidden flex-shrink-0 border border-slate-200/80 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 shadow-xs">
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              setIsViewerOpen(true);
+            }}
+            className="w-14 h-20 sm:w-16 sm:h-22 rounded-xl overflow-hidden flex-shrink-0 border border-slate-200/80 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 shadow-xs relative group/thumb cursor-zoom-in"
+            title="Klik untuk lihat gambar fullscreen"
+          >
             <img
               src={effectiveCover}
               alt={chapter.title}
-              className="w-full h-full object-cover"
+              className={`w-full h-full object-cover transition-transform duration-300 group-hover/thumb:scale-105 ${getBlurImageClass()}`}
               loading="lazy"
             />
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 flex items-center justify-center transition-opacity">
+              <Maximize2 className="w-3.5 h-3.5 text-white" />
+            </div>
           </div>
         )}
 
@@ -115,13 +131,13 @@ export const ChapterCard: React.FC<ChapterCardProps> = ({
           </div>
 
           {/* Title */}
-          <h4 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-300 transition-colors line-clamp-1">
+          <h4 className={`font-bold text-sm sm:text-base text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-300 transition-colors line-clamp-1 ${getBlurTitleClass()}`}>
             {chapter.title || 'Bab Tanpa Judul'}
           </h4>
 
           {/* Premise preview */}
           {chapter.premise && (
-            <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 mt-1 leading-relaxed">
+            <p className={`text-xs text-slate-600 dark:text-slate-400 line-clamp-2 mt-1 leading-relaxed ${getBlurTextClass()}`}>
               {chapter.premise}
             </p>
           )}
@@ -184,6 +200,17 @@ export const ChapterCard: React.FC<ChapterCardProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Universal Image Viewer Modal for Chapter Cover */}
+      {effectiveCover && (
+        <ImageViewerModal
+          isOpen={isViewerOpen}
+          imageUrl={effectiveCover}
+          title={chapter.title || `Bab ${chapter.order || index + 1}`}
+          subtitle={`Sampul Bab ${chapter.order || index + 1}`}
+          onClose={() => setIsViewerOpen(false)}
+        />
+      )}
     </div>
   );
 };

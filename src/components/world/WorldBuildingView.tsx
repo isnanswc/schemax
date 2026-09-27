@@ -24,10 +24,13 @@ import {
   Camera,
   GitFork,
   Boxes,
-  LayoutGrid
+  LayoutGrid,
+  Maximize2
 } from 'lucide-react';
 import { db } from '../../db';
 import { navStack } from '../../services/backNavigationService';
+import { usePrivacy } from '../../contexts/PrivacyContext';
+import { ImageViewerModal } from '../common/ImageViewerModal';
 
 interface WorldBuildingViewProps {
   bookId: string;
@@ -44,8 +47,10 @@ const EntityCard: React.FC<{
   onOpenImagePicker: (entity: WorldEntity) => void;
 }> = ({ entity, onDelete, onOpenHologram, onOpenImagePicker }) => {
   const { url } = useMediaUrl(entity.avatarMediaId);
+  const { getBlurImageClass, getBlurGlossaryClass, getBlurTextClass } = usePrivacy();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isPressing, setIsPressing] = useState(false);
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
 
   const longPressEvents = useLongPress(
     () => {
@@ -94,18 +99,39 @@ const EntityCard: React.FC<{
         <div
           onClick={(e) => {
             e.stopPropagation();
-            onOpenImagePicker(entity);
+            if (url) {
+              setIsViewerOpen(true);
+            } else {
+              onOpenImagePicker(entity);
+            }
           }}
-          className="relative group w-14 h-14 min-w-[3.5rem] min-h-[3.5rem] max-w-[3.5rem] max-h-[3.5rem] aspect-square rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex-shrink-0 flex items-center justify-center cursor-pointer shadow-inner"
-          title="Klik untuk pasang / ubah gambar utama"
+          className={`relative group w-14 h-14 min-w-[3.5rem] min-h-[3.5rem] max-w-[3.5rem] max-h-[3.5rem] aspect-square rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex-shrink-0 flex items-center justify-center cursor-pointer shadow-inner ${
+            url ? 'cursor-zoom-in' : ''
+          }`}
+          title={url ? "Klik untuk melihat gambar fullscreen (tekan tahan kamera untuk ubah)" : "Klik untuk pasang / ubah gambar utama"}
         >
           {url ? (
-            <img src={url} alt={entity.name} className="w-full h-full object-cover aspect-square block pointer-events-none" />
+            <img src={url} alt={entity.name} className={`w-full h-full object-cover aspect-square block pointer-events-none transition-transform group-hover:scale-105 ${getBlurImageClass()}`} />
           ) : (
             <Icon className={`w-6 h-6 ${meta.color}`} />
           )}
-          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-            <Camera className="w-4 h-4 text-white" />
+          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition gap-1">
+            {url && (
+              <div className="p-1 rounded-md bg-white/20 text-white" title="Layar Penuh">
+                <Maximize2 className="w-3.5 h-3.5" />
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenImagePicker(entity);
+              }}
+              className="p-1 rounded-md bg-white/20 hover:bg-white/40 text-white"
+              title="Ganti Foto"
+            >
+              <Camera className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
 
@@ -165,9 +191,9 @@ const EntityCard: React.FC<{
             </div>
           </div>
 
-          <h4 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate">{entity.name}</h4>
+          <h4 className={`font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate ${getBlurGlossaryClass()}`}>{entity.name}</h4>
           {entity.shortDescription && (
-            <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5 leading-snug">
+            <p className={`text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5 leading-snug ${getBlurTextClass()}`}>
               {entity.shortDescription}
             </p>
           )}
@@ -278,6 +304,17 @@ const EntityCard: React.FC<{
           <span>{isExpanded ? 'Tutup Rincian' : 'Lihat Rincian Lore, Relasi & Atribut'}</span>
           {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
         </button>
+      )}
+
+      {/* Universal Image Viewer Modal for Entity Avatar */}
+      {url && (
+        <ImageViewerModal
+          isOpen={isViewerOpen}
+          imageUrl={url}
+          title={entity.name}
+          subtitle={`Foto Entitas • ${meta.label}`}
+          onClose={() => setIsViewerOpen(false)}
+        />
       )}
     </div>
   );

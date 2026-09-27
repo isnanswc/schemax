@@ -30,7 +30,8 @@ import {
   SlidersHorizontal,
   Camera,
   GitFork,
-  RefreshCw
+  RefreshCw,
+  Maximize2
 } from 'lucide-react';
 import {
   StoryChapter,
@@ -54,6 +55,8 @@ import { EntityImagePickerModal } from '../../world/EntityImagePickerModal';
 import { getConditionMeta } from '../../world/entityConditionMeta';
 import { WorldAutoMapView } from '../../world/WorldAutoMapView';
 import { VerticalSceneTimeline } from './VerticalSceneTimeline';
+import { usePrivacy } from '../../../contexts/PrivacyContext';
+import { ImageViewerModal } from '../../common/ImageViewerModal';
 
 interface ChapterGlossaryTabProps {
   chapter: StoryChapter;
@@ -122,6 +125,8 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
   const [hologramEntity, setHologramEntity] = useState<WorldEntity | null>(null);
   const [imagePickerEntity, setImagePickerEntity] = useState<WorldEntity | null>(null);
   const [entityAvatarUrls, setEntityAvatarUrls] = useState<Record<string, string>>({});
+  const [activeViewerImage, setActiveViewerImage] = useState<{ url: string; title: string; subtitle?: string } | null>(null);
+  const { getBlurImageClass, getBlurGlossaryClass, getBlurTextClass } = usePrivacy();
   const createdUrlsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -1434,23 +1439,51 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
                   >
                     <div>
                       <div className="flex items-start gap-2.5 mb-2">
-                        {/* Avatar / Main picture with quick camera changer */}
+                        {/* Avatar / Main picture with quick camera changer & fullscreen */}
                         <div
-                          onClick={() => setImagePickerEntity(ent)}
-                          className="relative group w-12 h-12 min-w-[3rem] min-h-[3rem] max-w-[3rem] max-h-[3rem] aspect-square rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex-shrink-0 flex items-center justify-center cursor-pointer shadow-inner"
-                          title="Pasang / ubah gambar utama"
+                          onClick={() => {
+                            const imgUrl = ent.avatarMediaId ? entityAvatarUrls[ent.avatarMediaId] : null;
+                            if (imgUrl) {
+                              setActiveViewerImage({
+                                url: imgUrl,
+                                title: ent.name,
+                                subtitle: `Foto Entitas • ${meta.label}`,
+                              });
+                            } else {
+                              setImagePickerEntity(ent);
+                            }
+                          }}
+                          className={`relative group w-12 h-12 min-w-[3rem] min-h-[3rem] max-w-[3rem] max-h-[3rem] aspect-square rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex-shrink-0 flex items-center justify-center cursor-pointer shadow-inner ${
+                            ent.avatarMediaId && entityAvatarUrls[ent.avatarMediaId] ? 'cursor-zoom-in' : ''
+                          }`}
+                          title="Klik untuk lihat foto fullscreen (atau tombol kamera untuk ubah)"
                         >
                           {ent.avatarMediaId && entityAvatarUrls[ent.avatarMediaId] ? (
                             <img
                               src={entityAvatarUrls[ent.avatarMediaId]}
                               alt={ent.name}
-                              className="w-full h-full object-cover aspect-square block pointer-events-none"
+                              className={`w-full h-full object-cover aspect-square block pointer-events-none transition-transform group-hover:scale-105 ${getBlurImageClass()}`}
                             />
                           ) : (
                             <Icon className={`w-5 h-5 ${meta.color}`} />
                           )}
-                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-                            <Camera className="w-3.5 h-3.5 text-white" />
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition gap-1">
+                            {ent.avatarMediaId && entityAvatarUrls[ent.avatarMediaId] && (
+                              <div className="p-1 rounded-md bg-white/20 text-white" title="Layar Penuh">
+                                <Maximize2 className="w-3 h-3" />
+                              </div>
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setImagePickerEntity(ent);
+                              }}
+                              className="p-1 rounded-md bg-white/20 hover:bg-white/40 text-white"
+                              title="Ganti Foto"
+                            >
+                              <Camera className="w-3 h-3" />
+                            </button>
                           </div>
                         </div>
 
@@ -1506,7 +1539,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
                             </div>
                           </div>
 
-                          <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                          <h4 className={`text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate ${getBlurGlossaryClass()}`}>
                             {ent.name}
                           </h4>
                         </div>
@@ -2333,6 +2366,17 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
           showToast(`Gambar utama untuk "${updated.name}" berhasil dipasang!`);
         }}
       />
+
+      {/* Universal Image Viewer Modal for Entity Avatar */}
+      {activeViewerImage && (
+        <ImageViewerModal
+          isOpen={!!activeViewerImage}
+          imageUrl={activeViewerImage.url}
+          title={activeViewerImage.title}
+          subtitle={activeViewerImage.subtitle}
+          onClose={() => setActiveViewerImage(null)}
+        />
+      )}
     </div>
   );
 };

@@ -18,8 +18,11 @@ import {
   Camera,
   Loader2,
   Check,
-  Copy
+  Copy,
+  Maximize2
 } from 'lucide-react';
+import { usePrivacy } from '../../contexts/PrivacyContext';
+import { ImageViewerModal } from '../common/ImageViewerModal';
 
 interface WorldEntityHologramModalProps {
   entity: WorldEntity | null;
@@ -34,7 +37,9 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
   onClose,
   onEntityUpdated,
 }) => {
+  const { getBlurImageClass, getBlurGlossaryClass } = usePrivacy();
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
+  const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
   const [currentEntity, setCurrentEntity] = useState<WorldEntity | null>(entity);
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
 
@@ -165,19 +170,42 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
         {/* Top Header */}
         <div className="flex items-start justify-between gap-3 mb-4 pb-3 border-b border-slate-100 dark:border-slate-800 flex-shrink-0">
           <div className="flex items-center gap-3 min-w-0">
-            {/* Avatar Preview with Camera Quick Picker */}
+            {/* Avatar Preview with Camera Quick Picker & Fullscreen Trigger */}
             <div
-              onClick={() => setIsImagePickerOpen(true)}
-              className="relative group w-16 h-16 min-w-[4rem] min-h-[4rem] max-w-[4rem] max-h-[4rem] aspect-square rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex-shrink-0 flex items-center justify-center shadow-sm cursor-pointer"
-              title="Klik untuk pasang / ubah gambar utama"
+              onClick={() => {
+                if (url) {
+                  setIsImageViewerOpen(true);
+                } else {
+                  setIsImagePickerOpen(true);
+                }
+              }}
+              className={`relative group w-16 h-16 min-w-[4rem] min-h-[4rem] max-w-[4rem] max-h-[4rem] aspect-square rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex-shrink-0 flex items-center justify-center shadow-sm cursor-pointer ${
+                url ? 'cursor-zoom-in' : ''
+              }`}
+              title={url ? "Klik untuk melihat fullscreen (atau klik tombol kamera)" : "Klik untuk pasang / ubah gambar utama"}
             >
               {url ? (
-                <img src={url} alt={activeEntity.name} className="w-full h-full object-cover aspect-square block pointer-events-none" />
+                <img src={url} alt={activeEntity.name} className={`w-full h-full object-cover aspect-square block pointer-events-none transition-transform group-hover:scale-105 ${getBlurImageClass()}`} />
               ) : (
                 <Icon className={`w-8 h-8 ${meta.color}`} />
               )}
-              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-                <Camera className="w-5 h-5 text-white" />
+              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition gap-1">
+                {url && (
+                  <div className="p-1.5 rounded-lg bg-white/20 text-white" title="Layar Penuh">
+                    <Maximize2 className="w-4 h-4" />
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsImagePickerOpen(true);
+                  }}
+                  className="p-1.5 rounded-lg bg-white/20 hover:bg-white/40 text-white"
+                  title="Ganti Foto"
+                >
+                  <Camera className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
@@ -205,7 +233,7 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
                   <span>{condMeta.label}</span>
                 </span>
               </div>
-              <h3 className="text-lg font-black text-slate-900 dark:text-white truncate">
+              <h3 className={`text-lg font-black text-slate-900 dark:text-white truncate ${getBlurGlossaryClass()}`}>
                 {activeEntity.name}
               </h3>
             </div>
@@ -550,6 +578,17 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
           if (onEntityUpdated) onEntityUpdated(updated);
         }}
       />
+
+      {/* Universal Image Viewer Modal for Entity Avatar */}
+      {url && (
+        <ImageViewerModal
+          isOpen={isImageViewerOpen}
+          imageUrl={url}
+          title={activeEntity.name}
+          subtitle={`Foto Entitas • ${meta.label}`}
+          onClose={() => setIsImageViewerOpen(false)}
+        />
+      )}
     </div>
   );
 };

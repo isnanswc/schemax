@@ -18,6 +18,7 @@ import {
   Edit3,
   X
 } from 'lucide-react';
+import { usePrivacy } from '../../contexts/PrivacyContext';
 
 interface BookOverviewTabProps {
   book: Book;
@@ -36,6 +37,7 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
   onBookUpdated,
   onNavigateToTab,
 }) => {
+  const { getBlurTitleClass, getBlurTextClass } = usePrivacy();
   const [synopsis, setSynopsis] = useState(book.synopsis || '');
   const [isEditingSynopsis, setIsEditingSynopsis] = useState(false);
   const [targetWordCount, setTargetWordCount] = useState(book.wordCountTarget || 50000);
@@ -163,7 +165,7 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
               </div>
             </div>
 
-            <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white leading-tight">
+            <h2 className={`text-xl sm:text-2xl font-black text-slate-900 dark:text-white leading-tight ${getBlurTitleClass()}`}>
               {book.title}
             </h2>
 
@@ -197,7 +199,7 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
                   onClick={() => setIsEditingSynopsis(true)}
                   className="group cursor-pointer p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-950/40 dark:hover:bg-slate-950/70 border border-slate-200 dark:border-slate-800/60 transition"
                 >
-                  <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed italic">
+                  <p className={`text-xs text-slate-700 dark:text-slate-300 leading-relaxed italic ${getBlurTextClass()}`}>
                     {book.synopsis || 'Belum ada sinopsis. Klik di sini untuk menambahkan sinopsis.'}
                   </p>
                 </div>

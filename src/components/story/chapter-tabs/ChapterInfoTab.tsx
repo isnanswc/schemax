@@ -14,11 +14,14 @@ import {
   Upload,
   Check,
   Trash2,
-  X
+  X,
+  Maximize2
 } from 'lucide-react';
 import { StoryChapter, ChapterStatus, MediaItem } from '../../../types';
 import { db, saveMediaItem } from '../../../db';
 import { generateRefinedPremise } from '../../../services/aiService';
+import { usePrivacy } from '../../../contexts/PrivacyContext';
+import { ImageViewerModal } from '../../common/ImageViewerModal';
 
 interface ChapterInfoTabProps {
   chapter: StoryChapter;
@@ -35,6 +38,7 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
   onUpdateChapter,
   onNavigateToManuscript,
 }) => {
+  const { getBlurImageClass, getBlurTitleClass, getBlurTextClass } = usePrivacy();
   const [premise, setPremise] = useState(chapter.premise || chapter.aiSummary || '');
   const [notes, setNotes] = useState(chapter.notes || '');
   const [targetWordCount, setTargetWordCount] = useState(chapter.targetWordCount || 1500);
@@ -42,6 +46,7 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
   const [status, setStatus] = useState<ChapterStatus>(chapter.status);
   const [isGeneratingPremise, setIsGeneratingPremise] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
 
   // Synchronize premise if chapter.premise or chapter.aiSummary updates externally
   useEffect(() => {
@@ -216,32 +221,68 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
     <div className="space-y-4 pb-28 max-w-3xl mx-auto animate-fade-in-up px-1 sm:px-2">
       {/* 1. Header Card with Status, Meta & Cover Preview */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
-        {/* Cover Banner if set */}
+        {/* Cover Banner if set - Aesthetic & Panoramic with Blur Blend */}
         {coverUrl && (
-          <div className="relative h-44 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 group">
-            <img src={coverUrl} alt="Sampul Bab" className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-            <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white">
-              <span className="text-xs font-bold drop-shadow">Sampul Bab {chapter.order}</span>
-              <div className="flex items-center gap-1.5">
+          <div
+            onClick={() => setIsImageViewerOpen(true)}
+            className="relative h-48 sm:h-56 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 group/banner cursor-zoom-in shadow-md select-none transition-all duration-300"
+          >
+            {/* Background Ambient Glow */}
+            <div
+              className="absolute inset-0 bg-cover bg-center scale-110 filter blur-xl opacity-40 dark:opacity-30 pointer-events-none"
+              style={{ backgroundImage: `url(${coverUrl})` }}
+            />
+
+            {/* Crisp Cover Image */}
+            <img
+              src={coverUrl}
+              alt="Sampul Bab"
+              className={`w-full h-full object-cover group-hover/banner:scale-105 transition-transform duration-500 ease-out ${getBlurImageClass()}`}
+            />
+
+            {/* Aesthetic Gradient & Blur Blend towards bottom */}
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/40 to-transparent pointer-events-none backdrop-blur-[1px]" />
+            <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-slate-950/90 to-transparent pointer-events-none" />
+
+            <div className="absolute bottom-3 left-3 right-3 sm:bottom-4 sm:left-4 sm:right-4 flex items-end justify-between text-white">
+              <div className="min-w-0 pr-2">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-black/50 backdrop-blur-md border border-white/20 text-amber-300">
+                  Sampul Bab {chapter.order}
+                </span>
+                <h3 className={`text-sm sm:text-base font-black drop-shadow mt-1 truncate ${getBlurTitleClass()}`}>
+                  {chapter.title || `Bab ${chapter.order}`}
+                </h3>
+              </div>
+
+              <div className="flex items-center gap-1.5 flex-shrink-0">
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     loadMediaItems();
                     setIsMediaPickerOpen(true);
                   }}
-                  className="py-1 px-2.5 rounded-xl bg-black/60 hover:bg-black/90 text-white text-[11px] font-bold backdrop-blur-sm border border-white/20 transition"
+                  className="py-1.5 px-3 rounded-xl bg-black/60 hover:bg-black/90 text-white text-[11px] font-bold backdrop-blur-md border border-white/20 transition active:scale-95 shadow-sm"
                 >
-                  Ganti Sampul
+                  Ganti
                 </button>
                 <button
                   type="button"
-                  onClick={handleRemoveCover}
-                  className="p-1.5 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white text-[11px] transition"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveCover();
+                  }}
+                  className="p-1.5 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white text-[11px] transition active:scale-95 shadow-sm"
                   title="Hapus Sampul"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
+                <div
+                  className="p-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/20 text-white hover:bg-black/90 transition shadow-sm"
+                  title="Perbesar Layar Penuh"
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                </div>
               </div>
             </div>
           </div>
@@ -537,6 +578,17 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Universal Image Viewer Modal for Chapter Cover */}
+      {coverUrl && (
+        <ImageViewerModal
+          isOpen={isImageViewerOpen}
+          imageUrl={coverUrl}
+          title={chapter.title || `Bab ${chapter.order}`}
+          subtitle={`Sampul Bab ${chapter.order}`}
+          onClose={() => setIsImageViewerOpen(false)}
+        />
       )}
     </div>
   );

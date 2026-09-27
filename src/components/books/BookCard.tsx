@@ -6,6 +6,7 @@ import { useLongPress } from '../../hooks/useLongPress';
 import { navStack } from '../../services/backNavigationService';
 import { FileText, ArrowRight, MoreVertical, Trash2, CheckCircle2, Edit3, X } from 'lucide-react';
 import { db } from '../../db';
+import { usePrivacy } from '../../contexts/PrivacyContext';
 
 interface BookCardProps {
   book: Book;
@@ -20,6 +21,7 @@ export const BookCard: React.FC<BookCardProps> = ({
   chapterCount = 0,
   onBookUpdated,
 }) => {
+  const { getBlurTitleClass, getBlurTextClass } = usePrivacy();
   const [showMenu, setShowMenu] = useState(false);
   const [isPressing, setIsPressing] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -149,12 +151,12 @@ export const BookCard: React.FC<BookCardProps> = ({
             </div>
 
             {/* Book Title */}
-            <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-300 transition-colors line-clamp-1 leading-snug">
+            <h3 className={`font-bold text-sm sm:text-base text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-300 transition-colors line-clamp-1 leading-snug ${getBlurTitleClass()}`}>
               {book.title}
             </h3>
 
             {/* Synopsis */}
-            <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 mt-0.5 leading-relaxed">
+            <p className={`text-xs text-slate-600 dark:text-slate-400 line-clamp-2 mt-0.5 leading-relaxed ${getBlurTextClass()}`}>
               {book.synopsis || 'Belum ada sinopsis. Ketuk untuk mulai menulis naskah.'}
             </p>
           </div>
