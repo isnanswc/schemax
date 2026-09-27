@@ -75,6 +75,8 @@ export interface DetectedEntityCandidate {
   evolutionSummary?: string;
   condition?: EntityCondition | string;
   conditionDetails?: string;
+  faction?: string;
+  associatedFaction?: string;
   isExisting: boolean;
   existingEntityId?: string;
   detectedAliasOf?: string;

@@ -949,36 +949,62 @@ ${chapterText.slice(0, 30000)}
 
 Tugas Analisis Mendalam:
 1. DETEKSI ENTITAS BARU (suggestedAction: "register_new"):
-   - Cari karakter, lokasi, item/senjata/relik, atau istilah lore penting yang muncul di naskah bab ini TAPI BELUM ADA di daftar entitas buku di atas.
-   - PENTING UNTUK KARAKTER:
-     * initialDescription: Latar belakang asal-usul atau peran awalnya (misal: "Putri bangsawan di Kerajaan Asura").
-     * initialTraits: Sifat & watak kepribadian dasar/awalnya (misal: "Penyayang, baik hati, penurut, santun").
-     * currentDescription: Gambaran kondisi fisik/sosial/situasi saat ini di bab ini.
-     * currentTraits: Sifat & watak kepribadian saat ini di bab ini.
-     * physicalTraits: CIRI-CIRI FISIK LENGKAP & SPESIFIK (perawakan tubuh, wajah, rambut, warna kulit, pakaian/kostum khas, aksesoris, tanda lahir/luka parut). Jika naskah berlatar Nusantara/lokal, default fisik adalah orang Indonesia/Asia Tenggara kecuali naskah menyatakan lain.
-     * visualPrompt: Text-to-Image Prompt siap pakai dalam Bahasa Inggris dengan spesifikasi: "Full body portrait standing upright, centered, Indonesian/Southeast Asian ethnicity (sesuaikan dengan naskah), [deskripsi fisik detail, pakaian, dan rambut], hyper realistic, 8k resolution, cinematic lighting, photorealistic textures, 9:16 aspect ratio".
-     * evolutionSummary: Ringkasan titik balik atau penyebab perubahannya jika ada.
-     * condition: Status kondisi saat ini ("aktif", "luka", "gugur", "hilang", "berkhianat", "terkutuk", "ditawan", "pelarian", "koma", atau "spesial").
-     * conditionDetails: Detail singkat kondisinya jika ada.
+   - Cari karakter, lokasi, item/senjata/relik, atau istilah lore/faksi penting yang muncul di naskah bab ini TAPI BELUM ADA di daftar entitas buku di atas.
+   
+   A. SPESIFIKASI UNTUK KARAKTER (category: "character"):
+      * initialDescription: Latar belakang asal-usul atau peran awalnya (misal: "Putri bangsawan di Kerajaan Asura").
+      * initialTraits: Sifat & watak kepribadian dasar/awalnya (misal: "Penyayang, baik hati, santun, penurut").
+      * currentDescription: Gambaran kondisi fisik/sosial/situasi saat ini di bab ini.
+      * currentTraits: Sifat & watak kepribadian saat ini di bab ini (misal: "Kasar, manipulatif, penuh dendam").
+      * physicalTraits: CIRI-CIRI FISIK LENGKAP & SPESIFIK (perawakan, wajah, rambut, kulit, busana/kostum, aksesoris, luka). Default Nusantara/lokal jika naskah lokal.
+      * visualPrompt: Text-to-Image prompt Bahasa Inggris: "Full body portrait standing upright, centered, Indonesian/Southeast Asian ethnicity (sesuaikan naskah), [deskripsi fisik detail, pakaian, dan rambut], hyper realistic, 8k resolution, cinematic lighting, photorealistic textures, 9:16 aspect ratio".
+      * evolutionSummary: Ringkasan titik balik atau penyebab perubahannya jika ada.
+      * condition: Status kondisi saat ini ("aktif", "luka", "gugur", "hilang", "berkhianat", "terkutuk", "ditawan", "pelarian", "koma", atau "spesial").
+      * conditionDetails: Detail singkat kondisi.
+      * faction: Nama faksi/kelompok/klan jika berafiliasi.
+
+   B. SPESIFIKASI UNTUK ITEM / PUSAKA / SENJATA (category: "item"):
+      * shortDescription: Fungsi, kegunaan, atau efek mistis/teknologis benda ini.
+      * initialTraits / initialDescription: Asal usul pembuatan benda, pemilik pertama, atau kondisi awal saat pertama kali ditemukan/ditempa (misal: "Pedang pusaka keramat yang memancarkan aura suci pelindung").
+      * currentTraits / currentDescription: Kondisi daya magis, tingkat keausan, atau anomali benda saat ini di bab ini (misal: "Bilah pedang retak dan menghitam karena terkorosi racun kegelapan").
+      * physicalTraits: Material bahan (logam, kayu bertuah, batu permata), ukiran rune, warna, ukuran, dan aura visual yang kasat mata.
+      * visualPrompt: Text-to-Image prompt Bahasa Inggris: "Close-up macro product shot of [nama item], [deskripsi material, ukiran, ornamen, dan efek cahaya/aura], cinematic studio lighting, hyper realistic, photorealistic metallic/crystal textures, 8k resolution, centered, vertical 9:16 aspect ratio".
+      * condition: Status benda ("aktif" utuh, "luka" retak/rusak, "hilang", "terkutuk", "spesial").
+
+   C. SPESIFIKASI UNTUK LOKASI / TEMPAT (category: "location"):
+      * shortDescription: Fungsi wilayah/bangunan dan posisinya di dunia cerita.
+      * initialTraits / initialDescription: Kondisi historis tempat ini di masa lalu (misal: "Kuil megah pusat ibadah yang damai dan asri").
+      * currentTraits / currentDescription: Atmosfer, kondisi lingkungan, dan situasi keamanan saat ini di bab ini (misal: "Runtuh terbakar, diselimuti kabut racun dan dijaga monster rawa").
+      * physicalTraits: Arsitektur bangunan, bentang alam geologis, pencahayaan cuaca, warna dominan lingkungan, vegetasi.
+      * visualPrompt: Text-to-Image prompt Bahasa Inggris: "Atmospheric wide establishing landscape shot of [nama lokasi], [deskripsi arsitektur, lingkungan, cuaca, dan pencahayaan dramatis], cinematic composition, unreal engine 5 render, hyper realistic, photorealistic, 8k resolution, vertical 9:16 aspect ratio".
+      * condition: Status wilayah ("aktif" berpenghuni, "luka" hancur/rusak, "terkutuk", "hilang" terisolasi, "spesial").
+
+   D. SPESIFIKASI UNTUK LORE / FAKSI / HUKUM DUNIA (category: "lore"):
+      * shortDescription: Penjelasan aturan dunia, mitos, ordo rahasia, atau sekte/faksi.
+      * initialTraits / initialDescription: Doktrin awal, tujuan luhur pendirian faksi, atau asal usul legenda kuno.
+      * currentTraits / currentDescription: Status pergerakan faksi saat ini, reputasi di mata masyarakat, atau pengaruh hukum dunia di bab ini.
+      * physicalTraits: Lambang/panji faksi, seragam ciri khas anggota, segel magis, atau artefak simbolik faksi.
+      * visualPrompt: Text-to-Image prompt Bahasa Inggris: "Emblematic banner and heraldry of [nama lore/faksi], [deskripsi simbol, motif mitologi, lambang faksi], elegant dramatic lighting, high fantasy aesthetic, hyper realistic, 8k resolution, vertical 9:16 aspect ratio".
+      * faction: Nama faksi jika entitas ini adalah faksi/organisasi.
 
 2. PEMBARUAN ENTITAS YANG SUDAH ADA (suggestedAction: "update_existing"):
-   - Jika entitas SUDAH ADA di daftar Glosarium di atas, lalu di naskah bab ini mengalami perubahan sifat, ciri fisik baru (misal: mendapat bekas luka baru, potong rambut, ganti pakaian perang), atau perubahan kondisi status.
+   - Jika entitas SUDAH ADA di daftar Glosarium di atas, lalu di naskah bab ini mengalami perubahan sifat/kondisi (misal: karakter dirasuki/berubah sifat, pedang patah/diberkati, istana terbakar, faksi menyatakan perang).
    - Sertakan dengan:
      * suggestedAction: "update_existing"
      * isExisting: true
      * existingEntityId: ID entitas dari daftar di atas
      * name: Nama entitas asli
-     * initialTraits: Pertahankan sifat awal yang sudah tercatat
-     * currentTraits: Sifat & kepribadian terkini di bab ini
-     * physicalTraits: Ciri fisik terkini (termasuk luka/perubahan pakaian jika ada)
-     * visualPrompt: Prompt gambar terbaru sesuai perubahan fisik
+     * initialTraits: Pertahankan sifat/kondisi awal yang sudah tercatat
+     * currentTraits: Sifat & kondisi terkini di bab ini
+     * physicalTraits: Ciri fisik terkini (termasuk perubahan visual baru)
+     * visualPrompt: Prompt gambar terbaru yang merefleksikan wujud terkini
      * currentDescription: Deskripsi kondisi terkini di bab ini
-     * evolutionSummary: Penjelasan mengapa sifat/kondisi berubah di bab ini
-     * condition: Status kondisi terkini
+     * evolutionSummary: Penjelasan kronologis mengapa sifat/kondisi berubah di bab ini
+     * condition: Status kondisi terkini ("aktif", "luka", "gugur", "hilang", "berkhianat", "terkutuk", "ditawan", "pelarian", "koma", "spesial")
      * conditionDetails: Rincian kondisi terkini
 
 3. DETEKSI ALIAS / SEBUTAN LAIN (suggestedAction: "add_alias"):
-   - Cari julukan, sebutan lain, gelar, atau istilah pengganti dari entitas yang SUDAH ADA. Contoh: Jika ada julukan "Sang Pendekar Jubah Hitam" merujuk ke Ahmad, deteksi sebagai ALIAS Ahmad!
+   - Cari julukan, sebutan lain, gelar, atau istilah pengganti dari entitas yang SUDAH ADA. Contoh: Julukan "Sang Pusaka Pembelah Langit" merujuk ke Pedang Surya, deteksi sebagai ALIAS Pedang Surya!
 
 Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
 [
@@ -989,12 +1015,13 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
     "initialDescription": "Deskripsi atau latar belakang awal",
     "initialTraits": "Sifat & kepribadian awal (misal: penyayang, baik hati, penurut)",
     "currentDescription": "Deskripsi kondisi saat ini",
-    "currentTraits": "Sifat & kepribadian saat ini",
-    "physicalTraits": "Perawakan tegap, tinggi 172cm, kulit sawo matang khas Indonesia, rambut ikal hitam sebahu, mengenakan jubah tenun lurik gelap dengan selempang pedang kuningan",
-    "visualPrompt": "Full body portrait standing upright, centered, Indonesian man in his late 20s, tan skin, wavy black shoulder-length hair, determined gaze, wearing dark traditional woven lurik robe with a brass scabbard sling, photorealistic textures, 8k resolution, cinematic lighting, hyper realistic, 9:16 aspect ratio",
-    "evolutionSummary": "",
+    "currentTraits": "Sifat & kepribadian saat ini (misal: kasar, manipulatif, pendendam)",
+    "physicalTraits": "Ciri fisik detail atau material/arsitektur benda/tempat",
+    "visualPrompt": "Prompt text-to-image AI Bahasa Inggris detail 9:16 aspect ratio...",
+    "evolutionSummary": "Titik balik peristiwa penyebab perubahan",
     "condition": "aktif",
-    "conditionDetails": "",
+    "conditionDetails": "Keterangan detail status",
+    "faction": "Nama faksi jika relevan",
     "isExisting": false,
     "existingEntityId": "",
     "detectedAliasOf": "",
@@ -1049,6 +1076,7 @@ Aturan:
           evolutionSummary: item.evolutionSummary || undefined,
           condition: item.condition || undefined,
           conditionDetails: item.conditionDetails || undefined,
+          faction: item.faction || undefined,
           isExisting: Boolean(item.isExisting) || action === 'update_existing' || action === 'add_alias',
           existingEntityId: item.existingEntityId || undefined,
           detectedAliasOf: item.detectedAliasOf || undefined,

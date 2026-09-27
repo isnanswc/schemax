@@ -404,6 +404,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
         currentTraits: candidate.currentTraits || candidate.initialTraits || '',
         physicalTraits: candidate.physicalTraits || undefined,
         visualPrompt: candidate.visualPrompt || undefined,
+        faction: candidate.faction || undefined,
         evolutionSummary: candidate.evolutionSummary || '',
         condition: candidate.condition || 'aktif',
         conditionDetails: candidate.conditionDetails || '',
@@ -647,6 +648,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
         currentTraits: c.currentTraits || c.initialTraits || '',
         physicalTraits: c.physicalTraits || undefined,
         visualPrompt: c.visualPrompt || undefined,
+        faction: c.faction || undefined,
         evolutionSummary: c.evolutionSummary || '',
         condition: c.condition || 'aktif',
         conditionDetails: c.conditionDetails || '',
@@ -908,33 +910,33 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
 
       {/* 1. Top Header Card */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5">
-            <span className="p-1.5 rounded-xl bg-amber-500/15 text-amber-500 font-bold">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="p-2 rounded-2xl bg-amber-500/15 text-amber-500 font-bold flex-shrink-0">
               <Compass className="w-4 h-4" />
             </span>
-            <div>
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white truncate">
                 Glosarium &amp; Galeri Bab Ini
               </h2>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
                 Pusat referensi entitas, visual cerita, dan pembagian adegan
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button
               type="button"
               onClick={handleDetectEntities}
               disabled={isDetectingEntities || !getEffectiveText()}
-              className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-gradient-to-r from-amber-500/15 to-indigo-500/15 hover:from-amber-500/25 hover:to-indigo-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-xs font-bold transition active:scale-95 disabled:opacity-50 flex-shrink-0"
+              className="w-full sm:w-auto flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-xl bg-gradient-to-r from-amber-500/20 via-emerald-500/20 to-indigo-500/20 hover:from-amber-500/30 hover:to-indigo-500/30 text-amber-800 dark:text-amber-300 border border-amber-500/30 text-xs font-bold transition active:scale-95 disabled:opacity-50 shadow-sm"
               title="Pindai naskah untuk mendeteksi tokoh, latar, relik, atau sebutan alias baru"
             >
               {isDetectingEntities ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />
-                  <span>Memindai...</span>
+                  <span>Memindai Naskah...</span>
                 </>
               ) : (
                 <>
@@ -1298,13 +1300,17 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
                           <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-[11px] space-y-1">
                             {item.initialTraits && (
                               <div className="flex items-start gap-1 text-slate-600 dark:text-slate-400">
-                                <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5 flex-shrink-0">🌱 Sifat Awal:</span>
+                                <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5 flex-shrink-0">
+                                  {item.category === 'item' ? '🏺 Wujud/Asal:' : item.category === 'location' ? '🗺️ Kondisi Awal:' : item.category === 'lore' ? '📜 Asal/Prinsip:' : '🌱 Sifat Awal:'}
+                                </span>
                                 <span>{item.initialTraits}</span>
                               </div>
                             )}
                             {item.currentTraits && (
                               <div className="flex items-start gap-1 text-slate-800 dark:text-slate-200">
-                                <span className="font-bold text-amber-600 dark:text-amber-400 flex items-center gap-0.5 flex-shrink-0">⚡ Sifat Terkini:</span>
+                                <span className="font-bold text-amber-600 dark:text-amber-400 flex items-center gap-0.5 flex-shrink-0">
+                                  {item.category === 'item' ? '✨ Efek/Kondisi:' : item.category === 'location' ? '⚡ Suasana Saat Ini:' : item.category === 'lore' ? '🚩 Pengaruh Terkini:' : '⚡ Sifat Terkini:'}
+                                </span>
                                 <span className="font-medium">{item.currentTraits}</span>
                               </div>
                             )}
@@ -1316,9 +1322,53 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
                           </div>
                         )}
 
+                        {/* Physical / Architectural / Material Traits & Faction */}
+                        {(item.physicalTraits || item.faction) && (
+                          <div className="p-2 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 text-[11px] space-y-1">
+                            {item.physicalTraits && (
+                              <div className="text-slate-700 dark:text-slate-300">
+                                <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                                  {item.category === 'character' ? '👤 Ciri Fisik: ' : item.category === 'item' ? '⚔️ Material & Bentuk: ' : item.category === 'location' ? '🏛️ Arsitektur & Alam: ' : '🛡️ Lambang & Atribut: '}
+                                </span>
+                                <span>{item.physicalTraits}</span>
+                              </div>
+                            )}
+                            {item.faction && (
+                              <div className="text-[10px] text-indigo-700 dark:text-indigo-300 font-medium">
+                                <span className="font-bold">Faksi/Afiliasi:</span> {item.faction}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-2">
                           {item.shortDescription || item.currentDescription || 'Tidak ada deskripsi singkat.'}
                         </p>
+
+                        {/* Visual Image Generation Prompt Preview */}
+                        {item.visualPrompt && (
+                          <div className="p-2 rounded-xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/30 text-[10px] space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-purple-700 dark:text-purple-300 flex items-center gap-1">
+                                🎨 Visual Prompt AI:
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(item.visualPrompt || '');
+                                  showToast('Visual prompt disalin!');
+                                }}
+                                className="px-1.5 py-0.5 rounded bg-purple-200/60 dark:bg-purple-900/60 hover:bg-purple-300 text-purple-900 dark:text-purple-200 font-semibold text-[9px] transition"
+                                title="Salin prompt gambar ke clipboard"
+                              >
+                                Salin Prompt
+                              </button>
+                            </div>
+                            <p className="text-slate-600 dark:text-slate-400 italic font-mono text-[9.5px] line-clamp-2 select-all">
+                              {item.visualPrompt}
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
