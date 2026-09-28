@@ -441,3 +441,47 @@ button:active:not(:disabled),
 .animate-scale-up {
   animation: scaleUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* ⚡ Marker / Penanda Batas Antar Sesi AI di Naskah Utama */
+.schemax-ai-session-divider {
+  margin: 2.5rem 0 1.5rem 0;
+  text-align: center;
+  position: relative;
+  user-select: none;
+}
+
+.schemax-ai-session-divider::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.6), transparent);
+  z-index: 1;
+}
+
+.schemax-ai-session-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.85rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  border-radius: 9999px;
+  background-color: #fef3c7;
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  letter-spacing: 0.025em;
+}
+
+html.dark .schemax-ai-session-tag {
+  background-color: rgba(15, 23, 42, 0.95);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.45);
+  box-shadow: 0 1px 6px rgba(245, 158, 11, 0.2);
+}

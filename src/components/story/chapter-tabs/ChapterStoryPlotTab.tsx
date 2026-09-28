@@ -27,7 +27,11 @@ import {
   HelpCircle,
   ExternalLink,
   MapPin,
-  Compass
+  Compass,
+  History,
+  ShieldCheck,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { StoryChapter, WorldEntity, Book } from '../../../types';
 import { db } from '../../../db';
@@ -92,6 +96,24 @@ function getLatestEntityState(
   };
 }
 
+// Helper to strip HTML tags to pure text while converting paragraphs to clean newlines
+function stripHtmlToCleanText(html: string): string {
+  if (!html) return '';
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = html;
+
+  // Replace AI session tags with readable text markers
+  const sessionTags = tempDiv.querySelectorAll('.schemax-ai-session-tag, .schemax-ai-session-divider');
+  sessionTags.forEach((tag) => {
+    const text = tag.textContent?.trim() || 'Batas Sesi AI';
+    tag.replaceWith(document.createTextNode(`\n\n--- [${text}] ---\n\n`));
+  });
+
+  return (tempDiv.textContent || tempDiv.innerText || '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
   chapter,
   bookTitle,
@@ -104,10 +126,10 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
   const [activeSheet, setActiveSheet] = useState<'internal' | 'external'>('internal');
 
   const [book, setBook] = useState<Book | null>(null);
+  const [earlierChaptersList, setEarlierChaptersList] = useState<StoryChapter[]>([]);
   const [copiedItem, setCopiedItem] = useState<string | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const [isSummarizingRecap, setIsSummarizingRecap] = useState(false);
-  const [isGeneratingPlot, setIsGeneratingPlot] = useState(false);
   const [isReloadingContext, setIsReloadingContext] = useState(false);
   const [saveToast, setSaveToast] = useState(false);
 
@@ -119,6 +141,7 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
   );
   const [charactersText, setCharactersText] = useState('');
   const [settingItemLoreText, setSettingItemLoreText] = useState('');
+  const [proseStyleSample, setProseStyleSample] = useState('');
 
   const [characterScope, setCharacterScope] = useState<'relevant' | 'all'>('relevant');
   const [settingScope, setSettingScope] = useState<'compact' | 'all'>('compact');
@@ -128,13 +151,25 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
   // ==========================================
   const [targetWords, setTargetWords] = useState<number>(chapter.targetWordCount || 1500);
   const [additionalPrompt, setAdditionalPrompt] = useState<string>('');
-  const [writeMode, setWriteMode] = useState<'overwrite' | 'append'>('overwrite');
+
+  // Default to append if there is existing content in manuscript, otherwise overwrite
+  const hasExistingText = Boolean(
+    chapter.contentHtml && stripHtmlToCleanText(chapter.contentHtml).length > 25
+  );
+
+  const [writeMode, setWriteMode] = useState<'overwrite' | 'append'>(
+    hasExistingText ? 'append' : 'overwrite'
+  );
+
   const [isGeneratingInternal, setIsGeneratingInternal] = useState(false);
-  const [internalGenSuccess, setInternalGenSuccess] = useState<{ wordCount: number } | null>(null);
+  const [internalGenSuccess, setInternalGenSuccess] = useState<{ wordCount: number; sessionNum: number } | null>(null);
   const [internalGenError, setInternalGenError] = useState<string | null>(null);
 
   const plotTextareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // ==========================================
+  // 📚 LOAD ENTIRE NOVEL CONTEXT (ALL CHAPTERS & FULL GLOSSARY)
+  // ==========================================
   const loadAllContext = async (
     charScope: 'relevant' | 'all' = characterScope,
     setScope: 'compact' | 'all' = settingScope
@@ -143,75 +178,64 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
     const b = await db.books.get(chapter.bookId);
     if (b) setBook(b);
 
-    // Fetch all earlier chapters
+    // 2. Fetch ALL earlier chapters in ascending order (Ch 1, 2, ..., N-1)
     const earlierAsc = await db.chapters
       .where('bookId')
       .equals(chapter.bookId)
       .filter((c) => c.order < chapter.order)
       .sortBy('order');
 
+    setEarlierChaptersList(earlierAsc);
     const earlierDesc = [...earlierAsc].reverse();
 
-    // --- POINT 1: Story Plot (Pure Synopsis + Rolling Window Recap) ---
+    // --- POINT 1: Comprehensive Chronological Context of ALL Past Chapters ---
     let synopsisRaw = b?.synopsis?.trim() || '';
     if (earlierAsc.length > 0) {
-      if (earlierAsc.length > 3) {
-        const olderChapters = earlierAsc.slice(0, earlierAsc.length - 2);
-        const recentChapters = earlierAsc.slice(earlierAsc.length - 2);
+      const fullTimeline = earlierAsc
+        .map((c) => {
+          const sum = c.aiSummary || c.premise || c.notes || 'Selesai';
+          return `• Bab ${c.order} ("${c.title}"):\n  ${sum.replace(/\n+/g, ' ')}`;
+        })
+        .join('\n\n');
 
-        const olderTimeline = olderChapters
-          .map((c) => `Bab ${c.order}: ${(c.aiSummary || c.premise || c.title).slice(0, 75).replace(/\n+/g, ' ')}`)
-          .join(' ➔ ');
-
-        const recentRecap = recentChapters
-          .map((c) => {
-            const sum = c.aiSummary || c.premise || c.notes || 'Selesai';
-            return `- Bab ${c.order} (${c.title}): ${sum}`;
-          })
-          .join('\n');
-
-        synopsisRaw += `\n\n[Garis Besar Arka Cerita Terdahulu (Bab ${olderChapters[0].order}–${olderChapters[olderChapters.length - 1].order})]:\n${olderTimeline}\n\n[Peristiwa Penting Bab Terkini]:\n${recentRecap}`;
-      } else {
-        const recapBullets = earlierAsc
-          .map((c) => {
-            const sum = c.aiSummary || c.premise || c.notes || 'Selesai';
-            return `- Bab ${c.order} (${c.title}): ${sum}`;
-          })
-          .join('\n');
-        synopsisRaw += `\n\n[Peristiwa Penting Bab-Bab Sebelumnya]:\n${recapBullets}`;
-      }
+      synopsisRaw += `\n\n[KRONOLOGI PERISTIWA SELURUH BAB SEBELUMNYA (BAB 1 S/D ${earlierAsc[earlierAsc.length - 1].order})]:\n${fullTimeline}`;
     } else {
-      synopsisRaw += '\n\n(Ini adalah Bab Pertama dari novel. Mulai perkenalan dunia dan pengait cerita dari awal).';
+      synopsisRaw += '\n\n(Ini adalah Bab Pertama dari novel. Memulai perkenalan dunia, tokoh utama, dan pemicu konflik dari awal).';
     }
     setStoryPlotText(synopsisRaw);
 
-    // --- POINT 2: Ringkasan Bab Sebelumnya (Immediate Continuity Anchor) ---
+    // --- POINT 2: Ringkasan Bab Sebelumnya & Potongan Kalimat Terakhir (Titik Sambung) ---
     if (earlierDesc.length > 0) {
       const immediatePrev = earlierDesc[0];
       let prevSummary = `Bab ${immediatePrev.order}: "${immediatePrev.title}"\n`;
-      prevSummary += `Ringkasan: ${immediatePrev.aiSummary || immediatePrev.premise || immediatePrev.notes || 'Tidak ada catatan ringkasan.'}\n`;
+      prevSummary += `Rangkuman Kejadian: ${immediatePrev.aiSummary || immediatePrev.premise || immediatePrev.notes || 'Tidak ada catatan ringkasan.'}\n`;
 
       if (immediatePrev.contentHtml) {
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = immediatePrev.contentHtml;
-        const fullPrevText = (tempDiv.textContent || tempDiv.innerText || '').trim();
-        if (fullPrevText) {
-          const sentences = fullPrevText.split(/(?<=[.!?])\s+/).filter(Boolean);
-          const lastFew = sentences.slice(-4).join(' ');
-          prevSummary += `\n[Potongan Kalimat Terakhir Bab ${immediatePrev.order}]:\n"${lastFew}"`;
+        const cleanPrev = stripHtmlToCleanText(immediatePrev.contentHtml);
+        if (cleanPrev) {
+          const sentences = cleanPrev.split(/(?<=[.!?])\s+/).filter(Boolean);
+          const lastFew = sentences.slice(-5).join(' ');
+          prevSummary += `\n[Potongan Adegan Terakhir Bab ${immediatePrev.order}]:\n"${lastFew}"`;
+
+          // Sample prose style from immediate previous chapter for style consistency
+          const styleExtract = sentences.slice(0, 8).join(' ');
+          setProseStyleSample(styleExtract);
         }
       }
       setPrevChapterText(prevSummary);
     } else {
       setPrevChapterText('Tidak ada bab sebelumnya (Bab Pembuka Novel).');
+      if (b?.synopsis) {
+        setProseStyleSample(b.synopsis.slice(0, 300));
+      }
     }
 
-    // --- POINT 4: Characters & Latest Conditions ---
+    // --- POINT 4: GLOSARIUM LENGKAP SEMUA KARAKTER & KONDISI STATUS TERKINI ---
     const allCharacters = entities.filter((e) => e.category === 'character');
     let targetCharacters = allCharacters;
 
-    if (charScope === 'relevant' && allCharacters.length > 4) {
-      const searchTarget = `${chapter.title} ${chapter.premise || ''} ${chapter.notes || ''}`.toLowerCase();
+    if (charScope === 'relevant' && allCharacters.length > 6) {
+      const searchTarget = `${chapter.title} ${chapter.premise || ''} ${chapter.notes || ''} ${chapterPlotText}`.toLowerCase();
       targetCharacters = allCharacters.filter((c) => {
         const isMainRole = c.role === 'protagonist' || c.role === 'antagonist' || c.role === 'deuteragonist';
         const nameMatch = searchTarget.includes(c.name.toLowerCase());
@@ -219,7 +243,7 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
         return nameMatch || aliasMatch || isMainRole;
       });
       if (targetCharacters.length === 0) {
-        targetCharacters = allCharacters.slice(0, 5);
+        targetCharacters = allCharacters.slice(0, 6);
       }
     }
 
@@ -231,13 +255,16 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
           detail += `  - Kondisi Status Terkini: ${state.condition}${state.conditionDetails ? ` (${state.conditionDetails})` : ''} [Sumber: ${state.source}]\n`;
 
           if (c.aliases && c.aliases.length > 0) {
-            detail += `  - Sebutan Alias: ${c.aliases.join(', ')}\n`;
+            detail += `  - Sebutan Alias/Gelar: ${c.aliases.join(', ')}\n`;
           }
           if (c.currentTraits || c.initialTraits) {
             detail += `  - Sifat/Kepribadian: ${c.currentTraits || c.initialTraits}\n`;
           }
           if (c.physicalTraits) {
             detail += `  - Ciri Fisik: ${c.physicalTraits}\n`;
+          }
+          if (c.detailedNotes) {
+            detail += `  - Catatan Tokoh: ${c.detailedNotes.slice(0, 150).replace(/\n+/g, ' ')}\n`;
           }
           return detail.trimEnd();
         })
@@ -248,48 +275,53 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
       setCharactersText('- Karakter utama dan pendukung yang relevan dengan adegan bab ini.');
     }
 
-    // --- POINT 5: Setting, Items, World Lore & Style ---
+    // --- POINT 5: GLOSARIUM LENGKAP LOKASI, ITEM, FAKSI & ATURAN DUNIA ---
     const locEntities = entities.filter((e) => e.category === 'location');
     const itemEntities = entities.filter((e) => e.category === 'item');
+    const factionEntities = entities.filter((e) => e.category === 'faction');
     const loreEntities = entities.filter((e) => e.category === 'lore');
 
-    let combinedSettingLore = '=== LOKASI & SETTING TERKINI ===\n';
+    let combinedSettingLore = '=== GLOSARIUM LOKASI & LATAR ===\n';
     if (locEntities.length > 0) {
-      const targetLocs = setScope === 'compact' ? locEntities.slice(0, 5) : locEntities;
-      combinedSettingLore += targetLocs
+      combinedSettingLore += locEntities
         .map((l) => {
           const state = getLatestEntityState(l, chapter, earlierDesc);
-          return `- [Lokasi] ${l.name}: ${l.shortDescription || 'Latar'} (Kondisi: ${state.condition}${state.conditionDetails ? ` - ${state.conditionDetails}` : ''})`;
+          return `- [Lokasi] ${l.name}${l.aliases && l.aliases.length > 0 ? ` (Alias: ${l.aliases.join(', ')})` : ''}: ${l.shortDescription || 'Latar'} (Kondisi: ${state.condition}${state.conditionDetails ? ` - ${state.conditionDetails}` : ''})`;
         })
         .join('\n');
     } else {
       combinedSettingLore += '- Lokasi menyesuaikan alur adegan bab.\n';
     }
 
-    combinedSettingLore += '\n\n=== ITEM & ARTEFAK TERKINI ===\n';
+    combinedSettingLore += '\n\n=== GLOSARIUM ITEM, SENJATA & PUSAKA ===\n';
     if (itemEntities.length > 0) {
-      const targetItems = setScope === 'compact' ? itemEntities.slice(0, 5) : itemEntities;
-      combinedSettingLore += targetItems
+      combinedSettingLore += itemEntities
         .map((it) => {
           const state = getLatestEntityState(it, chapter, earlierDesc);
-          return `- [Item] ${it.name}: ${it.shortDescription || 'Benda'} (Status: ${state.condition}${state.conditionDetails ? ` - ${state.conditionDetails}` : ''})`;
+          return `- [Item/Pusaka] ${it.name}${it.aliases && it.aliases.length > 0 ? ` (Alias: ${it.aliases.join(', ')})` : ''}: ${it.shortDescription || 'Benda'} (Status: ${state.condition}${state.conditionDetails ? ` - ${state.conditionDetails}` : ''})`;
         })
         .join('\n');
     } else {
       combinedSettingLore += '- Mengikuti perlengkapan/benda yang dibawa karakter.\n';
     }
 
-    if (loreEntities.length > 0) {
-      combinedSettingLore += '\n\n=== ATURAN DUNIA & LORE ===\n';
-      const targetLore = setScope === 'compact' ? loreEntities.slice(0, 4) : loreEntities;
-      combinedSettingLore += targetLore
-        .map((lr) => `- ${lr.name}: ${lr.shortDescription || 'Hukum/aturan fiksi'}`)
+    if (factionEntities.length > 0) {
+      combinedSettingLore += '\n\n=== GLOSARIUM FAKSI & KLAN ===\n';
+      combinedSettingLore += factionEntities
+        .map((f) => `- [Faksi] ${f.name}: ${f.shortDescription || (f.detailedNotes ? f.detailedNotes.slice(0, 120) : 'Kelompok/Faksi')}`)
         .join('\n');
     }
 
-    combinedSettingLore += '\n\n=== PEDOMAN GAYA & SUDUT PANDANG (STYLE & POV) ===\n';
+    if (loreEntities.length > 0) {
+      combinedSettingLore += '\n\n=== HUKUM DUNIA, SISTEM KEKUATAN & LORE ===\n';
+      combinedSettingLore += loreEntities
+        .map((lr) => `- [Lore/Hukum] ${lr.name}: ${lr.shortDescription || (lr.detailedNotes ? lr.detailedNotes.slice(0, 150) : 'Aturan dunia fiksi')}`)
+        .join('\n');
+    }
+
+    combinedSettingLore += '\n\n=== PEDOMAN GAYA & KONSISTENSI SASTRA ===\n';
     combinedSettingLore +=
-      'Gaya Sastra: Terapkan teknik "Show, Don\'t Tell" (panca indera, gestur emosi alami), dialog berbobot dengan subteks kuat, ritme adegan dinamis.';
+      'Gaya Penulisan: Narasi mendalam, panca indera hidup (Show Don\'t Tell), dialog berbobot dengan subteks tajam, ritme cerita dinamis dan selaras dengan bab-bab sebelumnya.';
 
     setSettingItemLoreText(combinedSettingLore);
   };
@@ -300,7 +332,7 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
     return () => {
       active = false;
     };
-  }, [chapter.id, chapter.order, chapter.bookId]);
+  }, [chapter.id, chapter.order, chapter.bookId, chapterPlotText]);
 
   // Handle manual reload / sync of context
   const handleManualReloadContext = async () => {
@@ -393,6 +425,7 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
 
   // ==========================================
   // ⚡ GENERATE NASKAH UTAMA DENGAN AI INTERNAL
+  // (Full Glossary + Full Past Context + Existing Text Continuity + Style Consistency + Session Divider)
   // ==========================================
   const handleGenerateInternalManuscript = async () => {
     if (!chapterPlotText.trim()) {
@@ -401,13 +434,14 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
       return;
     }
 
-    if (chapter.contentHtml && chapter.contentHtml.replace(/<[^>]*>/g, '').trim().length > 30) {
-      if (writeMode === 'overwrite') {
-        const ok = confirm(
-          'Naskah utama saat ini sudah memuat cerita. Apakah Anda yakin ingin MENGGANTIKAN seluruh naskah dengan hasil generasi AI baru ini?'
-        );
-        if (!ok) return;
-      }
+    const currentCleanText = stripHtmlToCleanText(chapter.contentHtml || '');
+    const hasExistingManuscript = currentCleanText.length > 25;
+
+    if (hasExistingManuscript && writeMode === 'overwrite') {
+      const ok = confirm(
+        'Naskah utama saat ini sudah memuat cerita. Apakah Anda yakin ingin MENGGANTIKAN seluruh naskah dengan hasil generasi AI baru ini?'
+      );
+      if (!ok) return;
     }
 
     setIsGeneratingInternal(true);
@@ -417,11 +451,53 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
     try {
       const wordCountInstruction =
         targetWords >= 4000
-          ? 'Tuliskan naskah cerita novel selengkap dan semendalam mungkin hingga batas maksimal kapasitas output (minimal 2500 - 4000 kata).'
+          ? 'Tuliskan naskah cerita novel selengkap dan semendalam mungkin hingga batas maksimal kapasitas output model AI (minimal 2.500 - 4.000 kata).'
           : `Tuliskan naskah cerita secara proporsional dan mendalam dengan target sekitar ${targetWords} kata (minimal 500 kata).`;
 
+      // Calculate Session Number for Divider Tagging
+      const existingSessionsMatch = (chapter.contentHtml || '').match(/schemax-ai-session/gi);
+      const nextSessionNumber = (existingSessionsMatch ? existingSessionsMatch.length : 0) + 1;
+
+      // Existing story text prompt section if appending
+      let existingManuscriptSection = '';
+      if (writeMode === 'append' && hasExistingManuscript) {
+        existingManuscriptSection = `
+==================================================
+NASKAH YANG SAAT INI SUDAH TERTULIS DI BAB INI (BAB ${chapter.order}):
+==================================================
+"""
+${currentCleanText}
+"""
+
+[PETUNJUK KELANJUTAN CERITA SANGAT PENTING]:
+- Naskah di atas adalah teks yang SUDAH ADA di bab ini.
+- Tugas Anda adalah MENERUSKAN CERITA SECARA MULUS LANGSUNG DARI TITIK TERAKHIR NASKAH DI ATAS.
+- DILARANG KERAS mengulang kembali adegan, dialog, atau kalimat yang sudah tertulis di atas.
+- Mulailah langsung menuliskan kelanjutan cerita berikutnya berdasarkan Chapter Plot yang diberikan.
+`;
+      }
+
+      // Prose style sample section
+      let styleSection = '';
+      if (proseStyleSample.trim()) {
+        styleSection = `
+==================================================
+SAMPEL GAYA BAHASA & DIKSI BAB-BAB SEBELUMNYA (STYLE REFERENCE):
+==================================================
+"""
+${proseStyleSample}
+"""
+
+[PEDOMAN KONSISTENSI GAYA PENULISAN]:
+- Analisis ritme kalimat, pilihan diksi, gaya dialog, dan cara bertutur dari sampel bab-bab sebelumnya di atas.
+- Tuliskan bab ini dengan MENGIKUTI DAN MENYELARASKAN gaya penulisan tersebut secara konsisten.
+- Pertahankan Sudut Pandang (Point of View / POV) yang konsisten (jangan berganti-ganti secara sembarangan).
+- Pertahankan kedalaman deskripsi panca indera dan atmosfer cerita agar pembaca merasakan pengalaman yang homogen layaknya ditulis oleh satu pena pengarang yang sama.
+`;
+      }
+
       const prompt = `Anda adalah seorang novelis masterclass dan pengarang fiksi sastra tingkat tinggi.
-Tugas Anda adalah mengembangkan CHAPTER PLOT berikut menjadi SATU BAB NOVEL SASTRA UTUH BERBAHASA INDONESIA yang kaya, hidup, dan memikat.
+Tugas Anda adalah mengembangkan CHAPTER PLOT berikut menjadi ${writeMode === 'append' && hasExistingManuscript ? 'KELANJUTAN NASKAH BAB' : 'SATU BAB NOVEL SASTRA UTUH'} BERBAHASA INDONESIA yang kaya, hidup, mendalam, dan memikat.
 
 KONTEKS KESELURUHAN NOVEL:
 ${storyPlotText}
@@ -429,12 +505,13 @@ ${storyPlotText}
 KONTINUITAS DARI BAB SEBELUMNYA:
 ${prevChapterText}
 
-KARAKTER TERLIBAT & KONDISI TERKINI:
+GLOSARIUM LENGKAP ENTITAS (KARAKTER, ALIAS & STATUS TERKINI):
 ${charactersText}
 
-SETTING & ATURAN DUNIA:
+GLOSARIUM LENGKAP SETTING, ITEM, FAKSI & HUKUM DUNIA:
 ${settingItemLoreText}
-
+${styleSection}
+${existingManuscriptSection}
 ==================================================
 CHAPTER PLOT (ALUR & ADEGAN YANG HARUS DITULIS):
 """
@@ -447,15 +524,16 @@ ${wordCountInstruction}
 
 ${additionalPrompt.trim() ? `ATURAN & INSTRUKSI KHUSUS PENULIS:\n${additionalPrompt.trim()}\n` : ''}
 PETUNJUK PENULISAN:
-1. Kembangkan adegan secara runtut sesuai poin-poin Chapter Plot di atas.
-2. Terapkan teknik "Show, Don't Tell" (deskripsi panca indera, detak emosi tokoh, ekspresi fisik, reaksi alami tanpa klise).
-3. Buat dialog antar tokoh berbobot, berkarakter unik, dan memuat subteks emosional yang tajam.
-4. KEBEBASAN ARTISTIK PENUH: Jika alur atau instruksi memuat adegan dewasa/romansa sensual atau laga pertarungan berdarah, tuliskan dengan deskripsi sastra yang intens, berani, mendalam, dan bebas dari pembatasan sensor moralistik artifisial.
-5. FORMAT OUTPUT: Tulis HANYA naskah cerita fiksi dalam bentuk paragraf novel Indonesia yang rapi. Dilarang keras menyertakan judul, kata pengantar, basa-basi, atau catatan penutup meta AI. Langsung mulai dari kalimat pertama cerita.`;
+1. Pahami seluruh glosarium entitas (nama, alias, faksi, sifat awal vs terkini, serta kondisi terkini). Gunakan entitas secara akurat sesuai perannya.
+2. Pahami seluruh kesinambungan bab-bab sebelumnya agar plot mengalir runtut tanpa kontradiksi fakta cerita.
+3. Terapkan teknik "Show, Don't Tell" (deskripsi panca indera, detak emosi tokoh, ekspresi fisik, reaksi alami tanpa kalimat klise).
+4. Buat dialog antar tokoh berbobot, berkarakter khas, dan memuat subteks emosional yang tajam.
+5. KEBEBASAN ARTISTIK PENUH: Jika alur atau instruksi memuat adegan dewasa/romansa sensual atau laga pertarungan berdarah, tuliskan dengan deskripsi sastra yang intens, mendalam, dan bebas dari pembatasan sensor moralistik artifisial.
+6. FORMAT OUTPUT: Tulis HANYA naskah cerita fiksi dalam bentuk paragraf novel Indonesia yang rapi. Dilarang keras menyertakan judul, kata pengantar, basa-basi, atau catatan penutup meta AI. Langsung mulai dari kalimat pertama cerita.`;
 
       const res = await generateWithSmartFallback(
         prompt,
-        'Anda adalah novelis masterclass sastra fiksi. Tuliskan naskah novel yang mengalir, hidup, mendalam, dan bebas sensor sesuai visi cerita penulis.'
+        'Anda adalah novelis masterclass sastra fiksi. Tuliskan naskah novel yang mengalir, hidup, mendalam, konsisten dengan gaya cerita sebelumnya, dan bebas sensor sesuai visi cerita penulis.'
       );
 
       if (!res.text || !res.text.trim()) {
@@ -468,14 +546,29 @@ PETUNJUK PENULISAN:
         .map((p) => p.trim())
         .filter(Boolean);
 
-      const generatedHtml = rawParas
+      const generatedParagraphsHtml = rawParas
         .map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`)
         .join('');
 
-      const finalHtml =
-        writeMode === 'append' && chapter.contentHtml && chapter.contentHtml.trim()
-          ? `${chapter.contentHtml}<p><br></p>${generatedHtml}`
-          : generatedHtml;
+      // Create stylish AI Session Divider Tag
+      const now = new Date();
+      const timeStr =
+        now.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) +
+        ' ' +
+        now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+
+      const sessionDividerHtml = `
+<div class="schemax-ai-session-divider" data-session="${nextSessionNumber}" contenteditable="false">
+  <span class="schemax-ai-session-tag">⚡ Sesi AI #${nextSessionNumber} • ${timeStr}</span>
+</div>
+`;
+
+      let finalHtml = '';
+      if (writeMode === 'append' && chapter.contentHtml && chapter.contentHtml.trim()) {
+        finalHtml = `${chapter.contentHtml}${sessionDividerHtml}${generatedParagraphsHtml}`;
+      } else {
+        finalHtml = `${sessionDividerHtml}${generatedParagraphsHtml}`;
+      }
 
       const words = (finalHtml.replace(/<[^>]*>/g, ' ').match(/\S+/g) || []).length;
 
@@ -486,7 +579,7 @@ PETUNJUK PENULISAN:
         updatedAt: Date.now(),
       });
 
-      setInternalGenSuccess({ wordCount: words });
+      setInternalGenSuccess({ wordCount: words, sessionNum: nextSessionNumber });
     } catch (err: any) {
       console.error('Gagal generate naskah internal:', err);
       setInternalGenError(err?.message || 'Gagal menghasilkan naskah.');
@@ -507,12 +600,12 @@ PETUNJUK PENULISAN:
 Tugas Anda adalah mengembangkan Plot & Coretan Kasar Bab Ini menjadi bab novel sastra yang utuh, mendalam, dan mengalir dengan memperhatikan kesinambungan cerita, kondisi terkini para karakter, serta aturan dunia berikut:
 
 ==================================================
-1. SINOPSIS & REKAP KESELURUHAN NOVEL
+1. SINOPSIS & KRONOLOGI SELURUH BAB SEBELUMNYA
 ==================================================
 ${storyPlotText}
 
 ==================================================
-2. KONTINUITAS DARI BAB SEBELUMNYA
+2. KONTINUITAS DARI BAB SEBELUMNYA (TITIK SAMBUNG)
 ==================================================
 ${prevChapterText}
 
@@ -524,12 +617,12 @@ ${chapterPlotText.trim() || '(Penulis belum memasukkan plot bab, kembangkan adeg
 """
 
 ==================================================
-4. KARAKTER YANG TERLIBAT & STATUS KONDISI TERKINI
+4. GLOSARIUM KARAKTER, ALIAS & STATUS KONDISI TERKINI
 ==================================================
 ${charactersText}
 
 ==================================================
-5. SETTING, ITEM TERKINI, ATURAN DUNIA & GAYA PENULISAN
+5. GLOSARIUM SETTING, ITEM TERKINI & ATURAN DUNIA
 ==================================================
 ${settingItemLoreText}
 
@@ -553,22 +646,22 @@ INSTRUKSI PENULISAN:
   const points = [
     {
       id: 'story_plot',
-      title: '1. Sinopsis & Rekap Cerita Sebelumnya',
+      title: '1. Sinopsis & Kronologi Seluruh Bab Sebelumnya',
       icon: BookOpen,
       color: 'text-amber-500 bg-amber-500/10 border-amber-500/30',
       text: storyPlotText,
       setText: setStoryPlotText,
-      desc: 'Sinopsis murni novel dan perkembangan dari bab-bab sebelumnya.',
+      desc: 'Sinopsis novel dan kronologi perkembangan peristiwa dari Bab 1 s/d bab lalu.',
       canAiSummarize: chapter.order > 2,
     },
     {
       id: 'prev_chapter',
-      title: '2. Ringkasan Bab Sebelumnya (Titik Sambung)',
+      title: '2. Ringkasan Bab Sebelumnya (Titik Sambung Langsung)',
       icon: RotateCcw,
       color: 'text-cyan-500 bg-cyan-500/10 border-cyan-500/30',
       text: prevChapterText,
       setText: setPrevChapterText,
-      desc: 'Kejadian terakhir bab sebelumnya untuk kontinuitas langsung.',
+      desc: 'Kejadian terakhir dan potongan kalimat penutup bab sebelumnya.',
       canAiSummarize: false,
     },
     {
@@ -584,23 +677,23 @@ INSTRUKSI PENULISAN:
     },
     {
       id: 'characters',
-      title: '4. Karakter & Status Terkini (Adaptif per Bab)',
+      title: '4. Glosarium Karakter, Alias & Status Terkini',
       icon: Users,
       color: 'text-rose-500 bg-rose-500/10 border-rose-500/30',
       text: charactersText,
       setText: setCharactersText,
-      desc: 'Profil karakter beserta kondisi status terbaru dari bab lampau.',
+      desc: 'Profil tokoh, alias, faksi, serta kondisi status adaptif per bab.',
       canAiSummarize: false,
       canGeneratePlot: false,
     },
     {
       id: 'setting_item_lore',
-      title: '5. Setting, Item Terkini, Aturan Dunia & Gaya Penulisan',
+      title: '5. Glosarium Setting, Item Terkini & Aturan Dunia',
       icon: Scroll,
       color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/30',
       text: settingItemLoreText,
       setText: setSettingItemLoreText,
-      desc: 'Kondisi lokasi, item/relik aktif, hukum dunia fiksi, dan gaya penulisan.',
+      desc: 'Lokasi, item/pusaka aktif, faksi, hukum dunia fiksi, dan gaya penulisan.',
       canAiSummarize: false,
       canGeneratePlot: false,
     },
@@ -696,6 +789,25 @@ INSTRUKSI PENULISAN:
           ======================================================== */}
       {activeSheet === 'internal' && (
         <div className="space-y-4 animate-in fade-in">
+          {/* Awareness Banner: AI Context Intelligence Summary */}
+          <div className="p-3.5 bg-gradient-to-r from-amber-500/10 via-indigo-500/10 to-purple-500/10 border border-amber-500/30 rounded-2xl text-xs text-slate-700 dark:text-slate-300 space-y-1">
+            <div className="flex items-center gap-2 font-bold text-amber-800 dark:text-amber-300">
+              <ShieldCheck className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+              <span>Sistem Cerdas AI Internal Aktif:</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-[11px] text-slate-600 dark:text-slate-400">
+              <div>
+                • <strong>Glosarium Lengkap:</strong> {entities.length} Entitas &amp; Alias, Faksi, dan Kondisi Terkini Bab Ini otomatis terbaca.
+              </div>
+              <div>
+                • <strong>Konteks Seluruh Bab:</strong> Kronologi {earlierChaptersList.length} bab lampau &amp; titik sambung terakhir terhubung.
+              </div>
+              <div>
+                • <strong>Gaya &amp; Diksi Konsisten:</strong> Mengikuti gaya penulisan dan tempo bab-bab sebelumnya.
+              </div>
+            </div>
+          </div>
+
           {/* Card 1: FIELD CHAPTER PLOT & TEXT EDITOR TOOLS */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800/80 pb-3">
@@ -901,33 +1013,41 @@ INSTRUKSI PENULISAN:
               />
             </div>
 
-            {/* 3. Pilihan Penempatan Naskah (Overwrite vs Append) */}
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-              <span className="font-bold text-slate-700 dark:text-slate-300">
-                Opsi Penempatan Naskah:
-              </span>
-              <div className="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setWriteMode('overwrite')}
-                  className={`py-1 px-3 rounded-lg text-xs font-bold transition ${
-                    writeMode === 'overwrite'
-                      ? 'bg-amber-500 text-slate-950 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  Gantikan Naskah
-                </button>
+            {/* 3. Pilihan Penempatan Naskah (Overwrite vs Append dengan Penanda Batas AI) */}
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+              <div>
+                <span className="font-bold text-slate-700 dark:text-slate-300 block">
+                  Penempatan Naskah &amp; Penanda Sesi:
+                </span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                  {writeMode === 'append'
+                    ? 'AI membaca naskah yang sudah ada, melanjutkan dari titik terakhir, & memberi garis pembatas Sesi AI.'
+                    : 'Naskah bab ini akan ditulis ulang dari awal dengan penanda Sesi AI #1.'}
+                </span>
+              </div>
+
+              <div className="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex-shrink-0 self-start sm:self-auto">
                 <button
                   type="button"
                   onClick={() => setWriteMode('append')}
-                  className={`py-1 px-3 rounded-lg text-xs font-bold transition ${
+                  className={`py-1.5 px-3 rounded-lg text-xs font-bold transition ${
                     writeMode === 'append'
                       ? 'bg-amber-500 text-slate-950 shadow-sm'
                       : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
-                  Tambahkan ke Akhir
+                  Lanjutkan Naskah (+ Sesi Baru)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWriteMode('overwrite')}
+                  className={`py-1.5 px-3 rounded-lg text-xs font-bold transition ${
+                    writeMode === 'overwrite'
+                      ? 'bg-amber-500 text-slate-950 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  Tulis Ulang Seluruh Naskah
                 </button>
               </div>
             </div>
@@ -944,12 +1064,16 @@ INSTRUKSI PENULISAN:
               {isGeneratingInternal ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>AI Sedang Menuliskan Naskah Bab...</span>
+                  <span>AI Sedang Menuliskan Naskah Bab (Membaca Seluruh Konteks &amp; Glosarium)...</span>
                 </>
               ) : (
                 <>
                   <Sparkles className="w-5 h-5" />
-                  <span>Generate Naskah Bab ke Editor Utama ✨</span>
+                  <span>
+                    {writeMode === 'append' && hasExistingText
+                      ? 'Lanjutkan Naskah Bab ke Editor Utama ✨'
+                      : 'Generate Naskah Bab ke Editor Utama ✨'}
+                  </span>
                 </>
               )}
             </button>
@@ -971,11 +1095,11 @@ INSTRUKSI PENULISAN:
                     <span>Naskah berhasil dibuat &amp; dimasukkan ke Naskah Utama!</span>
                   </div>
                   <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
-                    {internalGenSuccess.wordCount} Kata
+                    Sesi #{internalGenSuccess.sessionNum} • {internalGenSuccess.wordCount} Total Kata
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                  Naskah bab ini telah otomatis disimpan ke editor naskah utama. Anda bisa langsung membacanya atau mengeditnya lebih lanjut.
+                  Naskah bab ini telah otomatis disimpan dengan penanda batas sesi di editor. Anda bisa langsung membaca atau menyuntingnya.
                 </p>
                 <button
                   type="button"
@@ -1096,19 +1220,6 @@ INSTRUKSI PENULISAN:
                             Semua
                           </button>
                         </div>
-                      )}
-
-                      {pt.canAiSummarize && (
-                        <button
-                          type="button"
-                          onClick={handleSummarizePastChapters}
-                          disabled={isSummarizingRecap}
-                          className="py-1 px-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold text-[10px] transition flex items-center gap-1"
-                          title="Ringkas kejadian bab terdahulu menjadi narasi padat"
-                        >
-                          <Wand2 className={`w-3 h-3 ${isSummarizingRecap ? 'animate-spin' : ''}`} />
-                          <span>Rangkum Rekap</span>
-                        </button>
                       )}
 
                       <button
