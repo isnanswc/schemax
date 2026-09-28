@@ -2,35 +2,27 @@
   "name": "Schemax Story & Lore Studio",
   "short_name": "Schemax",
   "description": "Studio Penulisan Novel & Worldbuilding Berbasis AI – Offline-First",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "orientation": "portrait-primary",
+  "orientation": "portrait",
   "background_color": "#030712",
   "theme_color": "#030712",
   "lang": "id",
   "categories": ["productivity", "books"],
   "icons": [
     {
-      "src": "/icon-512.svg",
-      "sizes": "any",
+      "src": "./icon-512.svg",
+      "sizes": "192x192 512x512",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/icon-512.svg",
-      "sizes": "any",
+      "src": "./icon-512.svg",
+      "sizes": "192x192 512x512",
       "type": "image/svg+xml",
       "purpose": "maskable"
     }
-  ],
-  "shortcuts": [
-    {
-      "name": "Tulis Baru",
-      "short_name": "Tulis",
-      "description": "Mulai menulis bab baru",
-      "url": "/",
-      "icons": [{ "src": "/icon-512.svg", "sizes": "any" }]
-    }
   ]
 }
+
