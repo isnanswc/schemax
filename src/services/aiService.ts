@@ -538,6 +538,20 @@ export async function generateWithSmartFallback(
           `[Schemax AI Fallback] ${slot.provider.toUpperCase()} (${slot.label}) model "${model}" gagal: ${errorMessage}. Mencoba fallback berikutnya...`
         );
 
+        // Jika error adalah KUOTA HABIS (429 / RESOURCE_EXHAUSTED / quota exceeded),
+        // seluruh model pada API Key slot ini pasti akan gagal juga.
+        // Langsung BREAK loop model untuk slot ini dan lompat ke API Key slot berikutnya!
+        const isQuotaExceeded =
+          errorMessage.includes('429') ||
+          errorMessage.toLowerCase().includes('resource_exhausted') ||
+          errorMessage.toLowerCase().includes('quota') ||
+          errorMessage.toLowerCase().includes('rate limit');
+
+        if (isQuotaExceeded) {
+          console.warn(`[Schemax AI Fallback] Kuota API habis pada ${slot.label}. Melompati sisa model dan beralih ke slot API berikutnya...`);
+          break;
+        }
+
         // Jika terkena PROHIBITED_CONTENT pada Gemini, seluruh model Gemini akan menolaknya karena prompt dicegat di Google Gateway.
         // Langsung lewati slot Gemini ini agar lekas beralih ke slot provider Groq yang bebas filter.
         if (slot.provider === 'gemini' && errorMessage.includes('PROHIBITED_CONTENT')) {

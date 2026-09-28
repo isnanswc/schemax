@@ -195,7 +195,10 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
     }
 
     setTestingSlotId(slot.id);
-    const primaryModel = currentGlobalConfig.fallbackModels[0];
+    const primaryModel =
+      currentGlobalConfig.fallbackModels[0] ||
+      (currentGlobalConfig.cachedModels && currentGlobalConfig.cachedModels[0]?.id) ||
+      (slot.provider === 'gemini' ? 'gemini-2.5-flash' : 'llama-3.3-70b-versatile');
     const result = await testSlotConnection(slot, primaryModel);
     setTestingSlotId(null);
 
