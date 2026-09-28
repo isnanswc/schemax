@@ -333,11 +333,11 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
 
       {/* 2. RINGKASAN BAB (AI SUMMARY = PREMIS & CERITA SINGKAT) */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 flex-wrap">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                <FileText className="w-4 h-4 text-amber-500" />
+                <FileText className="w-4 h-4 text-amber-500 flex-shrink-0" />
                 <span>Ringkasan Isi Bab</span>
               </h3>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
@@ -349,7 +349,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
             {summary && (
               <button
                 type="button"
@@ -419,10 +419,10 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
 
       {/* 3. AUTO PLOT 4-ACT BREAKDOWN */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div className="min-w-0 flex-1">
             <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-              <Zap className="w-4 h-4 text-indigo-500" />
+              <Zap className="w-4 h-4 text-indigo-500 flex-shrink-0" />
               <span>Auto Plot 4-Babak Dramatis</span>
             </h3>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
@@ -434,7 +434,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
             type="button"
             onClick={handleGeneratePlot}
             disabled={isGeneratingPlot || isGeneratingAll}
-            className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-gradient-to-r from-indigo-500/15 to-purple-500/15 hover:from-indigo-500/25 hover:to-purple-500/25 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 text-xs font-bold transition active:scale-95 disabled:opacity-50 flex-shrink-0"
+            className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-gradient-to-r from-indigo-500/15 to-purple-500/15 hover:from-indigo-500/25 hover:to-purple-500/25 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 text-xs font-bold transition active:scale-95 disabled:opacity-50 self-start sm:self-auto flex-shrink-0"
             title="Analisis dan petakan struktur plot dramatis"
           >
             {isGeneratingPlot ? (

@@ -752,6 +752,7 @@ ${afterHtml}
             entities={entities}
             onUpdateChapter={handleUpdateChapterFields}
             onNavigateToManuscript={() => handleTabChange('manuscript')}
+            onNavigateToGlossary={() => handleTabChange('glossary')}
           />
         )}
 

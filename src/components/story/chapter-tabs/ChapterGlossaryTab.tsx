@@ -1560,20 +1560,31 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
                                 </span>
                               )}
 
-                              {ent.condition && (
+                              {/* Chapter-Specific Condition vs Global Condition */}
+                              {chapter.chapterEntityStates?.[ent.id]?.condition ? (
                                 <span
-                                  className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full border ${
+                                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${
+                                    getConditionMeta(chapter.chapterEntityStates[ent.id].condition).badgeClass
+                                  }`}
+                                  title={`Kondisi khusus Bab ${chapter.order}: ${chapter.chapterEntityStates[ent.id].conditionDetails || chapter.chapterEntityStates[ent.id].condition}`}
+                                >
+                                  {getConditionMeta(chapter.chapterEntityStates[ent.id].condition).emoji} Bab {chapter.order}: {getConditionMeta(chapter.chapterEntityStates[ent.id].condition).shortLabel}
+                                </span>
+                              ) : ent.condition ? (
+                                <span
+                                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${
                                     getConditionMeta(ent.condition).badgeClass
                                   }`}
+                                  title={`Kondisi global entitas: ${ent.condition}`}
                                 >
                                   {getConditionMeta(ent.condition).emoji} {getConditionMeta(ent.condition).shortLabel}
                                 </span>
-                              )}
+                              ) : null}
                             </div>
 
                             <div className="flex items-center gap-1">
                               {isPresent && (
-                                <span className="text-[9px] font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded-full border border-amber-500/20">
+                                <span className="text-[9px] font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-full border border-amber-500/20">
                                   Di Bab Ini
                                 </span>
                               )}
@@ -1595,9 +1606,10 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
                         </div>
                       </div>
 
+                      {/* Prominent Alias Pill */}
                       {ent.aliases && ent.aliases.length > 0 && (
-                        <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 font-medium flex items-center gap-1 truncate">
-                          <Link2 className="w-2.5 h-2.5 flex-shrink-0" />
+                        <p className="text-[10px] text-amber-700 dark:text-amber-300 mt-1 font-semibold flex items-center gap-1 truncate bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/20 w-fit max-w-full">
+                          <Link2 className="w-3 h-3 flex-shrink-0 text-amber-500" />
                           <span className="truncate">Alias: {ent.aliases.join(', ')}</span>
                         </p>
                       )}
