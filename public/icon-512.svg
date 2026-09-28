@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDE047"/>
+      <stop offset="50%" stop-color="#F59E0B"/>
+      <stop offset="100%" stop-color="#D97706"/>
+    </linearGradient>
+    <linearGradient id="c" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#06B6D4"/>
+      <stop offset="50%" stop-color="#818CF8"/>
+      <stop offset="100%" stop-color="#C084FC"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Dark Background with Rounded Corners -->
+  <rect width="512" height="512" rx="112" fill="#030712"/>
+
+  <!-- Subtle grid background texture -->
+  <rect width="512" height="512" rx="112" fill="url(#g)" opacity="0.04"/>
+
+  <!-- BLUEPRINT MATRIX NODES (scaled to 512px) -->
+  <g stroke="url(#c)" stroke-width="6" opacity="0.8" stroke-linecap="round">
+    <path d="M 236 390 L 400 390 L 400 225 Z" fill="none" stroke-dasharray="10 10"/>
+    <line x1="236" y1="390" x2="400" y2="225" stroke-width="5"/>
+    <line x1="318" y1="390" x2="400" y2="307" stroke-width="4" opacity="0.7"/>
+    <line x1="318" y1="225" x2="318" y2="390" stroke-width="4" stroke-dasharray="8 8"/>
+    <circle cx="400" cy="225" r="11" fill="#818CF8"/>
+    <circle cx="400" cy="390" r="11" fill="#06B6D4"/>
+    <circle cx="236" cy="390" r="10" fill="#C084FC"/>
+    <circle cx="318" cy="307" r="9" fill="#F59E0B"/>
+    <circle cx="359" cy="266" r="6" fill="#818CF8" opacity="0.9"/>
+    <circle cx="277" cy="348" r="6" fill="#06B6D4" opacity="0.9"/>
+  </g>
+
+  <!-- GOLDEN QUILL FEATHER - Left Vane -->
+  <path
+    d="M 348 103 C 328 133 246 195 195 267 C 174 292 164 328 154 358 C 174 338 205 328 231 328 C 210 292 246 230 292 190 C 318 164 344 138 348 103 Z"
+    fill="url(#g)"
+  />
+
+  <!-- GOLDEN QUILL FEATHER - Right Vane -->
+  <path
+    d="M 348 103 C 348 138 323 179 297 210 C 271 241 246 271 231 328 C 267 323 303 297 328 267 C 344 241 354 210 348 103 Z"
+    fill="url(#g)"
+    opacity="0.88"
+  />
+
+  <!-- Feather Central Spine (White) -->
+  <path
+    d="M 354 97 Q 266 215 154 358 L 133 394 C 133 394 143 384 159 374 Q 277 225 359 102 Z"
+    fill="#FFFBEB"
+  />
+
+  <!-- Nib Collar Ring -->
+  <path
+    d="M 143 369 L 169 379 L 159 394 L 133 384 Z"
+    fill="#F59E0B"
+  />
+
+  <!-- Pen Nib -->
+  <path
+    d="M 138 379 L 107 420 C 104 424 108 428 112 425 L 154 394 L 138 379 Z"
+    fill="url(#g)"
+  />
+
+  <!-- Nib center slit -->
+  <line x1="109" y1="423" x2="130" y2="392" stroke="#451A03" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Ink spark at nib tip -->
+  <circle cx="107" cy="424" r="8" fill="#FFFFFF" opacity="0.95"/>
+  <circle cx="107" cy="424" r="4" fill="#FDE047" opacity="0.8"/>
+</svg>

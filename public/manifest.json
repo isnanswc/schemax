@@ -1,16 +1,36 @@
 {
   "name": "Schemax Story & Lore Studio",
   "short_name": "Schemax",
-  "description": "Studio Penulisan Novel & Worldbuilding Offline-First",
-  "start_url": "./",
+  "description": "Studio Penulisan Novel & Worldbuilding Berbasis AI – Offline-First",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#030712",
   "theme_color": "#030712",
+  "lang": "id",
+  "categories": ["productivity", "books"],
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>",
-      "sizes": "192x192 512x512",
-      "type": "image/svg+xml"
+      "src": "/icon-512.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Tulis Baru",
+      "short_name": "Tulis",
+      "description": "Mulai menulis bab baru",
+      "url": "/",
+      "icons": [{ "src": "/icon-512.svg", "sizes": "any" }]
     }
   ]
 }
