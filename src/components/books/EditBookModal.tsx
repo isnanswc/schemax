@@ -4,6 +4,7 @@ import { Book, BookStatus } from '../../types';
 import { db, saveMediaItem } from '../../db';
 import { BookCoverImage } from './BookCoverImage';
 import { generateWithSmartFallback } from '../../services/aiService';
+import { AIGenerationEvent } from '../../types/ai';
 import { navStack } from '../../services/backNavigationService';
 
 interface EditBookModalProps {
@@ -44,6 +45,7 @@ export const EditBookModal: React.FC<EditBookModalProps> = ({
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+  const [activeAttempt, setActiveAttempt] = useState<AIGenerationEvent | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiSuccessMessage, setAiSuccessMessage] = useState<string | null>(null);
 
@@ -156,12 +158,15 @@ Instruksi Penulisan:
       const systemPrompt =
         'Anda adalah asisten editor novel dan copywriter buku profesional berbahasa Indonesia.';
 
-      const result = await generateWithSmartFallback(prompt, systemPrompt);
+      setActiveAttempt(null);
+      const result = await generateWithSmartFallback(prompt, systemPrompt, (event) => {
+        setActiveAttempt(event);
+      });
 
       if (result && result.text) {
         setSynopsis(result.text.trim());
         setAiSuccessMessage(
-          `✨ Sinopsis berhasil dirancang dari ${sourceChapters.length} bab (${result.provider.toUpperCase()} / ${result.model})!`
+          `✨ Sinopsis berhasil dirancang dari ${sourceChapters.length} bab via [${result.provider.toUpperCase()}] ${result.slotLabel} • ${result.model}!`
         );
       }
     } catch (err: any) {
@@ -169,6 +174,7 @@ Instruksi Penulisan:
       setAiError(err.message || 'Gagal menghubungi AI. Pastikan API key sudah dikonfigurasi di AI Config.');
     } finally {
       setIsGeneratingAi(false);
+      setTimeout(() => setActiveAttempt(null), 3000);
     }
   };
 
@@ -404,6 +410,21 @@ Instruksi Penulisan:
                 )}
               </button>
             </div>
+
+            {/* AI Live Attempt status banner */}
+            {isGeneratingAi && activeAttempt && (
+              <div className="p-2 mb-2 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/30 text-[11px] text-indigo-900 dark:text-indigo-200 flex items-center justify-between gap-2 animate-in fade-in">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="w-2 h-2 rounded-full bg-indigo-500 animate-ping flex-shrink-0" />
+                  <span className="truncate">
+                    Menganalisis bab via <strong>[{activeAttempt.provider.toUpperCase()}] {activeAttempt.slotLabel}</strong>
+                  </span>
+                </div>
+                <span className="font-mono text-[10px] text-indigo-700 dark:text-indigo-300 bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-500/30 truncate">
+                  {activeAttempt.model}
+                </span>
+              </div>
+            )}
 
             {/* AI Feedback alerts */}
             {aiSuccessMessage && (

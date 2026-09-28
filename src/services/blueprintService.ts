@@ -1,16 +1,35 @@
 import { StoryBlueprint } from '../types/blueprint';
 import { Book, WorldEntity, StoryChapter } from '../types';
 import { generateWithSmartFallback } from './aiService';
+import { AIGenerationEvent } from '../types/ai';
 import { db, saveMediaItem, createSvgBlob } from '../db';
+
+export interface BlueprintProgressInfo {
+  stage: 'compressing' | 'architecting' | 'parsing';
+  stageTitle: string;
+  stageSubtitle: string;
+  attempt?: AIGenerationEvent;
+}
+
+export type BlueprintProgressCallback = (info: BlueprintProgressInfo) => void;
 
 /**
  * Smart input preprocessing: If the idea text is very large (>5000 chars / ~3000+ words),
  * we first compress it into a structured summary via AI, then pass that summary as the
  * input for blueprint generation. This avoids token limit failures for large pastes.
  */
-async function preprocessLargeIdea(rawIdea: string): Promise<string> {
+async function preprocessLargeIdea(
+  rawIdea: string,
+  onProgress?: BlueprintProgressCallback
+): Promise<string> {
   // Under 5000 chars — send as-is
   if (rawIdea.length <= 5000) return rawIdea;
+
+  onProgress?.({
+    stage: 'compressing',
+    stageTitle: 'Meringkas Naskah / Premis Panjang...',
+    stageSubtitle: `Teks besar terdeteksi (${Math.round(rawIdea.length / 1000)}rb karakter). AI sedang mengekstrak inti cerita agar tidak melebihi kuota token.`,
+  });
 
   const summaryPrompt = `Ringkas dan ekstrak ELEMEN PENTING dari teks berikut menjadi sebuah premis cerita yang padat dan terstruktur. Fokus pada:
 1. Siapa tokoh utamanya (nama, hubungan antar tokoh, keluarga)
@@ -25,7 +44,14 @@ Keluarkan HANYA paragraf premis/ringkasan padat dalam Bahasa Indonesia tanpa jud
 
   const systemMsg = 'Anda adalah editor sastra yang ahli meringkas dan mengekstrak inti cerita dari teks panjang.';
   try {
-    const result = await generateWithSmartFallback(summaryPrompt, systemMsg);
+    const result = await generateWithSmartFallback(summaryPrompt, systemMsg, (event) => {
+      onProgress?.({
+        stage: 'compressing',
+        stageTitle: 'Meringkas Naskah / Premis Panjang...',
+        stageSubtitle: `Teks besar terdeteksi (${Math.round(rawIdea.length / 1000)}rb karakter). AI sedang mengekstrak inti cerita.`,
+        attempt: event,
+      });
+    });
     return `[DIKOMPRESI DARI TEKS PANJANG — ${rawIdea.length} KARAKTER]\n\n${result.text.trim()}`;
   } catch {
     // If compression fails, just truncate gracefully
@@ -34,7 +60,8 @@ Keluarkan HANYA paragraf premis/ringkasan padat dalam Bahasa Indonesia tanpa jud
 }
 
 export async function generateStoryBlueprint(
-  rawIdea: string
+  rawIdea: string,
+  onProgress?: BlueprintProgressCallback
 ): Promise<StoryBlueprint> {
 
   const systemPrompt = `Kamu adalah Arsitek Cerita Fiksi Tingkat Master (Master Story Architect & Worldbuilder).
@@ -158,7 +185,13 @@ WAJIB MERESPON HANYA DENGAN FORMAT JSON VALID:
 }`;
 
   // Preprocess: if idea is very long (naskah panjang / outline tebal), compress it first
-  const processedIdea = await preprocessLargeIdea(rawIdea);
+  const processedIdea = await preprocessLargeIdea(rawIdea, onProgress);
+
+  onProgress?.({
+    stage: 'architecting',
+    stageTitle: 'Merancang Blueprint Proyek Sastra...',
+    stageSubtitle: 'Menganalisis dinamika karakter, watak, latar dunia, relik, dan plot Bab 1.',
+  });
 
   const userPrompt = `Rancang Blueprint Proyek Cerita lengkap berdasarkan ide/premis mentah berikut:
 "${processedIdea}"
@@ -171,8 +204,20 @@ Instruksi Analisa Cerdas:
 - Tentukan gaya penulisan (writingStyle) yang paling cocok: bisa sastra puitis, emosional realistis, modern kasual santai (slang lu-gua / diksi kekinian), atau nuansa kultural dialek daerah jika ide mengarah ke sana.
 - Respon HANYA teks JSON valid.`;
 
-  const response = await generateWithSmartFallback(userPrompt, systemPrompt);
+  const response = await generateWithSmartFallback(userPrompt, systemPrompt, (event) => {
+    onProgress?.({
+      stage: 'architecting',
+      stageTitle: 'Merancang Blueprint Proyek Sastra...',
+      stageSubtitle: 'Menganalisis dinamika karakter, watak, latar dunia, relik, dan plot Bab 1.',
+      attempt: event,
+    });
+  });
 
+  onProgress?.({
+    stage: 'parsing',
+    stageTitle: 'Memvalidasi & Mengurai Struktur Blueprint...',
+    stageSubtitle: 'Menyusun karakter, relasi, dan bab ke format database lokal.',
+  });
 
   let cleanText = response.text.trim();
   if (cleanText.startsWith('```json')) {

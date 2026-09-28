@@ -10,6 +10,7 @@ import {
 } from '../../types';
 import { db } from '../../db';
 import { autoMapWorldEntities, AutoMapResult } from '../../services/aiService';
+import { AIGenerationEvent } from '../../types/ai';
 import { getConditionMeta, ENTITY_CONDITIONS } from './entityConditionMeta';
 import { getRelationshipMeta, RELATIONSHIP_META } from './relationshipMeta';
 import { EntityImagePickerModal } from './EntityImagePickerModal';
@@ -102,6 +103,8 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
 
   // Modals & Popups
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [activeAiAttempt, setActiveAiAttempt] = useState<AIGenerationEvent | null>(null);
+  const [aiStatusMessage, setAiStatusMessage] = useState<string>('');
   const [aiPreviewData, setAiPreviewData] = useState<AutoMapResult | null>(null);
   const [isAddRelationOpen, setIsAddRelationOpen] = useState(false);
   const [imagePickerEntity, setImagePickerEntity] = useState<WorldEntity | null>(null);
@@ -408,18 +411,38 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
     }
 
     setIsAiLoading(true);
+    setActiveAiAttempt(null);
+    setAiStatusMessage('Menghubungkan ke AI untuk menganalisis relasi, faksi, dan kondisi entitas...');
     try {
       const storyContext = activeChapter
         ? `Bab Ini: "${activeChapter.title}"\nPremis: ${activeChapter.premise || ''}\nNaskah Cerita Bab:\n${(activeChapter.contentHtml || '').replace(/<[^>]*>/g, ' ').slice(0, 10000)}`
         : undefined;
 
-      const result = await autoMapWorldEntities(bookTitle, entities, storyContext);
+      const result = await autoMapWorldEntities(
+        bookTitle,
+        entities,
+        storyContext,
+        (event) => {
+          setActiveAiAttempt(event);
+          if (event.status === 'attempt') {
+            setAiStatusMessage(`Sedang memetakan via [${event.provider.toUpperCase()}] ${event.slotLabel} • ${event.model}...`);
+          } else if (event.status === 'fallback') {
+            setAiStatusMessage(`⚠️ Gagal pada ${event.slotLabel} (${event.model}), beralih fallback berikutnya...`);
+          } else if (event.status === 'success') {
+            setAiStatusMessage(`Selesai dianalisis oleh ${event.slotLabel} • ${event.model} (${event.latencyMs}ms)`);
+          }
+        }
+      );
       setAiPreviewData(result);
     } catch (err: any) {
       console.error('Auto map failed:', err);
       alert(`Gagal menjalankan Auto-Map AI: ${err?.message || 'Periksa API Key Gemini Anda.'}`);
     } finally {
       setIsAiLoading(false);
+      setTimeout(() => {
+        setActiveAiAttempt(null);
+        setAiStatusMessage('');
+      }, 4000);
     }
   };
 
@@ -785,6 +808,32 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
             </div>
           </div>
         </div>
+
+        {/* 🚀 Real-time AI Status Indicator Bar for Auto-Map */}
+        {(isAiLoading || aiStatusMessage) && (
+          <div className="p-2.5 rounded-xl bg-pink-500/10 border border-pink-500/30 text-xs text-pink-900 dark:text-pink-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 animate-in fade-in">
+            <div className="flex items-center gap-2 min-w-0">
+              {isAiLoading && <span className="w-2 h-2 rounded-full bg-pink-500 animate-ping flex-shrink-0" />}
+              <span className="font-semibold truncate">
+                {aiStatusMessage || 'Sedang menganalisis relasi entitas & faksi...'}
+              </span>
+            </div>
+            {activeAiAttempt && (
+              <div className="flex items-center gap-1.5 text-[11px] font-mono bg-white/70 dark:bg-slate-900/80 px-2 py-0.5 rounded-lg border border-pink-500/20 flex-shrink-0 self-start sm:self-auto">
+                <span className="font-black text-pink-600 dark:text-pink-400">
+                  [{activeAiAttempt.provider.toUpperCase()}]
+                </span>
+                <span className="text-slate-700 dark:text-slate-300 truncate max-w-[140px]">
+                  {activeAiAttempt.slotLabel}
+                </span>
+                <span className="text-slate-400">•</span>
+                <span className="text-pink-600 dark:text-pink-300 font-bold truncate max-w-[170px]">
+                  {activeAiAttempt.model}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Main Interactive Map Viewport */}

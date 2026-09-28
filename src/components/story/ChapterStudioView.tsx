@@ -59,6 +59,7 @@ import {
   enhanceRawToProse,
   detectEntitiesAndAliases,
 } from '../../services/aiService';
+import { AIGenerationEvent } from '../../types/ai';
 
 interface ChapterStudioViewProps {
   chapter: StoryChapter;
@@ -120,6 +121,7 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
   // 3. AI Studio States (Atomic progress & states to avoid overwriting)
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [generateAllStep, setGenerateAllStep] = useState<string>('');
+  const [activeAiAttempt, setActiveAiAttempt] = useState<AIGenerationEvent | null>(null);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [isGeneratingPlot, setIsGeneratingPlot] = useState(false);
   const [isGeneratingScenes, setIsGeneratingScenes] = useState(false);
@@ -528,12 +530,16 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
     try {
       // Step 1: Summary
       setGenerateAllStep('1/4 Meringkas naskah cerita bab...');
-      const summary = await generateChapterSummary(chapter.title, book.title, text || premiseText);
+      const summary = await generateChapterSummary(chapter.title, book.title, text || premiseText, (event) => {
+        setActiveAiAttempt(event);
+      });
       await db.chapters.update(chapter.id, { aiSummary: summary, updatedAt: Date.now() });
 
       // Step 2: Plot
       setGenerateAllStep('2/4 Memetakan 4 dinamika struktur plot...');
-      const plot = await generateChapterAutoPlot(chapter.title, book.title, text, premiseText);
+      const plot = await generateChapterAutoPlot(chapter.title, book.title, text, premiseText, (event) => {
+        setActiveAiAttempt(event);
+      });
       await db.chapters.update(chapter.id, { aiPlot: plot, updatedAt: Date.now() });
 
       // Step 3: Scenes
@@ -544,13 +550,18 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
         book.title,
         text || premiseText,
         existingEntities,
-        imagePromptSettings
+        imagePromptSettings,
+        (event) => {
+          setActiveAiAttempt(event);
+        }
       );
       await db.chapters.update(chapter.id, { aiScenes: scenes, updatedAt: Date.now() });
 
       // Step 4: Entities & Aliases
       setGenerateAllStep('4/4 Memindai entitas baru & alias...');
-      const detected = await detectEntitiesAndAliases(text || premiseText, book.title, existingEntities);
+      const detected = await detectEntitiesAndAliases(text || premiseText, book.title, existingEntities, (event) => {
+        setActiveAiAttempt(event);
+      });
       await db.chapters.update(chapter.id, { aiDetectedEntities: detected, updatedAt: Date.now() });
 
       // Fetch fresh record from DB so state is 100% synchronized
@@ -566,6 +577,7 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
     } finally {
       setIsGeneratingAll(false);
       setGenerateAllStep('');
+      setActiveAiAttempt(null);
     }
   };
 
@@ -1320,9 +1332,14 @@ export const ChapterStudioView: React.FC<ChapterStudioViewProps> = ({
                 >
                   {isGeneratingAll ? (
                     <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-200" />
-                      <span className="text-[11px] truncate max-w-[170px]">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-200 flex-shrink-0" />
+                      <span className="text-[11px] truncate max-w-[280px]">
                         {generateAllStep || 'Menganalisis...'}
+                        {activeAiAttempt && (
+                          <span className="font-mono text-[9px] opacity-90 ml-1.5 bg-black/25 px-1 py-0.5 rounded">
+                            {activeAiAttempt.slotLabel}: {activeAiAttempt.model}
+                          </span>
+                        )}
                       </span>
                     </>
                   ) : (

@@ -49,6 +49,7 @@ import {
   analyzeImageWithVision,
   ImageVisionAnalysis
 } from '../../../services/aiService';
+import { AIGenerationEvent } from '../../../types/ai';
 import { WorldEntityHologramModal } from '../../world/WorldEntityHologramModal';
 import { AddWorldEntityModal } from '../../world/AddWorldEntityModal';
 import { EntityImagePickerModal } from '../../world/EntityImagePickerModal';
@@ -162,6 +163,8 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
   // AI & Processing States
   const [isAnalyzingScenes, setIsAnalyzingScenes] = useState(false);
   const [isDetectingEntities, setIsDetectingEntities] = useState(false);
+  const [activeAiAttempt, setActiveAiAttempt] = useState<AIGenerationEvent | null>(null);
+  const [aiProcessStatus, setAiProcessStatus] = useState<string>('');
   const [isBatchRegistering, setIsBatchRegistering] = useState(false);
   const [isBatchUpdating, setIsBatchUpdating] = useState(false);
   const [registeringCandidateId, setRegisteringCandidateId] = useState<string | null>(null);
@@ -342,6 +345,8 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
     }
 
     setIsDetectingEntities(true);
+    setActiveAiAttempt(null);
+    setAiProcessStatus('Menghubungi AI untuk memindai entitas & alias dalam bab...');
     try {
       const detected = await detectWorldEntitiesInChapter(
         textToAnalyze,
@@ -355,7 +360,17 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
           currentTraits: e.currentTraits,
           condition: typeof e.condition === 'string' ? e.condition : undefined,
           evolutionSummary: e.evolutionSummary,
-        }))
+        })),
+        (event) => {
+          setActiveAiAttempt(event);
+          if (event.status === 'attempt') {
+            setAiProcessStatus(`Sedang memproses via [${event.provider.toUpperCase()}] ${event.slotLabel} - ${event.model}...`);
+          } else if (event.status === 'fallback') {
+            setAiProcessStatus(`⚠️ Kuota/Koneksi gagal pada ${event.slotLabel} (${event.model}), beralih fallback...`);
+          } else if (event.status === 'success') {
+            setAiProcessStatus(`Berhasil diproses oleh ${event.slotLabel} • ${event.model} (${event.latencyMs}ms)`);
+          }
+        }
       );
 
       if (detected && detected.length > 0) {
@@ -372,6 +387,10 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
       alert('Gagal mendeteksi entitas: ' + (err.message || 'Periksa API Key'));
     } finally {
       setIsDetectingEntities(false);
+      setTimeout(() => {
+        setActiveAiAttempt(null);
+        setAiProcessStatus('');
+      }, 4000);
     }
   };
 
@@ -936,7 +955,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
               {isDetectingEntities ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />
-                  <span>Memindai Naskah...</span>
+                  <span>Memindai Entitas...</span>
                 </>
               ) : (
                 <>
@@ -947,6 +966,32 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
             </button>
           </div>
         </div>
+
+        {/* 🚀 Real-time AI Status Indicator Bar */}
+        {(isDetectingEntities || aiProcessStatus) && (
+          <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-900 dark:text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 animate-in fade-in">
+            <div className="flex items-center gap-2 min-w-0">
+              {isDetectingEntities && <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping flex-shrink-0" />}
+              <span className="font-semibold truncate">
+                {aiProcessStatus || 'Sedang memproses pemindaian naskah bab...'}
+              </span>
+            </div>
+            {activeAiAttempt && (
+              <div className="flex items-center gap-1.5 text-[11px] font-mono bg-white/70 dark:bg-slate-900/80 px-2 py-0.5 rounded-lg border border-amber-500/20 flex-shrink-0 self-start sm:self-auto">
+                <span className="font-black text-amber-700 dark:text-amber-400">
+                  [{activeAiAttempt.provider.toUpperCase()}]
+                </span>
+                <span className="text-slate-700 dark:text-slate-300 truncate max-w-[140px]">
+                  {activeAiAttempt.slotLabel}
+                </span>
+                <span className="text-slate-400">•</span>
+                <span className="text-amber-600 dark:text-amber-300 font-bold truncate max-w-[170px]">
+                  {activeAiAttempt.model}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 📑 Clean 4-Tab Navigation Bar: Candidates merged inside Entitas */}
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1">

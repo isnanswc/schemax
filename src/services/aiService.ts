@@ -706,7 +706,8 @@ export function resilientParseJsonObject<T = any>(rawText: string): Record<strin
 export async function generateChapterSummary(
   chapterTitle: string,
   bookTitle: string,
-  contentText: string
+  contentText: string,
+  onAttempt?: (event: AIGenerationEvent) => void
 ): Promise<string> {
   const prompt = `Anda adalah asisten editor novel profesional. Rangkum inti naskah bab berikut ini secara jelas, padat, dan menarik dalam 1 sampai 2 paragraf.
 
@@ -721,7 +722,7 @@ Instruksi:
 - Tulis langsung teks rangkumannya dalam Bahasa Indonesia sastrawi tanpa kata pengantar atau judul tambahan.`;
 
   const systemPrompt = 'Anda adalah editor sastra profesional yang ahli merangkum isi cerita.';
-  const res = await generateWithSmartFallback(prompt, systemPrompt);
+  const res = await generateWithSmartFallback(prompt, systemPrompt, onAttempt);
   return res.text.trim();
 }
 
@@ -730,7 +731,8 @@ export async function generateChapterAutoPlot(
   chapterTitle: string,
   bookTitle: string,
   contentText: string,
-  premise?: string
+  premise?: string,
+  onAttempt?: (event: AIGenerationEvent) => void
 ): Promise<{ hook: string; risingAction: string; climax: string; resolution: string }> {
   const prompt = `Analisis atau petakan alur struktur plot untuk bab berikut ini menjadi 4 komponen dramatik:
 1. Hook (Pemicu / Awal bab yang memikat)
@@ -754,7 +756,7 @@ Berikan output HANYA berupa JSON valid persis dengan struktur ini tanpa teks pem
 }`;
 
   const systemPrompt = 'Anda adalah konsultan plot dan story analyst profesional. Hasilkan hanya JSON yang valid.';
-  const res = await generateWithSmartFallback(prompt, systemPrompt);
+  const res = await generateWithSmartFallback(prompt, systemPrompt, onAttempt);
 
   const parsed = resilientParseJsonObject(res.text);
   if (parsed.hook || parsed.risingAction || parsed.climax || parsed.resolution) {
@@ -788,7 +790,8 @@ export async function generateChapterAutoScenes(
   bookTitle: string,
   contentText: string,
   existingEntities?: Array<{ id: string; name: string; category: string }>,
-  promptSettings?: ImagePromptSettings
+  promptSettings?: ImagePromptSettings,
+  onAttempt?: (event: AIGenerationEvent) => void
 ): Promise<ChapterSceneItem[]> {
   const entityContext =
     existingEntities && existingEntities.length > 0
@@ -856,7 +859,7 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
 
   const systemPrompt =
     'Anda adalah script reader, visual concept artist, dan continuity editor novel. Berikan HANYA format JSON array valid.';
-  const res = await generateWithSmartFallback(prompt, systemPrompt);
+  const res = await generateWithSmartFallback(prompt, systemPrompt, onAttempt);
 
   const parsedScenes = resilientParseJsonArray(res.text);
   if (parsedScenes.length > 0) {
@@ -1010,7 +1013,8 @@ export async function detectEntitiesAndAliases(
     physicalTraits?: string;
     condition?: string;
     evolutionSummary?: string;
-  }>
+  }>,
+  onAttempt?: (event: AIGenerationEvent) => void
 ): Promise<DetectedEntityCandidate[]> {
   const existingListStr =
     existingEntities.length > 0
@@ -1134,7 +1138,7 @@ Aturan:
 
   const systemPrompt =
     'Anda adalah editor kontinuitas sastra profesional dan konsistensi worldbuilding. Hasilkan HANYA JSON array valid.';
-  const res = await generateWithSmartFallback(prompt, systemPrompt);
+  const res = await generateWithSmartFallback(prompt, systemPrompt, onAttempt);
 
   try {
     const parsed = resilientParseJsonArray<any>(res.text);
@@ -1546,7 +1550,8 @@ export interface AutoMapResult {
 export async function autoMapWorldEntities(
   bookTitle: string,
   entities: WorldEntity[],
-  storyContext?: string
+  storyContext?: string,
+  onAttempt?: (event: AIGenerationEvent) => void
 ): Promise<AutoMapResult> {
   if (!entities || entities.length === 0) {
     return { factions: [], mappedEntities: [] };
@@ -1618,7 +1623,7 @@ Berikan output HANYA berupa JSON valid persis dengan struktur ini:
 }`;
 
   const systemPrompt = 'Anda adalah Narrative Engine & Lore Architect. Hasilkan analisis relasi dan faksi yang presisi dalam format JSON murni.';
-  const res = await generateWithSmartFallback(prompt, systemPrompt);
+  const res = await generateWithSmartFallback(prompt, systemPrompt, onAttempt);
   const parsed = resilientParseJsonObject<AutoMapResult>(res.text);
 
   const factions = Array.isArray(parsed.factions) ? parsed.factions : [];

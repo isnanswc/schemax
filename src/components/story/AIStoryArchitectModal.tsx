@@ -24,7 +24,8 @@ import {
 } from 'lucide-react';
 import { StoryBlueprint, BlueprintCharacter, BlueprintLocation, BlueprintItem, BlueprintChapter } from '../../types/blueprint';
 import { Book } from '../../types';
-import { generateStoryBlueprint, seedBlueprintToDatabase } from '../../services/blueprintService';
+import { generateStoryBlueprint, seedBlueprintToDatabase, BlueprintProgressInfo } from '../../services/blueprintService';
+import { AIGenerationEvent } from '../../types/ai';
 
 interface AIStoryArchitectModalProps {
   isOpen: boolean;
@@ -48,27 +49,14 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
 
   // Review Tabs: 'overview' | 'characters' | 'world' | 'chapters' | 'style'
   const [activeReviewTab, setActiveReviewTab] = useState<'overview' | 'characters' | 'world' | 'chapters' | 'style'>('overview');
-  const [loadingPhaseIndex, setLoadingPhaseIndex] = useState(0);
 
-  const loadingPhases = [
-    { title: 'Membaca & Menganalisa Input...', subtitle: rawIdea.length > 5000 ? `Teks besar terdeteksi (${Math.round(rawIdea.length / 1000)}rb karakter) — AI akan meringkas terlebih dahulu sebelum merancang blueprint.` : 'Memahami premis dan inti konflik cerita yang kamu tulis.' },
-    { title: 'Membedah Premis & Inti Konflik...', subtitle: 'Mengekstrak dinamika keluarga, taruhan emosional, dan tema sentral cerita.' },
-    { title: 'Merumuskan Karakter & Watak Batin...', subtitle: 'Menyusun usia, kelemahan masa lalu (wound), dan kebutuhan batin tokoh.' },
-    { title: 'Menyusun Ciri Fisik & Prompt Visual...', subtitle: 'Merancang penampilan otentik, gaya busana, dan prompt AI Bahasa Inggris.' },
-    { title: 'Memetakan Artefak & Aturan Dunia...', subtitle: 'Menghubungkan benda misterius, latar tempat, dan konsistensi cerita.' },
-    { title: 'Merancang Story Plot Bab 1 (Pembuka)...', subtitle: 'Menyusun ketukan adegan bab pembuka yang menghentak dan sarat misteri.' },
-  ];
-
-  React.useEffect(() => {
-    if (!isLoading) {
-      setLoadingPhaseIndex(0);
-      return;
-    }
-    const interval = setInterval(() => {
-      setLoadingPhaseIndex((prev) => (prev + 1) % loadingPhases.length);
-    }, 2400);
-    return () => clearInterval(interval);
-  }, [isLoading]);
+  // Real-time AI Tracking State
+  const [currentProgress, setCurrentProgress] = useState<BlueprintProgressInfo>({
+    stage: 'architecting',
+    stageTitle: 'Mempersiapkan Story Architect Engine...',
+    stageSubtitle: 'Memulai koneksi ke model AI yang dikonfigurasi.',
+  });
+  const [attemptHistory, setAttemptHistory] = useState<AIGenerationEvent[]>([]);
 
   if (!isOpen) return null;
 
@@ -86,9 +74,32 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
 
     setIsLoading(true);
     setError(null);
+    setAttemptHistory([]);
+    setCurrentProgress({
+      stage: 'architecting',
+      stageTitle: 'Menghubungkan ke Mesin AI...',
+      stageSubtitle: 'Memulai analisis premis dan struktur cerita.',
+    });
 
     try {
-      const generated = await generateStoryBlueprint(rawIdea);
+      const generated = await generateStoryBlueprint(rawIdea, (info) => {
+        setCurrentProgress(info);
+        if (info.attempt) {
+          setAttemptHistory((prev) => {
+            const last = prev[prev.length - 1];
+            if (
+              last &&
+              last.provider === info.attempt!.provider &&
+              last.model === info.attempt!.model &&
+              last.slotLabel === info.attempt!.slotLabel &&
+              last.status === info.attempt!.status
+            ) {
+              return prev;
+            }
+            return [...prev, info.attempt!];
+          });
+        }
+      });
       setBlueprint(generated);
       setStep('review');
     } catch (err: any) {
@@ -256,49 +267,139 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
         {step === 'input' && (
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 no-scrollbar">
             {isLoading ? (
-              <div className="py-10 px-4 flex flex-col items-center justify-center text-center space-y-6 animate-in fade-in zoom-in-95 duration-300">
+              <div className="py-8 px-4 flex flex-col items-center justify-center text-center space-y-5 animate-in fade-in zoom-in-95 duration-300">
                 {/* Visual Orb with Concentric Waves */}
-                <div className="relative w-24 h-24 flex items-center justify-center">
+                <div className="relative w-20 h-20 flex items-center justify-center">
                   <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-amber-500 to-indigo-600 blur-xl opacity-40 animate-pulse" />
-                  <div className="absolute -inset-3 rounded-full border border-amber-500/30 animate-ping opacity-30" />
+                  <div className="absolute -inset-2.5 rounded-full border border-amber-500/30 animate-ping opacity-30" />
                   <div className="absolute inset-0 rounded-full border-2 border-dashed border-amber-500/50 animate-spin" style={{ animationDuration: '8s' }} />
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-500 via-amber-600 to-indigo-600 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-amber-500/30 relative z-10">
-                    <Feather className="w-8 h-8 text-white animate-bounce" />
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-500 via-amber-600 to-indigo-600 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-amber-500/30 relative z-10">
+                    <Feather className="w-7 h-7 text-white animate-bounce" />
                   </div>
                 </div>
 
-                {/* Loading Status Text & Stage Indicator */}
-                <div className="space-y-2 max-w-md mx-auto">
-                  <span className="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30 inline-flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                    <span>Story Architect Engine Active</span>
-                  </span>
+                {/* Loading Status Text & Actual Stage Indicator */}
+                <div className="space-y-1.5 max-w-lg mx-auto">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-[10px] font-black uppercase tracking-wider">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                    <span>Story Architect Engine Sedang Bekerja</span>
+                  </div>
 
                   <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white transition-all duration-300">
-                    {loadingPhases[loadingPhaseIndex].title}
+                    {currentProgress.stageTitle}
                   </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                    {loadingPhases[loadingPhaseIndex].subtitle}
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-md mx-auto">
+                    {currentProgress.stageSubtitle}
                   </p>
                 </div>
 
-                {/* Animated Steps Progress Bar */}
-                <div className="w-full max-w-xs space-y-2 pt-2">
+                {/* 🚀 REAL-TIME AI ACTIVE SLOT & MODEL INFORMATION BOX */}
+                <div className="w-full max-w-md bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 text-left space-y-2 shadow-inner">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1">
+                      <Zap className="w-3 h-3 text-amber-500" />
+                      <span>Unit AI & Model yang Bekerja</span>
+                    </span>
+                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold">
+                      Aktif
+                    </span>
+                  </div>
+
+                  {/* Active Slot & Model Banner */}
+                  {currentProgress.attempt ? (
+                    <div className="flex flex-col gap-1 p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
+                            currentProgress.attempt.provider === 'gemini'
+                              ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30'
+                              : 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30'
+                          }`}>
+                            {currentProgress.attempt.provider.toUpperCase()}
+                          </span>
+                          <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                            {currentProgress.attempt.slotLabel}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1 flex-shrink-0">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
+                          Memproses
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-600 dark:text-slate-400 truncate pt-0.5">
+                        <span className="text-slate-400">Model:</span>
+                        <span className="text-amber-700 dark:text-amber-300 font-bold truncate">
+                          {currentProgress.attempt.model}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                      <span>Menginisialisasi konfigurasi API Key...</span>
+                    </div>
+                  )}
+
+                  {/* Fallback Event Log History if any slot failed or bounced */}
+                  {attemptHistory.length > 1 && (
+                    <div className="pt-2 border-t border-slate-200 dark:border-slate-800/80 space-y-1">
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">
+                        Jejak Pergantian Model (Fallback Log):
+                      </span>
+                      <div className="max-h-24 overflow-y-auto space-y-1 no-scrollbar">
+                        {attemptHistory.map((att, idx) => (
+                          <div key={idx} className="flex items-center justify-between text-[10px] py-0.5">
+                            <span className="font-mono text-slate-600 dark:text-slate-400 truncate max-w-[240px]">
+                              {att.slotLabel} • {att.model}
+                            </span>
+                            <span className={`text-[9px] font-semibold ${
+                              att.status === 'success'
+                                ? 'text-emerald-500'
+                                : att.status === 'fallback'
+                                ? 'text-rose-500'
+                                : 'text-amber-500'
+                            }`}>
+                              {att.status === 'fallback' ? 'Limit/Gagal ➔ Beralih' : att.status}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Progress Stage Tracker */}
+                <div className="w-full max-w-xs space-y-1.5 pt-1">
                   <div className="flex items-center justify-between gap-1.5">
-                    {loadingPhases.map((_, idx) => (
-                      <div
-                        key={idx}
-                        className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
-                          idx <= loadingPhaseIndex
-                            ? 'bg-gradient-to-r from-amber-500 to-indigo-500 shadow-sm'
-                            : 'bg-slate-200 dark:bg-slate-800'
-                        }`}
-                      />
-                    ))}
+                    {['Meringkas', 'Merancang Blueprint', 'Validasi'].map((stName, idx) => {
+                      const isDone =
+                        currentProgress.stage === 'parsing'
+                          ? true
+                          : currentProgress.stage === 'architecting'
+                          ? idx <= 1
+                          : idx === 0;
+                      return (
+                        <div
+                          key={idx}
+                          className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
+                            isDone
+                              ? 'bg-gradient-to-r from-amber-500 to-indigo-500 shadow-sm'
+                              : 'bg-slate-200 dark:bg-slate-800'
+                          }`}
+                        />
+                      );
+                    })}
                   </div>
                   <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold px-0.5">
-                    <span>Fase {loadingPhaseIndex + 1} dari {loadingPhases.length}</span>
-                    <span className="text-amber-500 font-bold">Menganalisa...</span>
+                    <span>
+                      {currentProgress.stage === 'compressing'
+                        ? 'Tahap 1: Ekstraksi Ringkasan'
+                        : currentProgress.stage === 'architecting'
+                        ? 'Tahap 2: Perancangan Arsitektur Cerita'
+                        : 'Tahap 3: Finalisasi Blueprint'}
+                    </span>
+                    <span className="text-amber-500 font-bold">Proses Berjalan</span>
                   </div>
                 </div>
               </div>

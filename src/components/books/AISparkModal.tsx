@@ -13,6 +13,7 @@ import {
   Plus
 } from 'lucide-react';
 import { generateWithSmartFallback } from '../../services/aiService';
+import { AIGenerationEvent } from '../../types/ai';
 import { Book } from '../../types';
 
 interface AISparkModalProps {
@@ -37,6 +38,7 @@ export const AISparkModal: React.FC<AISparkModalProps> = ({
   const [sparks, setSparks] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [activeAttempt, setActiveAttempt] = useState<AIGenerationEvent | null>(null);
 
   if (!isOpen) return null;
 
@@ -84,6 +86,7 @@ export const AISparkModal: React.FC<AISparkModalProps> = ({
     setIsLoading(true);
     setError(null);
     setSparks([]);
+    setActiveAttempt(null);
 
     const systemPrompt = `Kamu adalah Konsultan Plot dan Ide Kreatif Fiksi (Story Architect).
 Tugasmu: Berikan 3 ide yang orisinal, segar, tidak klise, dan memicu rasa ingin tahu tinggi dalam Bahasa Indonesia.
@@ -109,7 +112,9 @@ Berikan tepat 3 ide bernomor (1, 2, 3), masing-masing 2-3 kalimat tajam tanpa ka
     }
 
     try {
-      const result = await generateWithSmartFallback(userPrompt, systemPrompt);
+      const result = await generateWithSmartFallback(userPrompt, systemPrompt, (event) => {
+        setActiveAttempt(event);
+      });
       // Split into 3 ideas
       const rawText = result.text;
       const parts = rawText
@@ -126,6 +131,7 @@ Berikan tepat 3 ide bernomor (1, 2, 3), masing-masing 2-3 kalimat tajam tanpa ka
       setError(err?.message || 'Gagal menghasilkan ide.');
     } finally {
       setIsLoading(false);
+      setTimeout(() => setActiveAttempt(null), 3000);
     }
   };
 
@@ -246,7 +252,7 @@ Berikan tepat 3 ide bernomor (1, 2, 3), masing-masing 2-3 kalimat tajam tanpa ka
             {isLoading ? (
               <>
                 <Zap className="w-4 h-4 animate-spin" />
-                <span>Menghasilkan 3 Pilihan Ide...</span>
+                <span>Menghubungi AI...</span>
               </>
             ) : (
               <>
@@ -255,6 +261,21 @@ Berikan tepat 3 ide bernomor (1, 2, 3), masing-masing 2-3 kalimat tajam tanpa ka
               </>
             )}
           </button>
+
+          {/* Active AI Status Information Box */}
+          {isLoading && activeAttempt && (
+            <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs flex items-center justify-between gap-2 animate-in fade-in">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping flex-shrink-0" />
+                <span className="text-slate-600 dark:text-slate-300 font-semibold truncate">
+                  Memproses: <span className="font-bold text-amber-700 dark:text-amber-300">[{activeAttempt.provider.toUpperCase()}] {activeAttempt.slotLabel}</span>
+                </span>
+              </div>
+              <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 truncate bg-white dark:bg-slate-900 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-800">
+                {activeAttempt.model}
+              </span>
+            </div>
+          )}
 
           {/* Error Message */}
           {error && (
