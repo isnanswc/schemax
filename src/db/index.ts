@@ -76,10 +76,16 @@ export function createSvgBlob(text: string, bgColor: string, icon = '📖'): Blo
   return new Blob([svg], { type: 'image/svg+xml' });
 }
 
-// Seed initial data if database is empty
+// Seed initial data if database is empty (only runs ONCE — never repeats even if user deletes all books)
 export async function seedInitialDataIfNeeded() {
+  const SEED_FLAG = 'schemax_initial_seed_done_v1';
+  if (localStorage.getItem(SEED_FLAG)) return; // Already seeded before — never seed again
   const bookCount = await db.books.count();
-  if (bookCount > 0) return;
+  if (bookCount > 0) {
+    // Books exist (possibly from cloud sync or manual creation), mark as seeded and skip
+    localStorage.setItem(SEED_FLAG, '1');
+    return;
+  }
 
   const now = Date.now();
   const sampleBookId = 'book_nusantara_demo';
@@ -232,4 +238,7 @@ export async function seedInitialDataIfNeeded() {
       updatedAt: now
     }
   ]);
+
+  // Mark seed as permanently done — will never repeat even if user deletes all books
+  localStorage.setItem(SEED_FLAG, '1');
 }

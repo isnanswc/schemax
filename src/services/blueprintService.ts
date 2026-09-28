@@ -3,9 +3,40 @@ import { Book, WorldEntity, StoryChapter } from '../types';
 import { generateWithSmartFallback } from './aiService';
 import { db, saveMediaItem, createSvgBlob } from '../db';
 
+/**
+ * Smart input preprocessing: If the idea text is very large (>5000 chars / ~3000+ words),
+ * we first compress it into a structured summary via AI, then pass that summary as the
+ * input for blueprint generation. This avoids token limit failures for large pastes.
+ */
+async function preprocessLargeIdea(rawIdea: string): Promise<string> {
+  // Under 5000 chars — send as-is
+  if (rawIdea.length <= 5000) return rawIdea;
+
+  const summaryPrompt = `Ringkas dan ekstrak ELEMEN PENTING dari teks berikut menjadi sebuah premis cerita yang padat dan terstruktur. Fokus pada:
+1. Siapa tokoh utamanya (nama, hubungan antar tokoh, keluarga)
+2. Apa kejadian / masalah / konflik utamanya
+3. Apa dampak / akibat yang terjadi
+4. Setting / latar cerita
+
+Teks Asli (bisa berupa naskah/cerita/outline/catatan):
+${rawIdea.slice(0, 12000)}
+
+Keluarkan HANYA paragraf premis/ringkasan padat dalam Bahasa Indonesia tanpa judul atau pengantar, maksimal 500 kata.`;
+
+  const systemMsg = 'Anda adalah editor sastra yang ahli meringkas dan mengekstrak inti cerita dari teks panjang.';
+  try {
+    const result = await generateWithSmartFallback(summaryPrompt, systemMsg);
+    return `[DIKOMPRESI DARI TEKS PANJANG — ${rawIdea.length} KARAKTER]\n\n${result.text.trim()}`;
+  } catch {
+    // If compression fails, just truncate gracefully
+    return rawIdea.slice(0, 5000) + '\n\n[...teks terpotong karena terlalu panjang, lanjutkan dengan yang sudah ada]';
+  }
+}
+
 export async function generateStoryBlueprint(
   rawIdea: string
 ): Promise<StoryBlueprint> {
+
   const systemPrompt = `Kamu adalah Arsitek Cerita Fiksi Tingkat Master (Master Story Architect & Worldbuilder).
 Tugasmu: Menganalisa satu ide/premis mentah dari penulis dan merancang BLUEPRINT PROYEK CERITA NOVEL LENGKAP berstandar sastra profesional.
 
@@ -126,8 +157,11 @@ WAJIB MERESPON HANYA DENGAN FORMAT JSON VALID:
   ]
 }`;
 
+  // Preprocess: if idea is very long (naskah panjang / outline tebal), compress it first
+  const processedIdea = await preprocessLargeIdea(rawIdea);
+
   const userPrompt = `Rancang Blueprint Proyek Cerita lengkap berdasarkan ide/premis mentah berikut:
-"${rawIdea}"
+"${processedIdea}"
 
 Instruksi Analisa Cerdas:
 - Pahami relasi karakter dalam ide tersebut secara mendalam (misal keluarga, pasangan, sahabat, dsb.).
@@ -138,6 +172,7 @@ Instruksi Analisa Cerdas:
 - Respon HANYA teks JSON valid.`;
 
   const response = await generateWithSmartFallback(userPrompt, systemPrompt);
+
 
   let cleanText = response.text.trim();
   if (cleanText.startsWith('```json')) {

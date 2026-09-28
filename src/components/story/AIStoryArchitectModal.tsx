@@ -51,6 +51,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
   const [loadingPhaseIndex, setLoadingPhaseIndex] = useState(0);
 
   const loadingPhases = [
+    { title: 'Membaca & Menganalisa Input...', subtitle: rawIdea.length > 5000 ? `Teks besar terdeteksi (${Math.round(rawIdea.length / 1000)}rb karakter) — AI akan meringkas terlebih dahulu sebelum merancang blueprint.` : 'Memahami premis dan inti konflik cerita yang kamu tulis.' },
     { title: 'Membedah Premis & Inti Konflik...', subtitle: 'Mengekstrak dinamika keluarga, taruhan emosional, dan tema sentral cerita.' },
     { title: 'Merumuskan Karakter & Watak Batin...', subtitle: 'Menyusun usia, kelemahan masa lalu (wound), dan kebutuhan batin tokoh.' },
     { title: 'Menyusun Ciri Fisik & Prompt Visual...', subtitle: 'Merancang penampilan otentik, gaya busana, dan prompt AI Bahasa Inggris.' },
@@ -319,6 +320,19 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                     placeholder="Contoh: Menceritakan seorang pemuda yang bernama Agung, yang menemukan cincin misterius. Dia membawa pulang cincin dan malapetaka terjadi: seluruh keluarganya hilang ingatan dan membuat hubungan mereka berantakan, Santi istri Agung sampai mengira Agung adalah maling di rumahnya..."
                     className="w-full p-4 sm:p-5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-amber-500 leading-relaxed resize-y shadow-inner min-h-[190px] sm:min-h-[240px]"
                   />
+                  {/* Character count & large-text notice */}
+                  <div className="flex items-center justify-between px-1 mt-1">
+                    <span className={`text-[10px] font-semibold ${rawIdea.length > 5000 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400'}`}>
+                      {rawIdea.length.toLocaleString()} karakter
+                    </span>
+                    {rawIdea.length > 5000 && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                        <span>⚡</span>
+                        <span>Mode Teks Besar — AI akan meringkas dulu</span>
+                      </span>
+                    )}
+                  </div>
+
                 </div>
 
                 {/* Quick Inspiration Templates */}
