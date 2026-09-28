@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowLeft, BookOpen, MoreVertical, Shield } from 'lucide-react';
 import { Book } from '../../types';
 import { usePrivacy } from '../../contexts/PrivacyContext';
+import { SchemaxLogo } from '../common/SchemaxLogo';
 
 interface MobileHeaderProps {
   currentBook?: Book | null;
@@ -30,9 +31,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
               <ArrowLeft className="w-4 h-4" />
             </button>
           ) : (
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-600 flex items-center justify-center text-slate-950 font-black shadow-md shadow-amber-500/20 flex-shrink-0">
-              <BookOpen className="w-4 h-4 sm:w-5 sm:h-5" />
-            </div>
+            <SchemaxLogo size={34} variant="badge" />
           )}
 
           <div className="min-w-0">
