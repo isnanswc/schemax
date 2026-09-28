@@ -46,35 +46,40 @@ interface ChapterStoryPlotTabProps {
   onNavigateToGlossary?: () => void;
 }
 
-// Helper to determine the latest condition of an entity based on current chapter or earlier chapters
+// Helper to determine the condition and traits of an entity based strictly on previous chapter history (up to chapter.order - 1)
 function getLatestEntityState(
   entity: WorldEntity,
   currentChapter: StoryChapter,
-  earlierChapters: StoryChapter[]
-): { condition: string; conditionDetails?: string; source: string } {
-  // 1. Current chapter state
+  earlierChaptersDesc: StoryChapter[]
+): { condition: string; conditionDetails?: string; source: string; traits?: string; description?: string } {
+  // 1. Check if current chapter already has an explicitly defined state
   if (currentChapter.chapterEntityStates?.[entity.id]?.condition) {
     const s = currentChapter.chapterEntityStates[entity.id];
     return {
       condition: s.condition || 'aktif',
       conditionDetails: s.conditionDetails,
       source: `Bab ${currentChapter.order} (Bab Ini)`,
+      traits: entity.currentTraits || entity.initialTraits,
+      description: entity.currentDescription || entity.shortDescription,
     };
   }
 
-  // 2. Search earlier chapters in descending order (order - 1, order - 2, ...)
-  for (const prev of earlierChapters) {
+  // 2. Search earlier chapters in descending order (Bab n-1, Bab n-2, ... Bab 1)
+  // This ensures Bab 3 reads Bab 2's condition, not future Bab 6 or global future updates!
+  for (const prev of earlierChaptersDesc) {
     if (prev.chapterEntityStates?.[entity.id]?.condition) {
       const s = prev.chapterEntityStates[entity.id];
       return {
         condition: s.condition || 'aktif',
         conditionDetails: s.conditionDetails,
         source: `Bab ${prev.order}`,
+        traits: entity.currentTraits || entity.initialTraits,
+        description: entity.currentDescription || entity.shortDescription,
       };
     }
   }
 
-  // 3. Search entity chronology
+  // 3. Search entity chapterChronology records for chapters strictly before this chapter
   if (entity.chapterChronology) {
     const records = Object.values(entity.chapterChronology)
       .filter((r) => r.chapterOrder < currentChapter.order)
@@ -84,15 +89,20 @@ function getLatestEntityState(
         condition: records[0].condition,
         conditionDetails: records[0].conditionDetails,
         source: `Bab ${records[0].chapterOrder}`,
+        traits: entity.currentTraits || entity.initialTraits,
+        description: entity.currentDescription || entity.shortDescription,
       };
     }
   }
 
-  // 4. Default to entity base profile condition
+  // 4. Fallback to Initial Entity State (never forward/future condition!)
+  // If chapter is Bab 1 or no earlier record exists, use initial profile
   return {
-    condition: entity.condition || 'aktif',
-    conditionDetails: entity.conditionDetails,
-    source: 'Profil Dasar',
+    condition: (entity as any).initialCondition || entity.condition || 'aktif',
+    conditionDetails: (entity as any).initialConditionDetails || entity.conditionDetails,
+    source: 'Kondisi Awal Novel',
+    traits: entity.initialTraits || entity.currentTraits,
+    description: entity.initialDescription || entity.shortDescription || entity.currentDescription,
   };
 }
 
@@ -136,8 +146,11 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
   // 5 Structured Context Points
   const [storyPlotText, setStoryPlotText] = useState('');
   const [prevChapterText, setPrevChapterText] = useState('');
+  // Chapter Plot & Coretan Bab is INDEPENDENT from Premis / Ringkasan Isi Bab!
   const [chapterPlotText, setChapterPlotText] = useState(
-    chapter.premise || chapter.rawDrafts?.[0]?.content || ''
+    chapter.rawDrafts?.find((d) => d.id === 'plot_' + chapter.id || d.title === 'Story Plot')?.content ||
+      chapter.rawDrafts?.[0]?.content ||
+      ''
   );
   const [charactersText, setCharactersText] = useState('');
   const [settingItemLoreText, setSettingItemLoreText] = useState('');
@@ -251,13 +264,18 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
       const charsStr = targetCharacters
         .map((c) => {
           const state = getLatestEntityState(c, chapter, earlierDesc);
-          const roleFaction = [c.role ? c.role.toUpperCase() : '', c.faction ? `Faksi: ${c.faction}` : ''].filter(Boolean).join(' • ');
-          let line = `• [${c.name}]${roleFaction ? ` (${roleFaction})` : ''}\n`;
+          const roleLabel = c.role ? c.role.toUpperCase() : 'KARAKTER';
+          let line = `• [${c.name}] (${roleLabel})\n`;
           line += `  - Kondisi: ${state.condition}${state.conditionDetails ? ` (${state.conditionDetails})` : ''}\n`;
           if (c.aliases && c.aliases.length > 0) {
             line += `  - Alias: ${c.aliases.join(', ')}\n`;
           }
-          const traits = c.currentTraits || c.initialTraits;
+          const desc = state.description || c.shortDescription || c.detailedNotes;
+          if (desc) {
+            const cleanDesc = desc.replace(/\n+/g, ' ').trim();
+            line += `  - Deskripsi: ${cleanDesc}\n`;
+          }
+          const traits = state.traits || c.currentTraits || c.initialTraits;
           if (traits) {
             line += `  - Sifat/Peran: ${traits}\n`;
           }
@@ -343,20 +361,24 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
     }
   };
 
-  // Handle live edit of Chapter Plot & auto-save to chapter premise in IndexedDB
+  // Handle live edit of Chapter Plot & auto-save to dedicated rawDrafts in IndexedDB (INDEPENDENT from Premis)
   const handleChapterPlotChange = (val: string) => {
     setChapterPlotText(val);
+    const existingDrafts = chapter.rawDrafts || [];
+    const otherDrafts = existingDrafts.filter((d) => d.id !== 'plot_' + chapter.id && d.title !== 'Story Plot');
+    const updatedDrafts = [
+      {
+        id: 'plot_' + chapter.id,
+        title: 'Story Plot',
+        content: val,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+      ...otherDrafts,
+    ];
+
     onUpdateChapter({
-      premise: val,
-      rawDrafts: [
-        {
-          id: 'plot_' + chapter.id,
-          title: 'Story Plot',
-          content: val,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        },
-      ],
+      rawDrafts: updatedDrafts,
     });
     setSaveToast(true);
     setTimeout(() => setSaveToast(false), 1200);
@@ -570,7 +592,6 @@ PETUNJUK PENULISAN:
       await onUpdateChapter({
         contentHtml: finalHtml,
         wordCount: words,
-        premise: chapterPlotText,
         updatedAt: Date.now(),
       });
 
