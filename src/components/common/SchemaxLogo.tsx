@@ -18,9 +18,6 @@ export const SchemaxLogo: React.FC<SchemaxLogoProps> = ({
   variant = 'icon',
   showGlow = true,
 }) => {
-  const gradientId = React.useId();
-  const glowFilterId = `glow-${gradientId}`;
-
   // SVG Graphic Elements
   const iconSvg = (
     <svg
@@ -29,18 +26,18 @@ export const SchemaxLogo: React.FC<SchemaxLogoProps> = ({
       viewBox="0 0 100 100"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className="flex-shrink-0 transition-transform duration-300"
+      className="flex-shrink-0 transition-transform duration-300 select-none"
     >
       <defs>
         {/* Amber Gold Metallic Gradient */}
-        <linearGradient id={`${gradientId}-gold`} x1="15%" y1="10%" x2="85%" y2="90%">
+        <linearGradient id="schemax-gold-grad" x1="15%" y1="10%" x2="85%" y2="90%">
           <stop offset="0%" stopColor="#FDE047" />
           <stop offset="40%" stopColor="#F59E0B" />
           <stop offset="100%" stopColor="#D97706" />
         </linearGradient>
 
         {/* Blueprint Circuit Electric Cyan/Purple Gradient */}
-        <linearGradient id={`${gradientId}-cyan`} x1="0%" y1="100%" x2="100%" y2="0%">
+        <linearGradient id="schemax-cyan-grad" x1="0%" y1="100%" x2="100%" y2="0%">
           <stop offset="0%" stopColor="#06B6D4" />
           <stop offset="50%" stopColor="#818CF8" />
           <stop offset="100%" stopColor="#C084FC" />
@@ -48,8 +45,8 @@ export const SchemaxLogo: React.FC<SchemaxLogoProps> = ({
 
         {/* Soft Radial Backlight Glow */}
         {showGlow && (
-          <filter id={glowFilterId} x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="3.5" result="blur" />
+          <filter id="schemax-glow-filter" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
             <feComposite in="SourceGraphic" in2="blur" operator="over" />
           </filter>
         )}
@@ -57,15 +54,15 @@ export const SchemaxLogo: React.FC<SchemaxLogoProps> = ({
 
       {/* Background Soft Glow Aura */}
       {showGlow && (
-        <circle cx="50" cy="50" r="32" fill="url(#" + gradientId + "-gold)" opacity="0.15" filter={`url(#${glowFilterId})`} />
+        <circle cx="50" cy="50" r="32" fill="url(#schemax-gold-grad)" opacity="0.18" />
       )}
 
       {/* --- BLUEPRINT / MATRIX SCHEMA NODES (Underneath & Behind Quill) --- */}
-      <g stroke={`url(#${gradientId}-cyan)`} strokeWidth="1.2" opacity="0.75" strokeLinecap="round">
+      <g stroke="url(#schemax-cyan-grad)" strokeWidth="1.2" opacity="0.85" strokeLinecap="round">
         {/* Geometric Structure Lines */}
         <path d="M 46 76 L 78 76 L 78 44 Z" fill="none" strokeDasharray="2 2" />
         <line x1="46" y1="76" x2="78" y2="44" strokeWidth="1" />
-        <line x1="62" y1="76" x2="78" y2="60" strokeWidth="0.8" opacity="0.6" />
+        <line x1="62" y1="76" x2="78" y2="60" strokeWidth="0.8" opacity="0.7" />
         <line x1="62" y1="44" x2="62" y2="76" strokeWidth="0.8" strokeDasharray="1.5 1.5" />
         
         {/* Matrix Coordinate Nodes (Circles) */}
@@ -78,18 +75,18 @@ export const SchemaxLogo: React.FC<SchemaxLogoProps> = ({
       </g>
 
       {/* --- THE ARCHITECT'S GOLDEN QUILL (Pena Emas Sastra) --- */}
-      <g filter={showGlow ? `url(#${glowFilterId})` : undefined}>
+      <g filter={showGlow ? 'url(#schemax-glow-filter)' : undefined}>
         {/* Main Feather Vane (Left Plume) */}
         <path
           d="M 68 20 C 64 26 48 38 38 52 C 34 57 32 64 30 70 C 34 66 40 64 45 64 C 41 57 48 45 57 37 C 62 32 67 27 68 20 Z"
-          fill={`url(#${gradientId}-gold)`}
+          fill="url(#schemax-gold-grad)"
         />
         
         {/* Main Feather Vane (Right Plume) */}
         <path
           d="M 68 20 C 68 27 63 35 58 41 C 53 47 48 53 45 64 C 52 63 59 58 64 52 C 67 47 69 41 68 20 Z"
-          fill={`url(#${gradientId}-gold)`}
-          opacity="0.85"
+          fill="url(#schemax-gold-grad)"
+          opacity="0.9"
         />
 
         {/* Central Shaft / Spine of Feather */}
@@ -107,7 +104,7 @@ export const SchemaxLogo: React.FC<SchemaxLogoProps> = ({
         {/* Pen Nib (Mata Pena Emas) */}
         <path
           d="M 27 74 L 21 82 C 20.5 82.8 21.2 83.5 22 83 L 30 77 L 27 74 Z"
-          fill={`url(#${gradientId}-gold)`}
+          fill="url(#schemax-gold-grad)"
         />
 
         {/* Nib Slit & Breather Hole */}
@@ -115,7 +112,7 @@ export const SchemaxLogo: React.FC<SchemaxLogoProps> = ({
         <circle cx="26" cy="76" r="0.75" fill="#451A03" />
 
         {/* Spark of Inspiration at Nib Tip */}
-        <circle cx="21" cy="83" r="1.5" fill="#FFFFFF" opacity="0.9" />
+        <circle cx="21" cy="83" r="1.5" fill="#FFFFFF" opacity="0.95" />
       </g>
     </svg>
   );
@@ -123,8 +120,8 @@ export const SchemaxLogo: React.FC<SchemaxLogoProps> = ({
   if (variant === 'badge') {
     return (
       <div
-        className={`inline-flex items-center justify-center p-1.5 rounded-2xl bg-gradient-to-tr from-slate-900 to-slate-800 border border-slate-700/80 shadow-lg shadow-amber-500/10 ${className}`}
-        style={{ width: size + 12, height: size + 12 }}
+        className={`inline-flex items-center justify-center rounded-2xl bg-slate-900 border border-slate-800 shadow-md shadow-amber-500/15 flex-shrink-0 overflow-hidden ${className}`}
+        style={{ width: size, height: size }}
       >
         {iconSvg}
       </div>

@@ -51,15 +51,11 @@ export function App() {
     return () => unbind();
   }, []);
 
-  // Initialize seed data if database is empty on first boot
+  // Never auto-seed dummy data on startup. The app starts clean.
+  // Demo data can only be loaded manually if desired via Sync & Storage modal.
   useEffect(() => {
-    seedInitialDataIfNeeded()
-      .then(() => {
-        setRefreshTrigger((prev) => prev + 1);
-      })
-      .catch((err) => {
-        console.error('Failed to seed initial data:', err);
-      });
+    // Initial mount trigger
+    setRefreshTrigger((prev) => prev + 1);
   }, []);
 
   // Live queries from IndexedDB via Dexie

@@ -31,7 +31,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
               <ArrowLeft className="w-4 h-4" />
             </button>
           ) : (
-            <SchemaxLogo size={34} variant="badge" />
+            <SchemaxLogo size={36} variant="badge" />
           )}
 
           <div className="min-w-0">
