@@ -304,34 +304,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       )}
 
-      {/* 💡 2. AI Quick Spark Pad (Inkubator Ide Cepat) */}
-      <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-sm">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="p-2 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex-shrink-0">
-            <Lightbulb className="w-4 h-4" />
-          </div>
-          <div className="min-w-0">
-            <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5 truncate">
-              <span>Inkubator Ide Cerita</span>
-              <span className="text-[9px] uppercase px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 font-extrabold">
-                AI Spark
-              </span>
-            </h4>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
-              Pancing plot twist, konsep karakter, atau pembuka adegan baru
-            </p>
-          </div>
-        </div>
 
-        <button
-          type="button"
-          onClick={handleOpenSparkModal}
-          className="inline-flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-amber-700 dark:text-amber-300 font-bold text-xs border border-slate-200 dark:border-slate-700 active:scale-95 transition flex-shrink-0"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-          <span>Brainstorm Ide</span>
-        </button>
-      </div>
 
       {/* 📊 3. Studio Momentum Micro-Stats */}
       <div className="grid grid-cols-3 gap-2">

@@ -251,22 +251,17 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
       const charsStr = targetCharacters
         .map((c) => {
           const state = getLatestEntityState(c, chapter, earlierDesc);
-          let detail = `• [${c.name}] (${c.role ? `${c.role.toUpperCase()}` : 'Karakter'}${c.faction ? ` • Faksi: ${c.faction}` : ''})\n`;
-          detail += `  - Kondisi Status Terkini: ${state.condition}${state.conditionDetails ? ` (${state.conditionDetails})` : ''} [Sumber: ${state.source}]\n`;
-
+          const roleFaction = [c.role ? c.role.toUpperCase() : '', c.faction ? `Faksi: ${c.faction}` : ''].filter(Boolean).join(' • ');
+          let line = `• [${c.name}]${roleFaction ? ` (${roleFaction})` : ''}\n`;
+          line += `  - Kondisi: ${state.condition}${state.conditionDetails ? ` (${state.conditionDetails})` : ''}\n`;
           if (c.aliases && c.aliases.length > 0) {
-            detail += `  - Sebutan Alias/Gelar: ${c.aliases.join(', ')}\n`;
+            line += `  - Alias: ${c.aliases.join(', ')}\n`;
           }
-          if (c.currentTraits || c.initialTraits) {
-            detail += `  - Sifat/Kepribadian: ${c.currentTraits || c.initialTraits}\n`;
+          const traits = c.currentTraits || c.initialTraits;
+          if (traits) {
+            line += `  - Sifat/Peran: ${traits}\n`;
           }
-          if (c.physicalTraits) {
-            detail += `  - Ciri Fisik: ${c.physicalTraits}\n`;
-          }
-          if (c.detailedNotes) {
-            detail += `  - Catatan Tokoh: ${c.detailedNotes.slice(0, 150).replace(/\n+/g, ' ')}\n`;
-          }
-          return detail.trimEnd();
+          return line.trimEnd();
         })
         .join('\n\n');
 
@@ -821,8 +816,10 @@ INSTRUKSI PENULISAN:
                 </p>
               </div>
 
-              <div className="text-[11px] font-mono text-slate-400 self-end sm:self-auto">
-                {chapterPlotText.trim() ? chapterPlotText.trim().split(/\s+/).length : 0} kata plot
+              <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-500 dark:text-slate-400 self-end sm:self-auto bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-200/60 dark:border-slate-700/60">
+                <span>{chapterPlotText.length.toLocaleString()} karakter</span>
+                <span>•</span>
+                <span>{chapterPlotText.trim() ? chapterPlotText.trim().split(/\s+/).length : 0} kata</span>
               </div>
             </div>
 
@@ -1011,6 +1008,9 @@ INSTRUKSI PENULISAN:
                 placeholder="Contoh: Fokus pada adegan romansa yang intim tanpa sensor moralistik / Deskripsikan aksi laga pertarungan secara brutal / Nada cerita sarkas dan dingin..."
                 className="w-full p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-xs leading-relaxed focus:outline-none focus:border-amber-500 shadow-inner"
               />
+              <div className="flex justify-end text-[10px] font-mono text-slate-400 dark:text-slate-500">
+                <span>{additionalPrompt.length.toLocaleString()} karakter</span>
+              </div>
             </div>
 
             {/* 3. Pilihan Penempatan Naskah (Overwrite vs Append dengan Penanda Batas AI) */}
@@ -1248,6 +1248,10 @@ INSTRUKSI PENULISAN:
                     onChange={(e) => pt.setText(e.target.value)}
                     className="w-full p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 text-xs font-mono leading-relaxed focus:outline-none focus:border-indigo-500 shadow-inner resize-y"
                   />
+                  <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 dark:text-slate-500 px-1">
+                    <span>{pt.text.length.toLocaleString()} karakter</span>
+                    <span>{pt.text.trim() ? pt.text.trim().split(/\s+/).length : 0} kata</span>
+                  </div>
                 </div>
               );
             })}

@@ -84,7 +84,6 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   // Editor Display Settings
   const [fontStyle, setFontStyle] = useState<'sans' | 'serif' | 'mono'>('serif');
   const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg'>('base');
-  const [isFocusMode, setIsFocusMode] = useState(false);
   const [activeFormats, setActiveFormats] = useState<{ [key: string]: boolean }>({});
 
   // Modals & Sheets
@@ -694,9 +693,7 @@ ${afterHtml}
   return (
     <div
       {...bindEmptyAreaLongPress()}
-      className={`fixed inset-0 z-50 bg-slate-50 dark:bg-slate-950 flex flex-col text-slate-900 dark:text-slate-100 h-[100dvh] overflow-hidden ${
-        isFocusMode ? 'focus-mode' : ''
-      }`}
+      className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-950 flex flex-col text-slate-900 dark:text-slate-100 h-[100dvh] overflow-hidden"
     >
       {/* 1. TOP STATUS BAR - Clean, Minimalist & Focused */}
       <header className="flex items-center justify-between px-3 sm:px-4 py-2.5 bg-white/95 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/80 z-20 safe-top flex-shrink-0 transition-colors">
@@ -1061,8 +1058,6 @@ ${afterHtml}
         onChangeStatus={handleStatusChange}
         isSaved={isSaved}
         onSaveManual={saveToIndexedDB}
-        isFocusMode={isFocusMode}
-        onToggleFocusMode={() => setIsFocusMode(!isFocusMode)}
         fontStyle={fontStyle}
         onChangeFontStyle={setFontStyle}
         fontSize={fontSize}

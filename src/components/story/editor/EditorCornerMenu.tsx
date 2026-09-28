@@ -29,8 +29,6 @@ interface EditorCornerMenuProps {
   onChangeStatus: (status: ChapterStatus) => void;
   isSaved: boolean;
   onSaveManual: () => void;
-  isFocusMode: boolean;
-  onToggleFocusMode: () => void;
   fontStyle: 'sans' | 'serif' | 'mono';
   onChangeFontStyle: (style: 'sans' | 'serif' | 'mono') => void;
   fontSize: 'sm' | 'base' | 'lg';
@@ -49,8 +47,6 @@ export const EditorCornerMenu: React.FC<EditorCornerMenuProps> = ({
   onChangeStatus,
   isSaved,
   onSaveManual,
-  isFocusMode,
-  onToggleFocusMode,
   fontStyle,
   onChangeFontStyle,
   fontSize,
@@ -252,29 +248,6 @@ export const EditorCornerMenu: React.FC<EditorCornerMenuProps> = ({
               Tampilan & Mode
             </label>
 
-            {/* Focus Mode */}
-            <button
-              type="button"
-              onClick={onToggleFocusMode}
-              className={`w-full py-2.5 px-3 rounded-2xl border text-xs font-bold transition flex items-center justify-between active:scale-95 ${
-                isFocusMode
-                  ? 'bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-400'
-                  : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                {isFocusMode ? (
-                  <Minimize2 className="w-4 h-4 text-amber-500" />
-                ) : (
-                  <Maximize2 className="w-4 h-4 text-slate-500" />
-                )}
-                <span>Mode Fokus Menulis</span>
-              </div>
-              <span className="text-[10px] font-bold">
-                {isFocusMode ? 'Aktif' : 'Nonaktif'}
-              </span>
-            </button>
-
             {/* Cari & Ganti Kata */}
             {onOpenFindReplace && (
               <button
@@ -380,7 +353,7 @@ export const EditorCornerMenu: React.FC<EditorCornerMenuProps> = ({
                 }}
                 className="py-2 px-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold text-left hover:bg-slate-200 dark:hover:bg-slate-700 transition"
               >
-                📝 Tulisan Kasar
+                ⚡ Story Plot
               </button>
               <button
                 type="button"
