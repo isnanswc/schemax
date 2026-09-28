@@ -1,4 +1,4 @@
-import { loadAISettings } from './aiService';
+import { loadAISettings, GEMINI_NON_BLOCK_SAFETY_SETTINGS } from './aiService';
 import { hashString } from '../utils/tensionUtils';
 
 export type TTSEngineMode = 'auto' | 'gemini' | 'groq' | 'wasm';
@@ -425,6 +425,7 @@ export async function generateGeminiSpeechAudio(
                 },
               },
             },
+            safetySettings: GEMINI_NON_BLOCK_SAFETY_SETTINGS,
           }),
         });
 

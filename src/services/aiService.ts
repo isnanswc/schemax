@@ -259,7 +259,28 @@ export function calculateSlotHealth(slot: AIKeySlot): {
   };
 }
 
-// Call Google Gemini API
+// Permanent Non-Block Content Filter Settings for Google Gemini
+// Allows full creative freedom in novel writing, mature romance, action/battles, and dark worldbuilding
+export const GEMINI_NON_BLOCK_SAFETY_SETTINGS = [
+  {
+    category: 'HARM_CATEGORY_HARASSMENT',
+    threshold: 'BLOCK_NONE',
+  },
+  {
+    category: 'HARM_CATEGORY_HATE_SPEECH',
+    threshold: 'BLOCK_NONE',
+  },
+  {
+    category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+    threshold: 'BLOCK_NONE',
+  },
+  {
+    category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+    threshold: 'BLOCK_NONE',
+  },
+];
+
+// Call Google Gemini API with permanent Non-Block safety settings
 async function executeGeminiRequest(
   apiKey: string,
   model: string,
@@ -286,6 +307,7 @@ async function executeGeminiRequest(
         temperature: 0.7,
         maxOutputTokens: 8192,
       },
+      safetySettings: GEMINI_NON_BLOCK_SAFETY_SETTINGS,
     }),
   });
 
@@ -296,8 +318,16 @@ async function executeGeminiRequest(
   }
 
   const data = await response.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  const candidate = data.candidates?.[0];
+  const text = candidate?.content?.parts?.[0]?.text;
   if (!text) {
+    if (candidate?.finishReason === 'SAFETY') {
+      throw new Error('Respon dibatasi oleh proteksi keselamatan tingkat dasar sistem.');
+    }
+    const blockReason = data.promptFeedback?.blockReason;
+    if (blockReason) {
+      throw new Error(`Permintaan ditolak oleh filter (${blockReason}).`);
+    }
     throw new Error('Respon Gemini kosong.');
   }
 
@@ -1324,6 +1354,7 @@ async function executeGeminiVisionRequest(
         temperature: 0.4,
         maxOutputTokens: 2048,
       },
+      safetySettings: GEMINI_NON_BLOCK_SAFETY_SETTINGS,
     }),
   });
 
