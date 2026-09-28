@@ -356,8 +356,6 @@ export async function seedBlueprintToDatabase(blueprint: StoryBlueprint): Promis
       const chap = blueprint.chapters[i];
       const chapId = 'chap_' + now.toString(36) + i;
 
-      const initialHtml = `<h2>${chap.title}</h2><p><em>${chap.premise.replace(/\\n/g, '<br/>')}</em></p><hr/><p></p>`;
-
       const chapterRecord: StoryChapter = {
         id: chapId,
         bookId,
@@ -375,7 +373,7 @@ export async function seedBlueprintToDatabase(blueprint: StoryBlueprint): Promis
             updatedAt: now,
           },
         ],
-        contentHtml: initialHtml,
+        contentHtml: '',
         wordCount: 0,
         targetWordCount: chap.targetWordCount || 1800,
         createdAt: now,

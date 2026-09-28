@@ -410,6 +410,13 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     if (activeTab === 'manuscript' && tab !== 'manuscript') {
       saveToIndexedDB();
     }
+    if (tab === 'manuscript' && editorRef.current) {
+      if (editorRef.current.innerHTML !== (currentChapter.contentHtml || '')) {
+        editorRef.current.innerHTML = currentChapter.contentHtml || '';
+        updateCounts();
+        applyTensionStyling();
+      }
+    }
     setActiveTab(tab);
   };
 
@@ -557,6 +564,13 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     setCurrentChapter(updated);
     if (fields.status) setStatus(fields.status);
     if (fields.title) setTitle(fields.title);
+    if (fields.wordCount !== undefined) setWordCount(fields.wordCount);
+
+    if (fields.contentHtml !== undefined && editorRef.current) {
+      editorRef.current.innerHTML = fields.contentHtml;
+      updateCounts();
+      applyTensionStyling();
+    }
 
     try {
       await db.chapters.put(updated);
@@ -762,57 +776,6 @@ ${afterHtml}
             activeTab === 'manuscript' ? 'flex flex-col flex-1' : 'hidden'
           } max-w-3xl mx-auto w-full pb-28`}
         >
-          {/* Find & Replace Bar */}
-          {isFindReplaceOpen && (
-            <div className="mb-4 p-3 bg-white dark:bg-slate-900 border border-amber-500/40 rounded-2xl shadow-lg animate-in fade-in slide-in-from-top-2">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-                  <Search className="w-3.5 h-3.5" />
-                  <span>Cari &amp; Ganti Kata</span>
-                </span>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                    {matchCount} kecocokan
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setIsFindReplaceOpen(false)}
-                    className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-                    title="Tutup (Esc)"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Cari kata..."
-                  className="w-full py-1.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 border border-slate-200 dark:border-slate-700"
-                />
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="text"
-                    value={replaceQuery}
-                    onChange={(e) => setReplaceQuery(e.target.value)}
-                    placeholder="Ganti dengan..."
-                    className="flex-1 py-1.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 border border-slate-200 dark:border-slate-700"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleReplaceAll}
-                    disabled={!searchQuery || matchCount === 0}
-                    className="py-1.5 px-3 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-bold rounded-xl text-xs transition whitespace-nowrap active:scale-95"
-                  >
-                    Ganti Semua
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Chapter Title Field */}
           <div className="mb-4 pt-1 border-b border-slate-200 dark:border-slate-800 pb-2.5">
             <div className="flex items-center justify-between mb-1">
@@ -836,8 +799,8 @@ ${afterHtml}
             />
           </div>
 
-          {/* 🚨 Quick Plothole Navigator & Continuity Alert Bar */}
-          {tensionData.items.some((it) => it.hasPlothole) && (
+          {/* 🚨 Quick Plothole Navigator & Continuity Alert Bar (Hidden when Find & Replace is open) */}
+          {tensionData.items.some((it) => it.hasPlothole) && !isFindReplaceOpen && (
             <div className="mb-4 p-3 bg-rose-500/10 dark:bg-rose-950/30 border border-rose-500/40 rounded-2xl shadow-sm animate-in fade-in slide-in-from-top-2">
               <div className="flex items-center justify-between gap-2 mb-1.5">
                 <div className="flex items-center gap-2 min-w-0">
@@ -965,7 +928,7 @@ ${afterHtml}
           onOpenStatsModal={() => setIsStatsModalOpen(true)}
           onOpenInsertImageModal={() => setIsInsertImageOpen(true)}
           onOpenAIAssistant={handleOpenAIAssistant}
-          onOpenFindReplace={() => setIsFindReplaceOpen(true)}
+          onOpenFindReplace={() => setIsFindReplaceOpen((prev) => !prev)}
           isPeekRawOpen={isPeekRawOpen}
           onTogglePeekRaw={() => setIsPeekRawOpen((prev) => !prev)}
           rawDraftCount={(currentChapter.rawDrafts || []).length}
@@ -974,6 +937,14 @@ ${afterHtml}
           hasTensionData={tensionData.items.length > 0}
           plotholeCount={tensionData.items.filter((it) => it.hasPlothole).length}
           onExitToTabs={() => handleTabChange('info')}
+          isFindReplaceOpen={isFindReplaceOpen}
+          searchQuery={searchQuery}
+          replaceQuery={replaceQuery}
+          matchCount={matchCount}
+          onSearchQueryChange={setSearchQuery}
+          onReplaceQueryChange={setReplaceQuery}
+          onReplaceAll={handleReplaceAll}
+          onCloseFindReplace={() => setIsFindReplaceOpen(false)}
         />
       ) : (
         <ChapterBottomNav

@@ -24,7 +24,8 @@ import {
   Search,
   Layers,
   Activity,
-  MessageSquare
+  MessageSquare,
+  X
 } from 'lucide-react';
 import { TensionDisplayMode } from '../../../types';
 
@@ -45,6 +46,14 @@ interface AdvancedEditorToolbarProps {
   hasTensionData?: boolean;
   plotholeCount?: number;
   onExitToTabs: () => void;
+  isFindReplaceOpen?: boolean;
+  searchQuery?: string;
+  replaceQuery?: string;
+  matchCount?: number;
+  onSearchQueryChange?: (q: string) => void;
+  onReplaceQueryChange?: (q: string) => void;
+  onReplaceAll?: () => void;
+  onCloseFindReplace?: () => void;
 }
 
 export const AdvancedEditorToolbar: React.FC<AdvancedEditorToolbarProps> = ({
@@ -64,6 +73,14 @@ export const AdvancedEditorToolbar: React.FC<AdvancedEditorToolbarProps> = ({
   hasTensionData = false,
   plotholeCount = 0,
   onExitToTabs,
+  isFindReplaceOpen = false,
+  searchQuery = '',
+  replaceQuery = '',
+  matchCount = 0,
+  onSearchQueryChange,
+  onReplaceQueryChange,
+  onReplaceAll,
+  onCloseFindReplace,
 }) => {
   const [keyboardOffset, setKeyboardOffset] = useState(0);
 
@@ -95,8 +112,63 @@ export const AdvancedEditorToolbar: React.FC<AdvancedEditorToolbarProps> = ({
       }}
       className="fixed bottom-0 inset-x-0 z-40 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 shadow-xl safe-bottom"
     >
-      {/* Floating Info & Quick Action Bar (Top of toolbar) */}
-      <div className="max-w-4xl mx-auto px-2 sm:px-3 py-1 flex items-center justify-between gap-1.5 overflow-x-auto no-scrollbar border-b border-slate-100 dark:border-slate-800/60 text-xs">
+      {/* 
+        Top Row of Toolbar:
+        - When Find & Replace is OPEN: Show Find & Replace fields right in this area!
+          (While tension, co-pilot, stats, plot are cleanly hidden).
+        - When Find & Replace is CLOSED: Show the normal Quick Action Bar (Plot, Co-Pilot, Tensi, Stats).
+      */}
+      {isFindReplaceOpen ? (
+        <div className="max-w-4xl mx-auto px-2 sm:px-3 py-1.5 flex items-center justify-between gap-1.5 border-b border-amber-500/40 bg-amber-500/10 dark:bg-amber-950/30 text-xs animate-in fade-in">
+          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+            <span className="p-1 rounded-md bg-amber-500/20 text-amber-600 dark:text-amber-400 flex-shrink-0" title="Cari &amp; Ganti Kata">
+              <Search className="w-3.5 h-3.5" />
+            </span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => onSearchQueryChange?.(e.target.value)}
+              placeholder="Cari kata..."
+              autoFocus
+              className="flex-1 min-w-[70px] py-1 px-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
+            />
+            <input
+              type="text"
+              value={replaceQuery}
+              onChange={(e) => onReplaceQueryChange?.(e.target.value)}
+              placeholder="Ganti jadi..."
+              className="flex-1 min-w-[70px] py-1 px-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
+            />
+            {matchCount > 0 && (
+              <span className="text-[10px] text-amber-700 dark:text-amber-400 font-mono font-bold whitespace-nowrap px-1 hidden sm:inline">
+                {matchCount} cocok
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button
+              type="button"
+              onClick={onReplaceAll}
+              disabled={!searchQuery || matchCount === 0}
+              className="py-1 px-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-slate-950 font-bold rounded-lg text-[11px] transition whitespace-nowrap active:scale-95 shadow-xs"
+              title="Ganti semua kemunculan kata"
+            >
+              Ganti Semua
+            </button>
+            <button
+              type="button"
+              onClick={onCloseFindReplace}
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition"
+              title="Tutup (Esc)"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* Floating Info & Quick Action Bar (Top of toolbar) */
+        <div className="max-w-4xl mx-auto px-2 sm:px-3 py-1 flex items-center justify-between gap-1.5 overflow-x-auto no-scrollbar border-b border-slate-100 dark:border-slate-800/60 text-xs">
         <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
           {/* Exit back to tabs */}
           <button
@@ -187,6 +259,7 @@ export const AdvancedEditorToolbar: React.FC<AdvancedEditorToolbarProps> = ({
           </span>
         </button>
       </div>
+    )}
 
       {/* Main Rich Text Formatting Bar */}
       <div className="max-w-4xl mx-auto px-2 py-1.5 flex items-center gap-1 overflow-x-auto no-scrollbar">
@@ -213,7 +286,11 @@ export const AdvancedEditorToolbar: React.FC<AdvancedEditorToolbarProps> = ({
           <button
             type="button"
             onClick={onOpenFindReplace}
-            className="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-amber-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition active:scale-90 flex-shrink-0"
+            className={`p-2 rounded-xl transition active:scale-90 flex-shrink-0 ${
+              isFindReplaceOpen
+                ? 'bg-amber-500 text-slate-950 font-bold shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-amber-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
             title="Cari & Ganti Kata (Find & Replace)"
           >
             <Search className="w-4 h-4" />

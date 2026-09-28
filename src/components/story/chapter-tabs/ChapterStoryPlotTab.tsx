@@ -41,7 +41,7 @@ interface ChapterStoryPlotTabProps {
   chapter: StoryChapter;
   bookTitle: string;
   entities?: WorldEntity[];
-  onUpdateChapter: (fields: Partial<StoryChapter>) => void;
+  onUpdateChapter: (fields: Partial<StoryChapter>) => void | Promise<void>;
   onNavigateToManuscript: () => void;
   onNavigateToGlossary?: () => void;
 }
@@ -572,7 +572,7 @@ PETUNJUK PENULISAN:
 
       const words = (finalHtml.replace(/<[^>]*>/g, ' ').match(/\S+/g) || []).length;
 
-      onUpdateChapter({
+      await onUpdateChapter({
         contentHtml: finalHtml,
         wordCount: words,
         premise: chapterPlotText,
