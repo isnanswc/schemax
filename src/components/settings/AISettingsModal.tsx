@@ -31,7 +31,10 @@ import {
   Zap,
   Globe,
   Info,
-  DownloadCloud
+  DownloadCloud,
+  ArrowUp,
+  ArrowDown,
+  ArrowRight,
 } from 'lucide-react';
 
 interface AISettingsModalProps {
@@ -212,6 +215,20 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
     saveAISettings(newConfig);
   };
 
+  const handleMoveProviderPriority = (index: number, direction: 'up' | 'down') => {
+    const currentList = [...config.providerPriority];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= currentList.length) return;
+
+    const [moved] = currentList.splice(index, 1);
+    currentList.splice(targetIndex, 0, moved);
+
+    const newConfig = { ...config, providerPriority: currentList };
+    setConfig(newConfig);
+    saveAISettings(newConfig);
+  };
+
+
   const handleTestConnection = async (slot: AIKeySlot) => {
     if (!slot.apiKey || !slot.apiKey.trim()) {
       alert('Silakan masukkan API Key terlebih dahulu sebelum tes.');
@@ -222,7 +239,11 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
     const primaryModel =
       currentGlobalConfig.fallbackModels[0] ||
       (currentGlobalConfig.cachedModels && currentGlobalConfig.cachedModels[0]?.id) ||
-      (slot.provider === 'gemini' ? 'gemini-2.5-flash' : 'llama-3.3-70b-versatile');
+      (slot.provider === 'gemini'
+        ? 'gemini-2.5-flash'
+        : slot.provider === 'groq'
+        ? 'llama-3.3-70b-versatile'
+        : 'meta-llama/llama-3.3-70b-instruct:free');
     const result = await testSlotConnection(slot, primaryModel);
     setTestingSlotId(null);
 
@@ -309,6 +330,93 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
                   }`}
                 />
               </button>
+            </div>
+          </div>
+
+          {/* Provider Execution Sequence & Priority Ordering */}
+          <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 space-y-2.5 shadow-sm">
+            <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-1">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-amber-500" />
+                <h4 className="font-extrabold text-xs sm:text-sm text-slate-900 dark:text-white">
+                  Urutan Prioritas Provider Utama
+                </h4>
+              </div>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono font-bold">
+                {config.providerPriority.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ➔ ')}
+              </span>
+            </div>
+
+            <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+              Atur provider mana yang pertama kali dicoba. Jika gagal/limit, otomatis melompat ke provider urutan berikutnya.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+              {config.providerPriority.map((providerKey, index) => {
+                const isGemini = providerKey === 'gemini';
+                const isGroq = providerKey === 'groq';
+                const displayName = isGemini ? 'Google Gemini' : isGroq ? 'Groq Cloud' : 'OpenRouter';
+                const icon = isGemini ? (
+                  <Cpu className="w-3.5 h-3.5 text-amber-500" />
+                ) : isGroq ? (
+                  <Zap className="w-3.5 h-3.5 text-indigo-400" />
+                ) : (
+                  <Globe className="w-3.5 h-3.5 text-purple-400" />
+                );
+
+                const activeCount = config.slots.filter((s) => s.provider === providerKey && s.apiKey && s.apiKey.trim().length > 0).length;
+
+                return (
+                  <div
+                    key={providerKey}
+                    className={`flex items-center justify-between p-2.5 rounded-xl border transition ${
+                      activeTab === providerKey
+                        ? 'bg-white dark:bg-slate-900 border-amber-500/60 shadow-sm'
+                        : 'bg-white/60 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800'
+                    }`}
+                  >
+                    <div
+                      className="flex items-center gap-2 min-w-0 cursor-pointer flex-1"
+                      onClick={() => setActiveTab(providerKey)}
+                    >
+                      <span className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center font-bold text-[10px] border border-slate-200 dark:border-slate-700">
+                        {index + 1}
+                      </span>
+                      <div className="min-w-0">
+                        <span className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-1 truncate">
+                          {icon}
+                          <span>{displayName}</span>
+                        </span>
+                        <span className="text-[10px] text-slate-400 block truncate">
+                          {activeCount > 0 ? `${activeCount} Key Siap` : 'Belum Ada Key'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Move Up / Down Buttons */}
+                    <div className="flex items-center gap-0.5 flex-shrink-0 ml-1">
+                      <button
+                        type="button"
+                        onClick={() => handleMoveProviderPriority(index, 'up')}
+                        disabled={index === 0}
+                        className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-20 transition active:scale-95"
+                        title="Geser Jadi Lebih Utama"
+                      >
+                        <ArrowUp className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleMoveProviderPriority(index, 'down')}
+                        disabled={index === config.providerPriority.length - 1}
+                        className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-20 transition active:scale-95"
+                        title="Geser Jadi Cadangan"
+                      >
+                        <ArrowDown className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 

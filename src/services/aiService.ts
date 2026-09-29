@@ -524,10 +524,11 @@ async function executeOpenRouterRequest(
   }
   messages.push({ role: 'user', content: prompt });
 
+  const cleanKey = apiKey.trim();
   const response = await fetch(url, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${apiKey.trim()}`,
+      Authorization: `Bearer ${cleanKey}`,
       'HTTP-Referer': 'https://schemax.app',
       'X-Title': 'Schemax Story Studio',
       'Content-Type': 'application/json',
@@ -542,14 +543,20 @@ async function executeOpenRouterRequest(
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    const message = errorData.error?.message || `HTTP ${response.status} ${response.statusText}`;
-    throw new Error(message);
+    const message =
+      errorData.error?.message ||
+      (typeof errorData.error === 'string' ? errorData.error : null) ||
+      `HTTP ${response.status} (${response.statusText || 'Gagal terhubung ke OpenRouter'})`;
+    throw new Error(`OpenRouter [${model}]: ${message}`);
   }
 
   const data = await response.json();
   const text = data.choices?.[0]?.message?.content;
   if (!text) {
-    throw new Error('Respon OpenRouter kosong.');
+    if (data.error) {
+      throw new Error(`OpenRouter: ${data.error.message || JSON.stringify(data.error)}`);
+    }
+    throw new Error(`Respon OpenRouter (${model}) kosong.`);
   }
 
   return text.trim();
@@ -605,17 +612,18 @@ export async function generateWithSmartFallback(
 
     let fallbackModels = (slot.models && slot.models.length > 0
       ? slot.models
-      : providerGlobal?.fallbackModels || []).filter(Boolean);
+      : providerGlobal?.fallbackModels || []).filter((m) => Boolean(m && m.trim().length > 0));
 
     // If no models were explicitly set or all were empty strings, fallback to cached models or known reliable defaults
     if (fallbackModels.length === 0) {
       if (providerGlobal?.cachedModels && providerGlobal.cachedModels.length > 0) {
-        fallbackModels = providerGlobal.cachedModels.map((m) => m.id);
+        // Take up to top 3 cached models
+        fallbackModels = providerGlobal.cachedModels.slice(0, 3).map((m) => m.id);
       } else {
         if (slot.provider === 'gemini') {
-          fallbackModels = ['gemini-3.8-flash-preview', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+          fallbackModels = ['gemini-2.5-flash', 'gemini-1.5-flash'];
         } else if (slot.provider === 'groq') {
-          fallbackModels = ['llama-3.3-70b-versatile', 'llama3-8b-8192'];
+          fallbackModels = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
         } else {
           fallbackModels = ['meta-llama/llama-3.3-70b-instruct:free', 'mistralai/mistral-7b-instruct:free'];
         }
@@ -759,19 +767,27 @@ export async function testSlotConnection(
   const startTime = Date.now();
   try {
     const testPrompt = 'Tes koneksi sistem Schemax. Jawab hanya dengan kata: OK_TERHUBUNG';
+    const effectiveModel =
+      modelName && modelName.trim().length > 0
+        ? modelName.trim()
+        : slot.provider === 'gemini'
+        ? 'gemini-2.5-flash'
+        : slot.provider === 'groq'
+        ? 'llama-3.3-70b-versatile'
+        : 'meta-llama/llama-3.3-70b-instruct:free';
 
     if (slot.provider === 'gemini') {
-      await executeGeminiRequest(slot.apiKey, modelName, testPrompt);
+      await executeGeminiRequest(slot.apiKey, effectiveModel, testPrompt);
     } else if (slot.provider === 'groq') {
-      await executeGroqRequest(slot.apiKey, modelName, testPrompt);
+      await executeGroqRequest(slot.apiKey, effectiveModel, testPrompt);
     } else if (slot.provider === 'openrouter') {
-      await executeOpenRouterRequest(slot.apiKey, modelName, testPrompt);
+      await executeOpenRouterRequest(slot.apiKey, effectiveModel, testPrompt);
     }
 
     const latencyMs = Date.now() - startTime;
     return {
       success: true,
-      message: `Terhubung dengan ${modelName}! (${latencyMs}ms)`,
+      message: `Terhubung dengan ${effectiveModel}! (${latencyMs}ms)`,
       latencyMs,
     };
   } catch (err: any) {
