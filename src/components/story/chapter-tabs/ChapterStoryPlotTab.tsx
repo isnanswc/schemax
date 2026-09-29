@@ -31,7 +31,8 @@ import {
   History,
   ShieldCheck,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Plus
 } from 'lucide-react';
 import { StoryChapter, WorldEntity, Book } from '../../../types';
 import { db } from '../../../db';
