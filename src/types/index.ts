@@ -294,6 +294,7 @@ export type ActiveTab = 'overview' | 'chapters' | 'world' | 'gallery' | 'sync';
 
 export interface GDriveConfig {
   apiKey?: string;
+  scriptUrl?: string; // Google Apps Script Web App URL
   folderUrl?: string;
   folderId?: string;
   folderName?: string;

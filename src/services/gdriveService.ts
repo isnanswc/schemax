@@ -78,14 +78,17 @@ export function saveGDriveConfig(config: GDriveConfig): void {
   }
 }
 
-// Dapatkan Google API Key yang valid (mengutamakan config GDrive, atau fallback ke Gemini Slot API Key jika ada)
-export function getEffectiveGoogleApiKey(): string {
+// Dapatkan Kredensial aktif (mengutamakan Apps Script Web App URL, lalu API Key khusus GDrive, lalu fallback ke Gemini Key)
+export function getEffectiveGDriveCredential(): string {
   const gdrive = loadGDriveConfig();
+  if (gdrive.scriptUrl && gdrive.scriptUrl.trim()) {
+    return gdrive.scriptUrl.trim();
+  }
   if (gdrive.apiKey && gdrive.apiKey.trim()) {
     return gdrive.apiKey.trim();
   }
 
-  // Coba ambil dari Gemini Slot API Key (Google Cloud API Key yang sama seringkali bisa mengakses Drive API)
+  // Coba ambil dari Gemini Slot API Key jika ada
   const aiSettings = loadAISettings();
   const geminiSlot = aiSettings.slots.find(
     (s) => s.provider === 'gemini' && s.apiKey && s.apiKey.trim().length > 0
@@ -97,13 +100,42 @@ export function getEffectiveGoogleApiKey(): string {
   return '';
 }
 
-// Cek dan ambil info folder Google Drive (nama folder dan validitas)
-export async function testAndFetchGDriveFolder(folderId: string, apiKey: string): Promise<{ name: string; fileCount: number }> {
-  if (!folderId) throw new Error('ID Folder Google Drive tidak valid.');
-  if (!apiKey) throw new Error('Google Cloud API Key diperlukan untuk membaca folder publik.');
+export function getEffectiveGoogleApiKey(): string {
+  return getEffectiveGDriveCredential();
+}
 
-  // 1. Ambil info folder
-  const folderUrl = `https://www.googleapis.com/drive/v3/files/${folderId}?fields=id,name,mimeType&key=${apiKey.trim()}`;
+// Cek dan ambil info folder Google Drive (nama folder dan validitas)
+// Mendukung Google Apps Script Web App URL atau Google Cloud API Key
+export async function testAndFetchGDriveFolder(
+  folderId: string,
+  apiKeyOrScriptUrl: string
+): Promise<{ name: string; fileCount: number }> {
+  if (!folderId) throw new Error('ID Folder Google Drive tidak valid.');
+  if (!apiKeyOrScriptUrl) {
+    throw new Error('Masukkan Google Apps Script Web App URL atau Google Cloud API Key.');
+  }
+
+  const trimmed = apiKeyOrScriptUrl.trim();
+
+  // Mode 1: Jika menggunakan Google Apps Script Web App URL
+  if (trimmed.includes('script.google.com')) {
+    const url = `${trimmed}${trimmed.includes('?') ? '&' : '?'}folderId=${encodeURIComponent(folderId)}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status} Gagal menghubungi Google Apps Script Web App.`);
+    }
+    const data = await res.json();
+    if (data.error) {
+      throw new Error(`Google Drive Error: ${data.error}`);
+    }
+    return {
+      name: data.name || 'Folder Google Drive',
+      fileCount: data.files?.length || 0,
+    };
+  }
+
+  // Mode 2: Jika menggunakan Google Cloud API Key resmi
+  const folderUrl = `https://www.googleapis.com/drive/v3/files/${folderId}?fields=id,name,mimeType&key=${trimmed}`;
   const folderRes = await fetch(folderUrl);
 
   if (!folderRes.ok) {
@@ -111,7 +143,7 @@ export async function testAndFetchGDriveFolder(folderId: string, apiKey: string)
     const message = err.error?.message || `HTTP ${folderRes.status} Gagal mengakses folder Google Drive.`;
     if (folderRes.status === 404 || folderRes.status === 403) {
       throw new Error(
-        'Folder tidak ditemukan atau belum diset publik. Pastikan izin akses folder adalah "Anyone with the link can view".'
+        'Folder tidak ditemukan atau akses ditolak. Pastikan izin akses folder adalah "Anyone with the link can view". Atau gunakan metode Google Apps Script Web App.'
       );
     }
     throw new Error(message);
@@ -119,8 +151,7 @@ export async function testAndFetchGDriveFolder(folderId: string, apiKey: string)
 
   const folderData = await folderRes.json();
 
-  // 2. Hitung jumlah item di dalamnya
-  const listUrl = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&fields=files(id)&pageSize=100&key=${apiKey.trim()}`;
+  const listUrl = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&fields=files(id)&pageSize=100&key=${trimmed}`;
   const listRes = await fetch(listUrl);
   let fileCount = 0;
   if (listRes.ok) {
@@ -137,13 +168,39 @@ export async function testAndFetchGDriveFolder(folderId: string, apiKey: string)
 // Ambil isi subfolder & file gambar dari folder tertentu
 export async function listGDriveFolderContents(
   folderId: string,
-  apiKey: string
+  apiKeyOrScriptUrl: string
 ): Promise<GDriveItem[]> {
-  if (!folderId || !apiKey) return [];
+  if (!folderId || !apiKeyOrScriptUrl) return [];
 
+  const trimmed = apiKeyOrScriptUrl.trim();
+
+  // Mode 1: Google Apps Script Web App URL
+  if (trimmed.includes('script.google.com')) {
+    const url = `${trimmed}${trimmed.includes('?') ? '&' : '?'}folderId=${encodeURIComponent(folderId)}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Gagal memuat isi folder (${response.status}) via Google Apps Script.`);
+    }
+    const data = await response.json();
+    if (data.error) {
+      throw new Error(data.error);
+    }
+    const rawFiles: any[] = data.files || [];
+    return rawFiles.map((f: any) => ({
+      id: f.id,
+      name: f.name,
+      mimeType: f.mimeType,
+      isFolder: Boolean(f.isFolder),
+      size: f.size,
+      directUrl: f.isFolder ? undefined : getGDriveDirectImageUrl(f.id),
+      thumbnailUrl: f.isFolder ? undefined : getGDriveDirectImageUrl(f.id),
+    }));
+  }
+
+  // Mode 2: Google Cloud API Key
   const query = `'${folderId}' in parents and trashed = false`;
   const fields = 'files(id, name, mimeType, size, thumbnailLink, webContentLink)';
-  const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=${encodeURIComponent(fields)}&pageSize=100&orderBy=folder,name&key=${apiKey.trim()}`;
+  const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=${encodeURIComponent(fields)}&pageSize=100&orderBy=folder,name&key=${trimmed}`;
 
   const response = await fetch(url);
   if (!response.ok) {
