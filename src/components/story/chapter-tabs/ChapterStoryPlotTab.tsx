@@ -132,8 +132,8 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
   onNavigateToManuscript,
   onNavigateToGlossary,
 }) => {
-  // 📑 Two Sheets Toggle: 'internal' (AI Internal Studio) vs 'external' (AI External Context Pack)
-  const [activeSheet, setActiveSheet] = useState<'internal' | 'external'>('internal');
+  // 📑 Three Sheets Toggle: 'internal' (AI Internal Studio) vs 'toolsaday' (AI Toolsaday Bridge) vs 'external' (AI External Context Pack)
+  const [activeSheet, setActiveSheet] = useState<'internal' | 'toolsaday' | 'external'>('internal');
 
   const [book, setBook] = useState<Book | null>(null);
   const [earlierChaptersList, setEarlierChaptersList] = useState<StoryChapter[]>([]);
@@ -177,6 +177,11 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
   const [isGeneratingInternal, setIsGeneratingInternal] = useState(false);
   const [internalGenSuccess, setInternalGenSuccess] = useState<{ wordCount: number; sessionNum: number } | null>(null);
   const [internalGenError, setInternalGenError] = useState<string | null>(null);
+
+  // Toolsaday Bridge States
+  const [toolsadayPastedText, setToolsadayPastedText] = useState('');
+  const [toolsadayImportSuccess, setToolsadayImportSuccess] = useState<{ wordCount: number; sessionNum: number } | null>(null);
+  const [copiedToolsadayPrompt, setCopiedToolsadayPrompt] = useState(false);
 
   const plotTextareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -652,6 +657,103 @@ INSTRUKSI PENULISAN:
 ==================================================`;
   };
 
+  // Compile prompt specifically optimized for Toolsaday Story Generator
+  const getToolsadayFormattedPrompt = (): string => {
+    return `Write a rich, captivating novel chapter in Indonesian based on the following story specifications:
+
+[GENRE & PREMISE]:
+Novel: ${bookTitle} (Bab ${chapter.order}: ${chapter.title})
+${chapter.premise || chapter.aiSummary || book?.synopsis?.slice(0, 350) || 'Cerita novel fiksi mendalam.'}
+
+[CHARACTERS & CURRENT CONDITION]:
+${charactersText ? charactersText.slice(0, 800) : 'Tokoh utama dan tokoh pendukung berinteraksi intens.'}
+
+[SETTING & WORLD DETAILS]:
+${settingItemLoreText ? settingItemLoreText.slice(0, 500) : 'Latar tempat atmosferik, mendukung suasana ketegangan.'}
+
+[CHAPTER PLOT / SCENE BEATS TO WRITE]:
+${chapterPlotText.trim() || 'Kembangkan bab ini dengan pembuka yang memikat, konflik yang memuncak, dan penutup bab yang berkesan.'}
+
+[WRITING STYLE & GUIDELINES]:
+- Language: Indonesian (Bahasa Indonesia sastra yang mengalir alami dan ekspresif).
+- Narrative depth: Show, don't tell. Rich sensory descriptions and natural character dialogue.
+- Continuity: Build directly from previous events, keeping emotional stakes high.
+- Output: Write ONLY the story prose in clean novel paragraphs without meta introduction or title headers.`;
+  };
+
+  const handleCopyToolsadayPrompt = () => {
+    const text = getToolsadayFormattedPrompt();
+    navigator.clipboard.writeText(text);
+    setCopiedToolsadayPrompt(true);
+    setTimeout(() => setCopiedToolsadayPrompt(false), 2200);
+  };
+
+  // Import story generated from Toolsaday into current chapter manuscript
+  const handleImportFromToolsaday = async (targetText: string, mode: 'append' | 'overwrite') => {
+    const textToImport = targetText.trim();
+    if (!textToImport) {
+      alert('Teks naskah masih kosong. Silakan tempelkan hasil dari Toolsaday terlebih dahulu.');
+      return;
+    }
+
+    // Convert plain text paragraphs to clean HTML paragraphs
+    const rawParas = textToImport
+      .split(/\n\s*\n/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+
+    const generatedParagraphsHtml = rawParas
+      .map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`)
+      .join('');
+
+    const existingSessionsMatch = (chapter.contentHtml || '').match(/schemax-ai-session/gi);
+    const nextSessionNumber = (existingSessionsMatch ? existingSessionsMatch.length : 0) + 1;
+
+    const now = new Date();
+    const timeStr =
+      now.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) +
+      ' ' +
+      now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+
+    const sessionDividerHtml = `
+<div class="schemax-ai-session-divider" data-session="${nextSessionNumber}" contenteditable="false">
+  <span class="schemax-ai-session-tag">🌐 Impor Toolsaday #${nextSessionNumber} • ${timeStr}</span>
+</div>
+`;
+
+    let finalHtml = '';
+    if (mode === 'append' && chapter.contentHtml && chapter.contentHtml.trim()) {
+      finalHtml = `${chapter.contentHtml}${sessionDividerHtml}${generatedParagraphsHtml}`;
+    } else {
+      finalHtml = `${sessionDividerHtml}${generatedParagraphsHtml}`;
+    }
+
+    const words = (finalHtml.replace(/<[^>]*>/g, ' ').match(/\S+/g) || []).length;
+
+    await onUpdateChapter({
+      contentHtml: finalHtml,
+      wordCount: words,
+      updatedAt: Date.now(),
+    });
+
+    setToolsadayImportSuccess({ wordCount: words, sessionNum: nextSessionNumber });
+    setToolsadayPastedText('');
+  };
+
+  const handlePasteFromClipboardToToolsaday = async () => {
+    try {
+      const clipboardText = await navigator.clipboard.readText();
+      if (clipboardText && clipboardText.trim()) {
+        setToolsadayPastedText(clipboardText.trim());
+      } else {
+        alert('Clipboard kosong atau browser tidak mengizinkan baca clipboard otomatis. Silakan tempel (Ctrl+V) langsung ke kotak teks.');
+      }
+    } catch {
+      alert('Silakan tekan Ctrl+V (atau ketuk lama lalu Tempel) langsung di dalam kotak teks.');
+    }
+  };
+
+
   const handleCopyAll = () => {
     const full = getFullMasterPrompt();
     navigator.clipboard.writeText(full);
@@ -770,32 +872,45 @@ INSTRUKSI PENULISAN:
           </div>
         </div>
 
-        {/* 📑 TWO TABS SWITCHER: [ 🚀 AI Internal ] [ 🌐 AI External ] */}
-        <div className="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800">
+        {/* 📑 THREE TABS SWITCHER: [ 🚀 AI Internal ] [ ⚡ AI Toolsaday ] [ 🌐 AI External ] */}
+        <div className="grid grid-cols-3 p-1 bg-slate-100 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs sm:text-sm">
           <button
             type="button"
             onClick={() => setActiveSheet('internal')}
-            className={`py-2 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+            className={`py-2 px-2 sm:px-3 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all text-center ${
               activeSheet === 'internal'
                 ? 'bg-amber-500 text-slate-950 shadow-md font-black'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <Sparkles className="w-4 h-4" />
-            <span>AI Internal (Studio Naskah)</span>
+            <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">AI Internal</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSheet('toolsaday')}
+            className={`py-2 px-2 sm:px-3 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all text-center ${
+              activeSheet === 'toolsaday'
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md font-black'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Flame className="w-3.5 h-3.5 flex-shrink-0 text-amber-300" />
+            <span className="truncate">AI Toolsaday</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveSheet('external')}
-            className={`py-2 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+            className={`py-2 px-2 sm:px-3 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all text-center ${
               activeSheet === 'external'
                 ? 'bg-indigo-600 text-white shadow-md font-black'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <ExternalLink className="w-4 h-4" />
-            <span>AI External (Paket Konteks)</span>
+            <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">AI External (5 Poin)</span>
           </button>
         </div>
       </div>
@@ -1137,9 +1252,201 @@ INSTRUKSI PENULISAN:
       )}
 
       {/* ========================================================
-          SHEET 2: AI EXTERNAL (PAKET KONTEKS TERSTRUKTUR 5 POIN)
+          SHEET 2: AI TOOLSADAY (JEMBATAN CEPAT & IMPOR NASKAH)
+          ======================================================== */}
+      {activeSheet === 'toolsaday' && (
+        <div className="space-y-4 animate-in fade-in">
+          {/* Header Card: Panduan & Tombol Aksi Langsung */}
+          <div className="bg-gradient-to-br from-blue-600/10 via-indigo-600/10 to-purple-600/10 border border-blue-500/30 rounded-3xl p-4 sm:p-5 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 flex-shrink-0">
+                  <Flame className="w-5 h-5 text-amber-300" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>Toolsaday Story Generator Bridge</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-600 dark:text-blue-300 border border-blue-500/30">
+                      Gratis Tanpa Login
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Otomatis merangkum Plot Bab {chapter.order}, Karakter &amp; Setting ke format pas untuk Toolsaday.
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons: Salin Format & Buka Toolsaday */}
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={handleCopyToolsadayPrompt}
+                  className="flex-1 sm:flex-none py-2 px-3.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs transition active:scale-95 shadow-md shadow-blue-600/25 flex items-center justify-center gap-1.5"
+                >
+                  {copiedToolsadayPrompt ? (
+                    <>
+                      <Check className="w-4 h-4 text-emerald-300" />
+                      <span>Format Tersalin!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      <span>Salin Prompt Toolsaday</span>
+                    </>
+                  )}
+                </button>
+
+                <a
+                  href="https://toolsaday.com/writing/story-generator"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="py-2 px-3.5 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-100 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/60 font-extrabold text-xs transition active:scale-95 shadow-xs flex items-center justify-center gap-1.5 flex-shrink-0"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Buka Web Toolsaday ↗</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Step-by-Step Mini Guide */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-blue-200/50 dark:border-blue-900/40 text-[11px]">
+              <div className="p-2.5 rounded-xl bg-white/70 dark:bg-slate-900/60 border border-blue-100 dark:border-slate-800">
+                <span className="font-extrabold text-blue-600 dark:text-blue-400 block mb-0.5">1. Salin Format:</span>
+                <span className="text-slate-600 dark:text-slate-400">
+                  Klik tombol <strong>"Salin Prompt Toolsaday"</strong> di atas. Plot &amp; data bab Anda sudah dirangkum otomatis.
+                </span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-white/70 dark:bg-slate-900/60 border border-blue-100 dark:border-slate-800">
+                <span className="font-extrabold text-blue-600 dark:text-blue-400 block mb-0.5">2. Tempel di Toolsaday:</span>
+                <span className="text-slate-600 dark:text-slate-400">
+                  Buka tab Toolsaday, tempel (Ctrl+V) ke kolom cerita lalu klik <strong>Generate</strong>.
+                </span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-white/70 dark:bg-slate-900/60 border border-blue-100 dark:border-slate-800">
+                <span className="font-extrabold text-blue-600 dark:text-blue-400 block mb-0.5">3. Impor Hasil ke Sini:</span>
+                <span className="text-slate-600 dark:text-slate-400">
+                  Salin teks cerita dari Toolsaday, lalu tempel di kotak bawah ini dan klik <strong>Impor Naskah</strong>.
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Prompt Preview Box */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                <Scroll className="w-3.5 h-3.5 text-blue-500" />
+                <span>Isi Ringkasan Prompt yang Siap Dikirim ke Toolsaday:</span>
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono">
+                {getToolsadayFormattedPrompt().length.toLocaleString()} karakter
+              </span>
+            </div>
+
+            <textarea
+              readOnly
+              rows={6}
+              value={getToolsadayFormattedPrompt()}
+              className="w-full p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 text-xs font-mono leading-relaxed focus:outline-none shadow-inner resize-y"
+            />
+          </div>
+
+          {/* Import Received Manuscript Box */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <ClipboardPaste className="w-4 h-4 text-emerald-500" />
+                  <span>Tempelkan Hasil Naskah dari Toolsaday di Sini:</span>
+                </h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Naskah akan otomatis dibersihkan menjadi paragraf sastra dan dimasukkan ke Editor Naskah Bab {chapter.order}.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handlePasteFromClipboardToToolsaday}
+                className="py-1.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 font-bold text-xs transition active:scale-95 flex items-center gap-1 self-start sm:self-auto border border-slate-200 dark:border-slate-700 shadow-xs"
+              >
+                <ClipboardPaste className="w-3.5 h-3.5 text-blue-500" />
+                <span>Tempel dari Clipboard</span>
+              </button>
+            </div>
+
+            <textarea
+              rows={8}
+              value={toolsadayPastedText}
+              onChange={(e) => setToolsadayPastedText(e.target.value)}
+              placeholder="Tempelkan (Ctrl+V) naskah cerita hasil generate dari Toolsaday di sini..."
+              className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-slate-900 dark:text-slate-100 leading-relaxed focus:outline-none focus:border-blue-500 shadow-inner resize-y min-h-[160px]"
+            />
+
+            {/* Word counter & Actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
+              <span className="text-[11px] font-mono text-slate-500">
+                {toolsadayPastedText.trim()
+                  ? `${toolsadayPastedText.trim().split(/\s+/).length.toLocaleString()} kata terdeteksi`
+                  : 'Belum ada teks naskah'}
+              </span>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleImportFromToolsaday(toolsadayPastedText, 'append')}
+                  disabled={!toolsadayPastedText.trim()}
+                  className="flex-1 sm:flex-none py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs transition active:scale-95 shadow-md shadow-emerald-600/20 disabled:opacity-40 flex items-center justify-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Sambung ke Naskah (+ Sesi Baru)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm('Gantikan seluruh naskah bab ini dengan hasil dari Toolsaday?')) {
+                      handleImportFromToolsaday(toolsadayPastedText, 'overwrite');
+                    }
+                  }}
+                  disabled={!toolsadayPastedText.trim()}
+                  className="py-2.5 px-3.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 font-bold text-xs transition active:scale-95 disabled:opacity-40 border border-slate-200 dark:border-slate-700"
+                >
+                  <span>Ganti Seluruh Bab</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Success notification banner */}
+            {toolsadayImportSuccess && (
+              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 text-xs space-y-2 animate-in fade-in">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-bold">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    <span>Naskah dari Toolsaday berhasil diimpor ke Bab {chapter.order}!</span>
+                  </div>
+                  <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
+                    {toolsadayImportSuccess.wordCount} Total Kata
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={onNavigateToManuscript}
+                  className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 active:scale-95 transition flex items-center justify-center gap-2"
+                >
+                  <Feather className="w-4 h-4" />
+                  <span>Buka Naskah Utama Sekarang ➔</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================
+          SHEET 3: AI EXTERNAL (PAKET KONTEKS TERSTRUKTUR 5 POIN)
           ======================================================== */}
       {activeSheet === 'external' && (
+
         <div className="space-y-4 animate-in fade-in">
           {/* Master Copy & Action Banner */}
           <div className="p-4 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-amber-500/10 border border-indigo-500/25 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
