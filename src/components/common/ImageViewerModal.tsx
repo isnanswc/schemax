@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, ZoomIn, ZoomOut, RotateCcw, Eye, EyeOff, Download, Sparkles } from 'lucide-react';
+import { X, ZoomIn, ZoomOut, RotateCcw, Eye, EyeOff, Download, Sparkles, Check } from 'lucide-react';
 import { usePrivacy } from '../../contexts/PrivacyContext';
 import { navStack } from '../../services/backNavigationService';
 
@@ -9,6 +9,8 @@ interface ImageViewerModalProps {
   title?: string;
   subtitle?: string;
   onClose: () => void;
+  onAction?: () => void;
+  actionLabel?: string;
 }
 
 export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
@@ -17,6 +19,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
   title,
   subtitle,
   onClose,
+  onAction,
+  actionLabel,
 }) => {
   const { settings } = usePrivacy();
   const [scale, setScale] = useState(1);
@@ -201,6 +205,23 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         >
           <RotateCcw className="w-4 h-4" />
         </button>
+
+        {onAction && (
+          <>
+            <div className="w-px h-4 bg-white/20 mx-0.5" />
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAction();
+              }}
+              className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-bold text-xs transition flex items-center gap-1.5 shadow-md"
+            >
+              <Check className="w-3.5 h-3.5" />
+              <span>{actionLabel || 'Pilih Gambar'}</span>
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

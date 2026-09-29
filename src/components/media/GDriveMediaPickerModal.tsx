@@ -1,5 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { X, Folder, Image as ImageIcon, ArrowLeft, RefreshCw, Search, Check, Download, AlertCircle, HardDrive, ExternalLink } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  X,
+  Folder,
+  Image as ImageIcon,
+  ArrowLeft,
+  RefreshCw,
+  Search,
+  Check,
+  Download,
+  AlertCircle,
+  HardDrive,
+  ExternalLink,
+  Maximize2,
+  Eye,
+  EyeOff
+} from 'lucide-react';
 import { GDriveItem } from '../../types';
 import {
   loadGDriveConfig,
@@ -8,6 +23,8 @@ import {
   downloadGDriveImageBlob
 } from '../../services/gdriveService';
 import { saveMediaItem } from '../../db';
+import { usePrivacy } from '../../contexts/PrivacyContext';
+import { ImageViewerModal } from '../common/ImageViewerModal';
 
 interface GDriveMediaPickerModalProps {
   isOpen: boolean;
@@ -35,6 +52,7 @@ export const GDriveMediaPickerModal: React.FC<GDriveMediaPickerModalProps> = ({
   title = 'Pilih Gambar dari Google Drive',
   onOpenSettings,
 }) => {
+  const { settings, getBlurImageClass, bindEmptyAreaLongPress } = usePrivacy();
   const [config, setConfig] = useState(loadGDriveConfig());
   const [currentFolderId, setCurrentFolderId] = useState<string>('');
   const [folderHistory, setFolderHistory] = useState<FolderHistoryItem[]>([]);
@@ -43,6 +61,13 @@ export const GDriveMediaPickerModal: React.FC<GDriveMediaPickerModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [downloadingItemId, setDownloadingItemId] = useState<string | null>(null);
+
+  // Fullscreen Preview & Long-press unblur state
+  const [fullscreenItem, setFullscreenItem] = useState<GDriveItem | null>(null);
+  const [holdingItemId, setHoldingItemId] = useState<string | null>(null);
+  const longPressTimerRef = useRef<any>(null);
+  const isLongPressTriggeredRef = useRef<boolean>(false);
+  const pointerStartPosRef = useRef<{ x: number; y: number } | null>(null);
 
   const apiKey = getEffectiveGoogleApiKey();
 
@@ -124,6 +149,72 @@ export const GDriveMediaPickerModal: React.FC<GDriveMediaPickerModalProps> = ({
     }
   };
 
+  // Pointer event handlers: Long-Press for Fullscreen & Hold-to-Unblur
+  const handlePointerDown = (item: GDriveItem, e: React.PointerEvent) => {
+    if (downloadingItemId) return;
+    isLongPressTriggeredRef.current = false;
+    pointerStartPosRef.current = { x: e.clientX, y: e.clientY };
+
+    // Jika mode privasi aktif, unblur thumbnail ini seketika saat ditekan
+    if (settings.privacyMode && settings.blurImages) {
+      setHoldingItemId(item.id);
+    }
+
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressTriggeredRef.current = true;
+      setHoldingItemId(null);
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        try {
+          navigator.vibrate(40);
+        } catch (e) {}
+      }
+      setFullscreenItem(item);
+    }, 450); // 450ms untuk tahan lama layar penuh
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!pointerStartPosRef.current) return;
+    const dx = Math.abs(e.clientX - pointerStartPosRef.current.x);
+    const dy = Math.abs(e.clientY - pointerStartPosRef.current.y);
+    // Jika bergeser lebih dari 10px (sedang scroll), batalkan long press
+    if (dx > 10 || dy > 10) {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+      setHoldingItemId(null);
+    }
+  };
+
+  const handlePointerUp = (item: GDriveItem) => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    setHoldingItemId(null);
+    pointerStartPosRef.current = null;
+
+    // Jika sudah trigger mode full screen via long-press, jangan pilih gambar
+    if (isLongPressTriggeredRef.current) {
+      isLongPressTriggeredRef.current = false;
+      return;
+    }
+
+    // Ketuk biasa: langsung pilih gambar
+    handlePickImage(item);
+  };
+
+  const handlePointerCancel = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    setHoldingItemId(null);
+    pointerStartPosRef.current = null;
+    isLongPressTriggeredRef.current = false;
+  };
+
   // Filter gambar & folder berdasarkan pencarian
   const filteredItems = items.filter((item) =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -140,9 +231,17 @@ export const GDriveMediaPickerModal: React.FC<GDriveMediaPickerModalProps> = ({
               <HardDrive className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-extrabold text-sm text-slate-900 dark:text-white leading-tight">
-                {title}
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white leading-tight">
+                  {title}
+                </h3>
+                {settings.privacyMode && settings.blurImages && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">
+                    <EyeOff className="w-3 h-3" />
+                    <span>Privasi Aktif</span>
+                  </span>
+                )}
+              </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 Pilih gambar dan simpan otomatis ke penyimpanan lokal
               </p>
@@ -210,8 +309,11 @@ export const GDriveMediaPickerModal: React.FC<GDriveMediaPickerModalProps> = ({
           </div>
         </div>
 
-        {/* Main Content Area */}
-        <div className="flex-1 overflow-y-auto p-4">
+        {/* Main Content Area (With Empty Area Long Press Support) */}
+        <div
+          className="flex-1 overflow-y-auto p-4 select-none"
+          {...bindEmptyAreaLongPress()}
+        >
           {error && (
             <div className="p-4 mb-3 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
@@ -270,19 +372,31 @@ export const GDriveMediaPickerModal: React.FC<GDriveMediaPickerModalProps> = ({
                 }
 
                 const isDownloading = downloadingItemId === item.id;
+                // Privacy blur: buram jika privasi aktif KECUALI sedang ditekan (holdingItemId === item.id)
+                const isCardPrivacyBlur =
+                  settings.privacyMode && settings.blurImages && holdingItemId !== item.id;
 
                 return (
                   <div
                     key={item.id}
-                    onClick={() => !isDownloading && handlePickImage(item)}
-                    className="group relative aspect-square rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-amber-400 dark:hover:border-amber-500 cursor-pointer transition shadow-sm hover:shadow-md"
+                    onPointerDown={(e) => handlePointerDown(item, e)}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={() => handlePointerUp(item)}
+                    onPointerCancel={handlePointerCancel}
+                    onPointerLeave={handlePointerCancel}
+                    className="group relative aspect-square rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-amber-400 dark:hover:border-amber-500 cursor-pointer transition shadow-sm hover:shadow-md select-none touch-manipulation"
                   >
                     {item.directUrl ? (
                       <img
                         src={item.directUrl}
                         alt={item.name}
                         loading="lazy"
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        draggable={false}
+                        className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ${
+                          isCardPrivacyBlur
+                            ? 'filter blur-md scale-105 select-none'
+                            : 'filter blur-0'
+                        }`}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-slate-400">
@@ -290,20 +404,42 @@ export const GDriveMediaPickerModal: React.FC<GDriveMediaPickerModalProps> = ({
                       </div>
                     )}
 
+                    {/* Quick Fullscreen Button in top right */}
+                    <div className="absolute top-2 right-2 z-10 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFullscreenItem(item);
+                        }}
+                        className="p-1.5 rounded-xl bg-black/60 hover:bg-black/85 text-white/90 hover:text-white transition backdrop-blur-sm shadow active:scale-95"
+                        title="Lihat Layar Penuh"
+                      >
+                        <Maximize2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
                     {/* Gradient Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-2.5 flex flex-col justify-end text-white">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-2.5 flex flex-col justify-end text-white pointer-events-none">
                       <span className="text-xs font-semibold truncate leading-tight">
                         {item.name}
                       </span>
-                      <span className="text-[10px] text-amber-300 flex items-center gap-1 mt-0.5">
+                      <span className="text-[10px] text-amber-300 flex items-center gap-1 mt-0.5 font-medium">
                         <Download className="w-3 h-3" />
-                        <span>Klik untuk simpan</span>
+                        <span>Ketuk untuk simpan</span>
                       </span>
                     </div>
 
+                    {/* Holding unblur indicator */}
+                    {holdingItemId === item.id && settings.privacyMode && settings.blurImages && (
+                      <div className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-lg bg-emerald-500/90 text-white text-[9px] font-bold shadow-md animate-pulse">
+                        Melihat...
+                      </div>
+                    )}
+
                     {/* Loading download spinner */}
                     {isDownloading && (
-                      <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex flex-col items-center justify-center text-white space-y-1.5 p-2">
+                      <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex flex-col items-center justify-center text-white space-y-1.5 p-2 z-20">
                         <RefreshCw className="w-6 h-6 animate-spin text-amber-400" />
                         <span className="text-[11px] font-bold text-center">Menyimpan ke lokal...</span>
                       </div>
@@ -316,20 +452,44 @@ export const GDriveMediaPickerModal: React.FC<GDriveMediaPickerModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="p-3.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 flex items-center justify-between text-xs text-slate-500 flex-shrink-0">
-          <span className="text-[11px]">
-            💡 Gambar langsung diunduh ke <strong>IndexedDB</strong> perangkat Anda.
-          </span>
+        <div className="p-3.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-slate-500 flex-shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-[11px]">
+            <span>
+              💡 Ketuk untuk memilih • <strong>Tahan lama</strong> untuk layar penuh
+            </span>
+            {settings.privacyMode && settings.blurImages && (
+              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                (Tahan untuk unblur)
+              </span>
+            )}
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="py-1.5 px-4 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold transition text-xs"
+            className="self-end sm:self-auto py-1.5 px-4 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold transition text-xs"
           >
             Tutup
           </button>
         </div>
 
       </div>
+
+      {/* Fullscreen Image Preview with built-in Privacy Blur & Hold-to-Unblur */}
+      {fullscreenItem && (
+        <ImageViewerModal
+          isOpen={Boolean(fullscreenItem)}
+          imageUrl={fullscreenItem.directUrl || null}
+          title={fullscreenItem.name}
+          subtitle="Google Drive • Tahan layar untuk melihat tanpa blur"
+          onClose={() => setFullscreenItem(null)}
+          onAction={() => {
+            const itemToPick = fullscreenItem;
+            setFullscreenItem(null);
+            handlePickImage(itemToPick);
+          }}
+          actionLabel="Pilih Gambar Ini"
+        />
+      )}
     </div>
   );
 };
