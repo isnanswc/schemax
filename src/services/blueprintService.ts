@@ -232,13 +232,90 @@ Instruksi Analisa Cerdas:
     cleanText = cleanText.substring(firstBrace, lastBrace + 1);
   }
 
+  let rawParsed: any;
   try {
-    const blueprint: StoryBlueprint = JSON.parse(cleanText);
-    return blueprint;
+    rawParsed = JSON.parse(cleanText);
   } catch (err: any) {
     console.error('Gagal parsing JSON Blueprint:', cleanText);
-    throw new Error('Gagal mengurai respons AI menjadi struktur proyek. Silakan coba kembali.');
+    throw new Error('Gagal mengurai respons AI menjadi struktur proyek. Format JSON tidak lengkap. Silakan coba kembali.');
   }
+
+  // Normalisasi & Fallback Null-Safety Lengkap untuk mencegah layar blank jika AI mengembalikan field kosong/null
+  const normalizedBlueprint: StoryBlueprint = {
+    title: rawParsed.title || 'Karya Cerita Baru',
+    titleOptions: Array.isArray(rawParsed.titleOptions) && rawParsed.titleOptions.length > 0
+      ? rawParsed.titleOptions
+      : [rawParsed.title || 'Karya Cerita Baru'],
+    firstChapterTitleOptions: Array.isArray(rawParsed.firstChapterTitleOptions)
+      ? rawParsed.firstChapterTitleOptions
+      : [],
+    genre: rawParsed.genre || 'Fiksi Drama / Misteri',
+    logline: rawParsed.logline || '',
+    synopsis: rawParsed.synopsis || rawParsed.logline || 'Sinopsis cerita belum diuraikan.',
+    thematicCore: rawParsed.thematicCore || '',
+    storyContinuations: Array.isArray(rawParsed.storyContinuations) ? rawParsed.storyContinuations : [],
+    selectedContinuation:
+      rawParsed.selectedContinuation ||
+      (Array.isArray(rawParsed.storyContinuations) && rawParsed.storyContinuations[0]
+        ? `${rawParsed.storyContinuations[0].title}: ${rawParsed.storyContinuations[0].description}`
+        : ''),
+    writingStyle: rawParsed.writingStyle || 'Emosional, Penuh Ketegangan Batin & Realistis',
+    pointOfView: rawParsed.pointOfView || 'Orang Ketiga Terbatas (Menyorot Tokoh Utama)',
+    settingTimeAndTone: rawParsed.settingTimeAndTone || '',
+    characters: Array.isArray(rawParsed.characters)
+      ? rawParsed.characters.map((c: any) => ({
+          name: c.name || 'Tokoh Tanpa Nama',
+          role: c.role || 'Keluarga / Kerabat',
+          age: c.age || '25 Tahun',
+          physicalTraits: c.physicalTraits || '',
+          traits: c.traits || '',
+          visualPrompt: c.visualPrompt || '',
+          shortDescription: c.shortDescription || c.role || '',
+          want: c.want || '',
+          need: c.need || '',
+          flawOrWound: c.flawOrWound || '',
+          attributes: Array.isArray(c.attributes) ? c.attributes : [],
+          tags: Array.isArray(c.tags) ? c.tags : ['Karakter'],
+        }))
+      : [],
+    locations: Array.isArray(rawParsed.locations)
+      ? rawParsed.locations.map((l: any) => ({
+          name: l.name || 'Lokasi Cerita',
+          shortDescription: l.shortDescription || '',
+          detailedNotes: l.detailedNotes || l.shortDescription || '',
+          attributes: Array.isArray(l.attributes) ? l.attributes : [],
+          tags: Array.isArray(l.tags) ? l.tags : ['Lokasi'],
+        }))
+      : [],
+    items: Array.isArray(rawParsed.items)
+      ? rawParsed.items.map((it: any) => ({
+          name: it.name || 'Artefak / Relik',
+          shortDescription: it.shortDescription || '',
+          detailedNotes: it.detailedNotes || it.shortDescription || '',
+          attributes: Array.isArray(it.attributes) ? it.attributes : [],
+          tags: Array.isArray(it.tags) ? it.tags : ['Artefak'],
+        }))
+      : [],
+    chapters: Array.isArray(rawParsed.chapters) && rawParsed.chapters.length > 0
+      ? rawParsed.chapters.map((ch: any, idx: number) => ({
+          title: ch.title || `Bab ${idx + 1}: Permulaan`,
+          order: ch.order || idx + 1,
+          premise: ch.premise || '',
+          notes: ch.notes || '',
+          targetWordCount: ch.targetWordCount || 1800,
+        }))
+      : [
+          {
+            title: 'Bab 1: Permulaan yang Retak',
+            order: 1,
+            premise: 'Peristiwa awal pemicu konflik dimulai di sini.',
+            notes: 'Fokus pada atmosfer dan pengenalan ketegangan awal.',
+            targetWordCount: 1800,
+          },
+        ],
+  };
+
+  return normalizedBlueprint;
 }
 
 // 🚀 Seed Blueprint directly into Dexie IndexedDB
