@@ -291,3 +291,21 @@ export interface MediaItem {
 }
 
 export type ActiveTab = 'overview' | 'chapters' | 'world' | 'gallery' | 'sync';
+
+export interface GDriveConfig {
+  apiKey?: string;
+  folderUrl?: string;
+  folderId?: string;
+  folderName?: string;
+  lastSyncedAt?: number;
+}
+
+export interface GDriveItem {
+  id: string;
+  name: string;
+  mimeType: string;
+  isFolder: boolean;
+  size?: number;
+  thumbnailUrl?: string;
+  directUrl?: string;
+}

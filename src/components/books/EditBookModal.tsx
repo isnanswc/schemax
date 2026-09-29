@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { X, Image as ImageIcon, Sparkles, BookOpen, Check, Loader2, RefreshCw, Wand2 } from 'lucide-react';
+import { X, Image as ImageIcon, Sparkles, BookOpen, Check, Loader2, RefreshCw, Wand2, HardDrive } from 'lucide-react';
 import { Book, BookStatus } from '../../types';
 import { db, saveMediaItem } from '../../db';
 import { BookCoverImage } from './BookCoverImage';
 import { generateWithSmartFallback } from '../../services/aiService';
 import { AIGenerationEvent } from '../../types/ai';
 import { navStack } from '../../services/backNavigationService';
+import { GDriveMediaPickerModal } from '../media/GDriveMediaPickerModal';
 
 interface EditBookModalProps {
   isOpen: boolean;
   book: Book;
   onClose: () => void;
   onSuccess?: (updatedBook: Book) => void;
+  onOpenGDriveSettings?: () => void;
 }
 
 const GENRE_SUGGESTIONS = [
@@ -30,6 +32,7 @@ export const EditBookModal: React.FC<EditBookModalProps> = ({
   book,
   onClose,
   onSuccess,
+  onOpenGDriveSettings,
 }) => {
   const [title, setTitle] = useState(book.title);
   const [synopsis, setSynopsis] = useState(book.synopsis || '');
@@ -43,6 +46,8 @@ export const EditBookModal: React.FC<EditBookModalProps> = ({
   const [wordTarget, setWordTarget] = useState(String(book.wordCountTarget || 50000));
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
+  const [selectedCoverMediaId, setSelectedCoverMediaId] = useState<string | undefined>(book.coverMediaId);
+  const [isGDrivePickerOpen, setIsGDrivePickerOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [activeAttempt, setActiveAttempt] = useState<AIGenerationEvent | null>(null);
@@ -184,7 +189,7 @@ Instruksi Penulisan:
 
     setIsSubmitting(true);
     try {
-      let coverMediaId = book.coverMediaId;
+      let coverMediaId = selectedCoverMediaId || book.coverMediaId;
 
       if (coverFile) {
         coverMediaId = await saveMediaItem(book.id, coverFile, coverFile.name);
@@ -308,7 +313,7 @@ Instruksi Penulisan:
                   />
                 ) : (
                   <BookCoverImage
-                    mediaId={book.coverMediaId}
+                    mediaId={selectedCoverMediaId}
                     title={title || book.title}
                     aspectRatio="book"
                     className="w-full h-full"
@@ -317,21 +322,50 @@ Instruksi Penulisan:
               </div>
 
               <div className="flex-1 space-y-2">
-                <label className="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl cursor-pointer border border-slate-200 dark:border-slate-700 transition shadow-sm">
-                  <ImageIcon className="w-4 h-4 text-amber-500" />
-                  <span>{coverFile ? 'Ganti File Lain' : 'Ganti Sampul Buku'}</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl cursor-pointer border border-slate-200 dark:border-slate-700 transition shadow-sm">
+                    <ImageIcon className="w-4 h-4 text-amber-500" />
+                    <span>{coverFile ? 'Ganti File Lain' : 'Upload File'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsGDrivePickerOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-50 hover:bg-blue-100 dark:bg-blue-500/15 hover:dark:bg-blue-500/25 active:scale-95 text-blue-700 dark:text-blue-300 text-xs font-bold rounded-xl border border-blue-200 dark:border-blue-500/30 transition shadow-sm"
+                  >
+                    <HardDrive className="w-4 h-4 text-blue-500" />
+                    <span>Pilih dari GDrive</span>
+                  </button>
+                </div>
+
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-normal">
                   Foto disimpan lokal di <strong>IndexedDB</strong> perangkat Anda.
                 </p>
               </div>
             </div>
+
+            {/* GDrive Media Picker Modal */}
+            <GDriveMediaPickerModal
+              isOpen={isGDrivePickerOpen}
+              onClose={() => setIsGDrivePickerOpen(false)}
+              bookId={book.id}
+              category="cover_book"
+              title="Pilih Sampul Buku dari Google Drive"
+              onSelectImage={(newMediaId, directUrl) => {
+                setSelectedCoverMediaId(newMediaId);
+                setCoverFile(null);
+                if (directUrl) {
+                  setCoverPreviewUrl(directUrl);
+                }
+              }}
+              onOpenSettings={onOpenGDriveSettings}
+            />
           </div>
 
           {/* Genre Selection */}

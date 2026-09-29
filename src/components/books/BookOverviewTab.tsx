@@ -33,6 +33,7 @@ interface BookOverviewTabProps {
   mediaList: MediaItem[];
   onBookUpdated: (updated: Book) => void;
   onNavigateToTab: (tab: any) => void;
+  onOpenGDriveSettings?: () => void;
 }
 
 export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
@@ -42,6 +43,7 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
   mediaList,
   onBookUpdated,
   onNavigateToTab,
+  onOpenGDriveSettings,
 }) => {
   const { getBlurTitleClass, getBlurTextClass, getBlurImageClass } = usePrivacy();
   const [synopsis, setSynopsis] = useState(book.synopsis || '');
@@ -423,6 +425,7 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
           setSynopsis(updated.synopsis || '');
           setTargetWordCount(updated.wordCountTarget || 50000);
         }}
+        onOpenGDriveSettings={onOpenGDriveSettings}
       />
 
       {/* Select Cover from Gallery Modal */}

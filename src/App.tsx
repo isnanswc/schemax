@@ -16,6 +16,7 @@ import { MediaGalleryView } from './components/media/MediaGalleryView';
 import { CreateBookModal } from './components/books/CreateBookModal';
 import { SyncStatusModal } from './components/sync/SyncStatusModal';
 import { AISettingsModal } from './components/settings/AISettingsModal';
+import { GDriveSettingsModal } from './components/settings/GDriveSettingsModal';
 import { AIStoryArchitectModal } from './components/story/AIStoryArchitectModal';
 import { navStack } from './services/backNavigationService';
 import { LayoutDashboard, BookOpen } from 'lucide-react';
@@ -37,6 +38,7 @@ export function App() {
   const [createModalInitialStatus, setCreateModalInitialStatus] = useState<BookStatus>('draft');
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [isAISettingsOpen, setIsAISettingsOpen] = useState(false);
+  const [isGDriveSettingsOpen, setIsGDriveSettingsOpen] = useState(false);
   const [isArchitectModalOpen, setIsArchitectModalOpen] = useState(false);
   const [isCornerMenuOpen, setIsCornerMenuOpen] = useState(false);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
@@ -186,6 +188,16 @@ export function App() {
   const handleCloseAISettings = () => {
     navStack.pop('modal-ai-settings');
     setIsAISettingsOpen(false);
+  };
+
+  const handleOpenGDriveSettings = () => {
+    navStack.push('modal-gdrive-settings', () => setIsGDriveSettingsOpen(false));
+    setIsGDriveSettingsOpen(true);
+  };
+
+  const handleCloseGDriveSettings = () => {
+    navStack.pop('modal-gdrive-settings');
+    setIsGDriveSettingsOpen(false);
   };
 
   const handleOpenArchitect = () => {
@@ -344,6 +356,7 @@ export function App() {
                       triggerRefresh();
                     }}
                     onNavigateToTab={setActiveTab}
+                    onOpenGDriveSettings={handleOpenGDriveSettings}
                   />
                 )}
 
@@ -373,6 +386,7 @@ export function App() {
                     bookId={currentBook.id}
                     mediaList={bookMedia}
                     onRefresh={triggerRefresh}
+                    onOpenGDriveSettings={handleOpenGDriveSettings}
                   />
                 )}
               </div>
@@ -441,9 +455,16 @@ export function App() {
             onOpenAISettings={handleOpenAISettings}
             onOpenSyncModal={handleOpenSyncModal}
             onOpenPinSetup={handleOpenPinSetup}
+            onOpenGDriveSettings={handleOpenGDriveSettings}
           />
 
-          {/* 10. Dedicated PIN Setup & Security Configuration Modal */}
+          {/* 10. Google Drive Shared Folder Settings Modal */}
+          <GDriveSettingsModal
+            isOpen={isGDriveSettingsOpen}
+            onClose={handleCloseGDriveSettings}
+          />
+
+          {/* 11. Dedicated PIN Setup & Security Configuration Modal */}
           <PinSetupModal
             isOpen={isPinModalOpen}
             onClose={handleClosePinSetup}

@@ -29,6 +29,7 @@ interface AppCornerMenuModalProps {
   onOpenAISettings: () => void;
   onOpenSyncModal: () => void;
   onOpenPinSetup: () => void;
+  onOpenGDriveSettings: () => void;
 }
 
 export const AppCornerMenuModal: React.FC<AppCornerMenuModalProps> = ({
@@ -37,6 +38,7 @@ export const AppCornerMenuModal: React.FC<AppCornerMenuModalProps> = ({
   onOpenAISettings,
   onOpenSyncModal,
   onOpenPinSetup,
+  onOpenGDriveSettings,
 }) => {
   const { settings, updateSettings, togglePrivacyMode } = usePrivacy();
   const { settings: secSettings, lockApp } = useSecurity();
@@ -315,6 +317,24 @@ export const AppCornerMenuModal: React.FC<AppCornerMenuModalProps> = ({
             </span>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 font-mono">
               Gemini &amp; Groq
+            </span>
+          </button>
+
+          {/* Google Drive Shared Folder Button */}
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onOpenGDriveSettings();
+            }}
+            className="w-full py-2 px-3 rounded-2xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-500/10 dark:hover:bg-blue-500/20 border border-blue-200 dark:border-blue-500/30 text-blue-900 dark:text-blue-300 text-xs font-bold transition flex items-center justify-between active:scale-98 shadow-xs"
+          >
+            <span className="flex items-center gap-2">
+              <HardDrive className="w-4 h-4 text-blue-500" />
+              <span>Aset Google Drive</span>
+            </span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 font-mono">
+              Folder Publik
             </span>
           </button>
 
