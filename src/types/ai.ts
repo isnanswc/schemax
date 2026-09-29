@@ -1,4 +1,4 @@
-export type AIProviderType = 'gemini' | 'groq';
+export type AIProviderType = 'gemini' | 'groq' | 'openrouter';
 
 export interface AIModelOption {
   id: string;
@@ -38,6 +38,7 @@ export interface AISettingsConfig {
   providerPriority: AIProviderType[];
   geminiConfig: AIProviderGlobalConfig;
   groqConfig: AIProviderGlobalConfig;
+  openrouterConfig: AIProviderGlobalConfig;
   slots: AIKeySlot[];
 }
 

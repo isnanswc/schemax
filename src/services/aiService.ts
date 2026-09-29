@@ -36,12 +36,20 @@ export const DEFAULT_GROQ_MODELS: AIModelOption[] = [
   { id: 'gemma2-9b-it', name: 'Gemma 2 9B IT', description: 'Model open weights Google presisi tinggi' },
 ];
 
+export const DEFAULT_OPENROUTER_MODELS: AIModelOption[] = [
+  { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B Instruct (Free)', description: 'Gratis & 128k Konteks: Sangat cerdas dan luwes untuk novel naratif' },
+  { id: 'mistralai/mistral-7b-instruct:free', name: 'Mistral 7B Instruct (Free)', description: 'Gratis & Cepat: 32k Konteks untuk deskripsi dan dialog' },
+  { id: 'cognitivecomputations/dolphin-mixtral-8x7b', name: 'Dolphin Mixtral 8x7B (Uncensored)', description: 'Bebas Sensor / Refusal-Free: Khusus fiksi dewasa, dark romance & gore' },
+  { id: 'qwen/qwen-2.5-72b-instruct', name: 'Qwen 2.5 72B Instruct', description: 'Model sangat kuat untuk alur logika dan detail adegan mendalam' },
+  { id: 'openrouter/auto', name: 'OpenRouter Auto Router', description: 'Otomatis memilih model terbaik yang tersedia dan aktif' },
+];
+
 const STORAGE_KEY = 'schemax_ai_config_v3';
 
 export function getDefaultAISettings(): AISettingsConfig {
   return {
     smartAdjustEnabled: true,
-    providerPriority: ['gemini', 'groq'],
+    providerPriority: ['gemini', 'groq', 'openrouter'],
     geminiConfig: {
       fallbackModels: ['', '', ''],
       cachedModels: DEFAULT_GEMINI_MODELS,
@@ -49,6 +57,10 @@ export function getDefaultAISettings(): AISettingsConfig {
     groqConfig: {
       fallbackModels: ['', '', ''],
       cachedModels: DEFAULT_GROQ_MODELS,
+    },
+    openrouterConfig: {
+      fallbackModels: ['', '', ''],
+      cachedModels: DEFAULT_OPENROUTER_MODELS,
     },
     slots: [
       {
@@ -68,6 +80,19 @@ export function getDefaultAISettings(): AISettingsConfig {
         id: 'slot_groq_1',
         provider: 'groq',
         label: 'Groq Slot 1',
+        apiKey: '',
+        isActive: true,
+        stats: {
+          totalRequests: 0,
+          successRequests: 0,
+          failedRequests: 0,
+          consecutiveFailures: 0,
+        },
+      },
+      {
+        id: 'slot_openrouter_1',
+        provider: 'openrouter',
+        label: 'OpenRouter Slot 1',
         apiKey: '',
         isActive: true,
         stats: {
@@ -108,7 +133,14 @@ export function loadAISettings(): AISettingsConfig {
     const parsed = JSON.parse(raw);
     if (!parsed.slots || !Array.isArray(parsed.slots)) return getDefaultAISettings();
 
-    // Ensure geminiConfig & groqConfig exist
+    // Ensure providerPriority includes openrouter
+    if (!Array.isArray(parsed.providerPriority)) {
+      parsed.providerPriority = ['gemini', 'groq', 'openrouter'];
+    } else if (!parsed.providerPriority.includes('openrouter')) {
+      parsed.providerPriority.push('openrouter');
+    }
+
+    // Ensure geminiConfig & groqConfig & openrouterConfig exist
     if (!parsed.geminiConfig) {
       parsed.geminiConfig = {
         fallbackModels: ['', '', ''],
@@ -134,6 +166,20 @@ export function loadAISettings(): AISettingsConfig {
       }
       if (!parsed.groqConfig.cachedModels || parsed.groqConfig.cachedModels.length === 0) {
         parsed.groqConfig.cachedModels = DEFAULT_GROQ_MODELS;
+      }
+    }
+
+    if (!parsed.openrouterConfig) {
+      parsed.openrouterConfig = {
+        fallbackModels: ['', '', ''],
+        cachedModels: DEFAULT_OPENROUTER_MODELS,
+      };
+    } else {
+      if (!Array.isArray(parsed.openrouterConfig.fallbackModels)) {
+        parsed.openrouterConfig.fallbackModels = ['', '', ''];
+      }
+      if (!parsed.openrouterConfig.cachedModels || parsed.openrouterConfig.cachedModels.length === 0) {
+        parsed.openrouterConfig.cachedModels = DEFAULT_OPENROUTER_MODELS;
       }
     }
 
@@ -220,6 +266,56 @@ export async function fetchLiveGroqModels(apiKey: string): Promise<AIModelOption
 
   if (models.length === 0) {
     throw new Error('Tidak ada model Groq yang ditemukan dari API.');
+  }
+
+  return models;
+}
+
+// Fetch Live Models Directly from OpenRouter API (Menyaring model gratis dan uncensored untuk kemudahan pengguna)
+export async function fetchLiveOpenRouterModels(apiKey: string): Promise<AIModelOption[]> {
+  if (!apiKey || !apiKey.trim()) {
+    throw new Error('Masukkan API Key OpenRouter untuk mengambil daftar model.');
+  }
+
+  const url = 'https://openrouter.ai/api/v1/models';
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${apiKey.trim()}`,
+      'HTTP-Referer': 'https://schemax.app',
+      'X-Title': 'Schemax Story Studio',
+    },
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error?.message || `HTTP ${response.status} Gagal memuat model OpenRouter.`);
+  }
+
+  const data = await response.json();
+  const rawList: any[] = data.data || [];
+
+  // Urutkan model gratis (:free) atau model sastra/uncensored ke baris atas
+  const models: AIModelOption[] = rawList
+    .map((m: any) => {
+      const isFree = m.id?.includes(':free');
+      const ctx = m.context_length ? `[${Math.round(m.context_length / 1024)}k]` : '';
+      return {
+        id: m.id,
+        name: `${m.name || m.id} ${ctx} ${isFree ? '🎁 Free' : ''}`.trim(),
+        description: m.description ? m.description.slice(0, 110) : `Model OpenRouter (${ctx})`,
+        isFree,
+      };
+    })
+    .sort((a, b) => {
+      if (a.isFree && !b.isFree) return -1;
+      if (!a.isFree && b.isFree) return 1;
+      return a.id.localeCompare(b.id);
+    })
+    .map(({ id, name, description }) => ({ id, name, description }))
+    .filter((m) => Boolean(m.id));
+
+  if (models.length === 0) {
+    throw new Error('Tidak ada model OpenRouter yang ditemukan dari API.');
   }
 
   return models;
@@ -413,6 +509,52 @@ async function executeGroqRequest(
   return text.trim();
 }
 
+// Call OpenRouter API (Mendukung ratusan model, tier :free, dan model uncensored/refusal-free)
+async function executeOpenRouterRequest(
+  apiKey: string,
+  model: string,
+  prompt: string,
+  systemPrompt?: string
+): Promise<string> {
+  const url = 'https://openrouter.ai/api/v1/chat/completions';
+
+  const messages: any[] = [];
+  if (systemPrompt) {
+    messages.push({ role: 'system', content: systemPrompt });
+  }
+  messages.push({ role: 'user', content: prompt });
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey.trim()}`,
+      'HTTP-Referer': 'https://schemax.app',
+      'X-Title': 'Schemax Story Studio',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: model,
+      messages: messages,
+      temperature: 0.7,
+      max_tokens: 4096,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = errorData.error?.message || `HTTP ${response.status} ${response.statusText}`;
+    throw new Error(message);
+  }
+
+  const data = await response.json();
+  const text = data.choices?.[0]?.message?.content;
+  if (!text) {
+    throw new Error('Respon OpenRouter kosong.');
+  }
+
+  return text.trim();
+}
+
 // Smart Execution Dispatcher with Global 3-Model Fallback & Multi-Slot Cascading
 export async function generateWithSmartFallback(
   prompt: string,
@@ -427,7 +569,7 @@ export async function generateWithSmartFallback(
 
   if (activeSlots.length === 0) {
     throw new Error(
-      'Belum ada API Key yang dikonfigurasi. Silakan buka Pengaturan AI (ikon ✨ di header) untuk memasukkan API Key Gemini atau Groq Anda.'
+      'Belum ada API Key yang dikonfigurasi. Silakan buka Pengaturan AI (ikon ✨ di header) untuk memasukkan API Key Gemini, Groq, atau OpenRouter Anda.'
     );
   }
 
@@ -454,19 +596,29 @@ export async function generateWithSmartFallback(
   // Iterate over Slots
   for (const slot of activeSlots) {
     // Determine fallback models: slot override, providerGlobal fallbackModels, cachedModels, or sensible default
-    const providerGlobal = slot.provider === 'gemini' ? config.geminiConfig : config.groqConfig;
+    const providerGlobal =
+      slot.provider === 'gemini'
+        ? config.geminiConfig
+        : slot.provider === 'groq'
+        ? config.groqConfig
+        : config.openrouterConfig;
+
     let fallbackModels = (slot.models && slot.models.length > 0
       ? slot.models
-      : providerGlobal.fallbackModels || []).filter(Boolean);
+      : providerGlobal?.fallbackModels || []).filter(Boolean);
 
     // If no models were explicitly set or all were empty strings, fallback to cached models or known reliable defaults
     if (fallbackModels.length === 0) {
-      if (providerGlobal.cachedModels && providerGlobal.cachedModels.length > 0) {
+      if (providerGlobal?.cachedModels && providerGlobal.cachedModels.length > 0) {
         fallbackModels = providerGlobal.cachedModels.map((m) => m.id);
       } else {
-        fallbackModels = slot.provider === 'gemini'
-          ? ['gemini-3.8-flash-preview', 'gemini-2.5-flash', 'gemini-1.5-flash']
-          : ['llama-3.3-70b-versatile', 'llama3-8b-8192'];
+        if (slot.provider === 'gemini') {
+          fallbackModels = ['gemini-3.8-flash-preview', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+        } else if (slot.provider === 'groq') {
+          fallbackModels = ['llama-3.3-70b-versatile', 'llama3-8b-8192'];
+        } else {
+          fallbackModels = ['meta-llama/llama-3.3-70b-instruct:free', 'mistralai/mistral-7b-instruct:free'];
+        }
       }
     }
 
@@ -489,6 +641,8 @@ export async function generateWithSmartFallback(
           resultText = await executeGeminiRequest(slot.apiKey, model, prompt, systemPrompt);
         } else if (slot.provider === 'groq') {
           resultText = await executeGroqRequest(slot.apiKey, model, prompt, systemPrompt);
+        } else if (slot.provider === 'openrouter') {
+          resultText = await executeOpenRouterRequest(slot.apiKey, model, prompt, systemPrompt);
         }
 
         const latency = Date.now() - startTime;
@@ -565,7 +719,7 @@ export async function generateWithSmartFallback(
 
         // Catatan: Jika terkena PROHIBITED_CONTENT pada satu model, JANGAN langsung hentikan proses!
         // Beri kesempatan model lain dalam slot yang sama (misal Gemini 1.5 Pro vs 2.5 Flash memiliki toleransi filter berbeda),
-        // lalu lanjutkan ke Slot Gemini berikutnya, dan Slot Groq berikutnya secara bertingkat.
+        // lalu lanjutkan ke Slot Gemini berikutnya, Slot Groq, dan Slot OpenRouter secara bertingkat.
       }
     }
   }
@@ -577,14 +731,14 @@ export async function generateWithSmartFallback(
 
   const hasProhibited = attempts.some((att) => att.error?.includes('PROHIBITED_CONTENT'));
   if (hasProhibited) {
-    const hasGroqConfigured = config.slots.some(
-      (s) => s.provider === 'groq' && s.isActive && s.apiKey && s.apiKey.trim().length > 0
+    const hasUncensoredConfigured = config.slots.some(
+      (s) => (s.provider === 'groq' || s.provider === 'openrouter') && s.isActive && s.apiKey && s.apiKey.trim().length > 0
     );
 
     let tip = '';
-    if (!hasGroqConfigured) {
+    if (!hasUncensoredConfigured) {
       tip = `\n\n💡 Solusi Konten Cerita Dewasa / Konflik Sensitif:\n` +
-        `Google Gemini memiliki filter kata kunci bawaan server. Untuk cerita bertema dewasa/konflik berat, tambahkan provider Groq (Llama 3.3) di Pengaturan AI (ikon ✨ di header). Llama 3.3 di Groq tidak memiliki sensor kata kunci server Google.`;
+        `Google Gemini memiliki filter kata kunci bawaan server. Untuk cerita bertema dewasa/konflik berat, tambahkan provider Groq (Llama 3.3) atau OpenRouter (Dolphin/Llama Free) di Pengaturan AI (ikon ✨ di header) yang bebas dari filter server Google.`;
     }
 
     throw new Error(
@@ -608,8 +762,10 @@ export async function testSlotConnection(
 
     if (slot.provider === 'gemini') {
       await executeGeminiRequest(slot.apiKey, modelName, testPrompt);
-    } else {
+    } else if (slot.provider === 'groq') {
       await executeGroqRequest(slot.apiKey, modelName, testPrompt);
+    } else if (slot.provider === 'openrouter') {
+      await executeOpenRouterRequest(slot.apiKey, modelName, testPrompt);
     }
 
     const latencyMs = Date.now() - startTime;

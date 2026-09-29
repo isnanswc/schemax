@@ -12,6 +12,7 @@ import {
   testSlotConnection,
   fetchLiveGeminiModels,
   fetchLiveGroqModels,
+  fetchLiveOpenRouterModels,
 } from '../../services/aiService';
 import {
   X,
@@ -28,6 +29,7 @@ import {
   Cpu,
   Layers,
   Zap,
+  Globe,
   Info,
   DownloadCloud
 } from 'lucide-react';
@@ -62,7 +64,24 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
   if (!isOpen) return null;
 
   const currentSlots = config.slots.filter((s) => s.provider === activeTab);
-  const currentGlobalConfig = activeTab === 'gemini' ? config.geminiConfig : config.groqConfig;
+  const currentGlobalConfig =
+    activeTab === 'gemini'
+      ? config.geminiConfig
+      : activeTab === 'groq'
+      ? config.groqConfig
+      : config.openrouterConfig;
+
+  const getProviderConfigKey = (provider: AIProviderType) => {
+    if (provider === 'gemini') return 'geminiConfig';
+    if (provider === 'groq') return 'groqConfig';
+    return 'openrouterConfig';
+  };
+
+  const getProviderDisplayName = (provider: AIProviderType) => {
+    if (provider === 'gemini') return 'Google Gemini';
+    if (provider === 'groq') return 'Groq Cloud';
+    return 'OpenRouter';
+  };
 
   const toggleKeyVisibility = (slotId: string) => {
     setVisibleKeys((prev) => ({ ...prev, [slotId]: !prev[slotId] }));
@@ -79,26 +98,27 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
 
   const handleUpdateGlobalModel = (modelIndex: 0 | 1 | 2, modelId: string) => {
     setConfig((prev) => {
-      const targetConfig = activeTab === 'gemini' ? { ...prev.geminiConfig } : { ...prev.groqConfig };
+      const configKey = getProviderConfigKey(activeTab);
+      const targetConfig = { ...prev[configKey] };
       const newFallback = [...targetConfig.fallbackModels] as [string, string, string];
       newFallback[modelIndex] = modelId;
       targetConfig.fallbackModels = newFallback;
 
       const newConfig = {
         ...prev,
-        [activeTab === 'gemini' ? 'geminiConfig' : 'groqConfig']: targetConfig,
+        [configKey]: targetConfig,
       };
       saveAISettings(newConfig);
       return newConfig;
     });
   };
 
-  // Fetch live models directly from Gemini or Groq API
+  // Fetch live models directly from Gemini, Groq, or OpenRouter API
   const handleFetchLiveModels = async () => {
     // Find the first slot that has an API key
     const availableKeySlot = currentSlots.find((s) => s.apiKey && s.apiKey.trim().length > 0);
     if (!availableKeySlot) {
-      alert(`Silakan masukkan minimal 1 API Key ${activeTab === 'gemini' ? 'Gemini' : 'Groq'} terlebih dahulu untuk mengambil daftar model terbaru dari server.`);
+      alert(`Silakan masukkan minimal 1 API Key ${getProviderDisplayName(activeTab)} terlebih dahulu untuk mengambil daftar model terbaru dari server.`);
       return;
     }
 
@@ -109,12 +129,15 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
       let liveModels: AIModelOption[] = [];
       if (activeTab === 'gemini') {
         liveModels = await fetchLiveGeminiModels(availableKeySlot.apiKey);
-      } else {
+      } else if (activeTab === 'groq') {
         liveModels = await fetchLiveGroqModels(availableKeySlot.apiKey);
+      } else {
+        liveModels = await fetchLiveOpenRouterModels(availableKeySlot.apiKey);
       }
 
       setConfig((prev) => {
-        const targetConfig = activeTab === 'gemini' ? { ...prev.geminiConfig } : { ...prev.groqConfig };
+        const configKey = getProviderConfigKey(activeTab);
+        const targetConfig = { ...prev[configKey] };
         targetConfig.cachedModels = liveModels;
         targetConfig.lastFetchedAt = Date.now();
 
@@ -135,7 +158,7 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
 
         const newConfig = {
           ...prev,
-          [activeTab === 'gemini' ? 'geminiConfig' : 'groqConfig']: targetConfig,
+          [configKey]: targetConfig,
         };
         saveAISettings(newConfig);
         return newConfig;
@@ -152,10 +175,11 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
 
   const handleAddSlot = (provider: AIProviderType) => {
     const existingCount = config.slots.filter((s) => s.provider === provider).length;
+    const providerName = provider === 'gemini' ? 'Gemini' : provider === 'groq' ? 'Groq' : 'OpenRouter';
     const newSlot: AIKeySlot = {
       id: `slot_${provider}_${Date.now()}`,
       provider: provider,
-      label: `${provider === 'gemini' ? 'Gemini' : 'Groq'} Key ${existingCount + 1}`,
+      label: `${providerName} Key ${existingCount + 1}`,
       apiKey: '',
       isActive: true,
       stats: {
@@ -289,34 +313,49 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
           </div>
 
           {/* Provider Selection Tabs */}
-          <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-950/70 p-1 rounded-2xl border border-slate-200 dark:border-slate-800/80">
+          <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-100 dark:bg-slate-950/70 p-1 rounded-2xl border border-slate-200 dark:border-slate-800/80">
             <button
               onClick={() => setActiveTab('gemini')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold transition active:scale-95 ${
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-bold transition active:scale-95 ${
                 activeTab === 'gemini'
                   ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              <Cpu className="w-4 h-4" />
-              <span>Google Gemini</span>
+              <Cpu className="w-3.5 h-3.5" />
+              <span className="truncate">Gemini</span>
               <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-slate-950/20 text-slate-900 dark:text-amber-950">
-                {config.slots.filter((s) => s.provider === 'gemini').length} Key
+                {config.slots.filter((s) => s.provider === 'gemini').length}
               </span>
             </button>
 
             <button
               onClick={() => setActiveTab('groq')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold transition active:scale-95 ${
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-bold transition active:scale-95 ${
                 activeTab === 'groq'
                   ? 'bg-indigo-600 dark:bg-indigo-500 text-white shadow-md shadow-indigo-500/20'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              <Zap className="w-4 h-4" />
-              <span>Groq Cloud</span>
+              <Zap className="w-3.5 h-3.5" />
+              <span className="truncate">Groq</span>
               <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-slate-950/20 text-white dark:text-indigo-200">
-                {config.slots.filter((s) => s.provider === 'groq').length} Key
+                {config.slots.filter((s) => s.provider === 'groq').length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('openrouter')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-bold transition active:scale-95 ${
+                activeTab === 'openrouter'
+                  ? 'bg-purple-600 dark:bg-purple-500 text-white shadow-md shadow-purple-500/20'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5" />
+              <span className="truncate">OpenRouter</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-slate-950/20 text-white dark:text-purple-200">
+                {config.slots.filter((s) => s.provider === 'openrouter').length}
               </span>
             </button>
           </div>
@@ -327,14 +366,15 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <h4 className="font-extrabold text-xs sm:text-sm text-slate-900 dark:text-white">
-                    3 Model Fallback {activeTab === 'gemini' ? 'Gemini' : 'Groq'} (Global)
+                    3 Model Fallback {getProviderDisplayName(activeTab)} (Global)
                   </h4>
                   <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                     Otomatis untuk Semua Slot
                   </span>
                 </div>
                 <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  Atur sekali di sini, otomatis berlaku untuk seluruh API Key {activeTab === 'gemini' ? 'Gemini' : 'Groq'}.
+                  Atur sekali di sini, otomatis berlaku untuk seluruh API Key {getProviderDisplayName(activeTab)}.
+                  {activeTab === 'openrouter' && ' Menyediakan model gratis (:free) dan bebas sensor (Dolphin/Abliterated).'}
                 </p>
               </div>
 
@@ -451,7 +491,7 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
               <div className="text-center py-8 px-4 border border-dashed border-slate-300 dark:border-slate-800 rounded-2xl bg-slate-50 dark:bg-slate-950/40">
                 <Key className="w-8 h-8 mx-auto text-slate-400 dark:text-slate-600 mb-2" />
                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-                  Belum ada slot API Key untuk {activeTab === 'gemini' ? 'Gemini' : 'Groq'}.
+                  Belum ada slot API Key untuk {getProviderDisplayName(activeTab)}.
                 </p>
                 <button
                   onClick={() => handleAddSlot(activeTab)}
@@ -544,7 +584,9 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
                         placeholder={
                           activeTab === 'gemini'
                             ? 'Tempel Gemini API Key (AIzaSy...)'
-                            : 'Tempel Groq API Key (gsk_...)'
+                            : activeTab === 'groq'
+                            ? 'Tempel Groq API Key (gsk_...)'
+                            : 'Tempel OpenRouter API Key (sk-or-v1-...)'
                         }
                         className="w-full pl-3 pr-24 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-amber-400 font-mono shadow-sm"
                       />
@@ -600,7 +642,7 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
               className="w-full py-2.5 px-4 rounded-2xl bg-white dark:bg-slate-950 border border-dashed border-slate-300 dark:border-slate-800 hover:border-slate-400 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white font-semibold text-xs transition active:scale-[0.99] flex items-center justify-center gap-1.5 shadow-sm"
             >
               <Plus className="w-4 h-4 text-amber-500" />
-              <span>Tambah Slot API Key {activeTab === 'gemini' ? 'Gemini' : 'Groq'} Baru</span>
+              <span>Tambah Slot API Key {getProviderDisplayName(activeTab)} Baru</span>
             </button>
           </div>
         </div>
