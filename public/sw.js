@@ -1,7 +1,7 @@
 // Schemax PWA Service Worker
 // Handles offline caching and install prompt support
 
-const CACHE_NAME = 'schemax-v2';
+const CACHE_NAME = 'schemax-v3';
 
 // Core app shell files to cache for offline support
 const STATIC_ASSETS = [
@@ -41,11 +41,11 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   // Skip non-GET and chrome-extension requests
   if (event.request.method !== 'GET') return;
-  if (event.request.url.startsWith('chrome-extension://')) return;
-  if (event.request.url.includes('googleapis.com')) return;
-  if (event.request.url.includes('generativelanguage.googleapis.com')) return;
-  if (event.request.url.includes('api.groq.com')) return;
-  if (event.request.url.includes('fonts.googleapis.com')) return;
+  // IMPORTANT: Do NOT intercept cross-origin requests (Google Apps Script, Google APIs, AI APIs, etc.)
+  // Let the browser handle cross-origin network requests directly.
+  if (!event.request.url.startsWith(self.location.origin)) {
+    return;
+  }
 
   event.respondWith(
     fetch(event.request)
@@ -77,6 +77,7 @@ self.addEventListener('fetch', (event) => {
           if (event.request.mode === 'navigate') {
             return caches.match('/index.html');
           }
+          return new Response('Offline', { status: 503, statusText: 'Offline or Service Unavailable' });
         });
       })
   );

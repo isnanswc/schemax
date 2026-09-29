@@ -209,10 +209,12 @@ export const GDriveSettingsModal: React.FC<GDriveSettingsModalProps> = ({
                   </button>
                 </div>
 
-                <ol start={3} className="list-decimal list-inside space-y-1 text-slate-600 dark:text-slate-400">
-                  <li>Klik <strong>Deploy &rarr; New deployment</strong> &rarr; pilih <strong>Web app</strong>.</li>
-                  <li>Set <i>Who has access</i> menjadi: <strong>"Anyone"</strong>.</li>
-                  <li>Klik <strong>Deploy</strong> lalu salin <strong>Web app URL</strong>-nya ke kolom di bawah.</li>
+                <ol start={3} className="list-decimal list-inside space-y-1.5 text-slate-600 dark:text-slate-400">
+                  <li>Klik tombol biru <strong>Deploy &rarr; New deployment</strong> &rarr; pilih ikon gear/roda gigi lalu pilih jenis <strong>Web app</strong>.</li>
+                  <li>Di bagian <i>Execute as</i>: pilih <strong>Me (email Anda)</strong>.</li>
+                  <li>Di bagian <i>Who has access</i>: <strong className="text-amber-600 dark:text-amber-400 underline">Wajib pilih "Anyone" (Siapa saja)</strong> agar bisa diakses tanpa error 404.</li>
+                  <li>Klik <strong>Deploy</strong> &rarr; jika muncul jendela otorisasi, klik <strong>Review Permissions</strong> &rarr; pilih akun Google &rarr; klik <strong>Advanced</strong> (Lanjutan) &rarr; klik <strong>Go to Untitled project (unsafe)</strong> &rarr; <strong>Allow</strong>.</li>
+                  <li>Salin <strong>Web app URL</strong> yang berakhiran <code>/exec</code> lalu tempel ke kolom di bawah.</li>
                 </ol>
               </div>
             )}
@@ -273,7 +275,19 @@ export const GDriveSettingsModal: React.FC<GDriveSettingsModalProps> = ({
           {testError && (
             <div className="p-3 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-xs text-red-700 dark:text-red-300 flex items-start gap-2">
               <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-              <span>{testError}</span>
+              <div className="space-y-1.5 leading-relaxed">
+                <span className="font-semibold">{testError}</span>
+                {(testError.includes('NetworkError') || testError.includes('Failed to fetch') || testError.includes('404')) && (
+                  <div className="text-[11px] text-slate-600 dark:text-slate-400 pt-1.5 border-t border-red-200/60 dark:border-red-500/20">
+                    <p className="font-bold text-slate-800 dark:text-slate-200">Solusi jika muncul NetworkError / 404:</p>
+                    <ul className="list-disc list-inside mt-0.5 space-y-0.5 text-[10.5px]">
+                      <li>Di Google Apps Script, klik <strong>Deploy &rarr; Manage deployments</strong> &rarr; klik ikon <strong>Pensil (Edit)</strong>.</li>
+                      <li>Pastikan <strong>Who has access</strong> diset ke <strong>"Anyone"</strong> (bukan <em>Only myself</em>).</li>
+                      <li>Ubah Version ke <strong>New version</strong> lalu klik <strong>Deploy</strong> ulang.</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
