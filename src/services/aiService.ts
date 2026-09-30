@@ -474,10 +474,16 @@ async function executeGroqRequest(
       ? prompt.slice(0, 32000) + '\n\n[...konteks dipotong sesuai batas token Groq...]'
       : prompt;
 
+  // Instruksi wajib Bahasa Indonesia untuk semua pemrosesan AI Groq
+  const INDONESIAN_MANDATORY_INSTRUCTION =
+    'PENTING & WAJIB: Seluruh respon, narasi, analisis, dialog, penjelasan, dan nilai field JSON WAJIB ditulis dalam BAHASA INDONESIA yang baku, luwes, dan bermutu sastra (kecuali untuk nama variabel/kunci JSON atau prompt gambar berbahasa Inggris).';
+
+  let effectiveSystemPrompt = systemPrompt
+    ? `${systemPrompt}\n\n${INDONESIAN_MANDATORY_INSTRUCTION}`
+    : INDONESIAN_MANDATORY_INSTRUCTION;
+
   const messages: any[] = [];
-  if (systemPrompt) {
-    messages.push({ role: 'system', content: systemPrompt });
-  }
+  messages.push({ role: 'system', content: effectiveSystemPrompt });
   messages.push({ role: 'user', content: budgetedPrompt });
 
   const response = await fetch(url, {
