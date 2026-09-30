@@ -485,3 +485,123 @@ html.dark .schemax-ai-session-tag {
   border-color: rgba(245, 158, 11, 0.45);
   box-shadow: 0 1px 6px rgba(245, 158, 11, 0.2);
 }
+
+/* ========================================================
+   CINEMATIC OBSIDIAN GLASS & ATMOSPHERE STYLES
+   ======================================================== */
+
+.cinematic-glass-card {
+  position: relative;
+  border-radius: 1.75rem;
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html.dark .cinematic-glass-card {
+  background: rgba(11, 15, 25, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 12px 36px -10px rgba(0, 0, 0, 0.65), inset 0 1px 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+html:not(.dark) .cinematic-glass-card {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 12px 36px -10px rgba(15, 23, 42, 0.06), inset 0 1px 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.cinematic-glass-card-interactive {
+  cursor: pointer;
+}
+
+.cinematic-glass-card-interactive:hover {
+  transform: translateY(-2px);
+}
+
+html.dark .cinematic-glass-card-interactive:hover {
+  border-color: rgba(245, 158, 11, 0.35);
+  box-shadow: 0 20px 48px -12px rgba(0, 0, 0, 0.75), 0 0 24px 0 rgba(245, 158, 11, 0.12), inset 0 1px 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+html:not(.dark) .cinematic-glass-card-interactive:hover {
+  border-color: rgba(245, 158, 11, 0.45);
+  box-shadow: 0 20px 48px -12px rgba(245, 158, 11, 0.12), inset 0 1px 1px 0 rgba(255, 255, 255, 1);
+}
+
+/* Floating Glass HUD Ribbon */
+.cinematic-hud-ribbon {
+  position: relative;
+  border-radius: 1.5rem;
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  transition: all 0.3s ease;
+}
+
+html.dark .cinematic-hud-ribbon {
+  background: rgba(11, 15, 25, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.6), inset 0 1px 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+html:not(.dark) .cinematic-hud-ribbon {
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 30px -8px rgba(15, 23, 42, 0.06), inset 0 1px 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* Aurora background drifting animations */
+@keyframes aurora-drift-1 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.65;
+  }
+  50% {
+    transform: translate(30px, -25px) scale(1.12);
+    opacity: 0.85;
+  }
+}
+
+@keyframes aurora-drift-2 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translate(-35px, 20px) scale(1.18);
+    opacity: 0.8;
+  }
+}
+
+@keyframes golden-glow-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-aurora-drift-1 {
+  animation: aurora-drift-1 16s ease-in-out infinite;
+}
+
+.animate-aurora-drift-2 {
+  animation: aurora-drift-2 22s ease-in-out infinite alternate;
+}
+
+.golden-shimmer-bar {
+  position: relative;
+  overflow: hidden;
+}
+
+.golden-shimmer-bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  background-size: 200% 100%;
+  animation: golden-glow-shimmer 3.2s infinite;
+}
