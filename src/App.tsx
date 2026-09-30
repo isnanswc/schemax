@@ -4,6 +4,7 @@ import { Book, StoryChapter, WorldEntity, MediaItem, ActiveTab, BookStatus } fro
 import { db, seedInitialDataIfNeeded } from './db';
 import { MobileHeader } from './components/layout/MobileHeader';
 import { BottomNavigation } from './components/layout/BottomNavigation';
+import { HomeBottomNavigation } from './components/layout/HomeBottomNavigation';
 import { DashboardView } from './components/dashboard/DashboardView';
 import { WorksView } from './components/works/WorksView';
 import { BookOverviewTab } from './components/books/BookOverviewTab';
@@ -282,39 +283,6 @@ export function App() {
             {!currentBook ? (
               /* Home Screen: Toggle between Dashboard & Works */
               <div className="space-y-4">
-                {/* 🌟 Top Navigation Switcher: [ Dashboard ] [ Works ] */}
-                <div className="flex items-center justify-center pt-0.5 pb-1">
-                  <div className="inline-flex p-1 rounded-2xl bg-slate-200/80 dark:bg-slate-900 border border-slate-300/80 dark:border-slate-800 shadow-inner">
-                    <button
-                      type="button"
-                      onClick={() => setMainMenu('dashboard')}
-                      className={`flex items-center gap-2 py-2 px-5 sm:px-6 rounded-xl text-xs sm:text-sm font-bold transition-all ${
-                        mainMenu === 'dashboard'
-                          ? 'bg-white dark:bg-amber-500 text-slate-900 dark:text-slate-950 shadow-sm border border-slate-200/60 dark:border-transparent'
-                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                    >
-                      <LayoutDashboard className="w-4 h-4" />
-                      <span>Dashboard</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMainMenu('works')}
-                      className={`flex items-center gap-2 py-2 px-5 sm:px-6 rounded-xl text-xs sm:text-sm font-bold transition-all ${
-                        mainMenu === 'works'
-                          ? 'bg-white dark:bg-amber-500 text-slate-900 dark:text-slate-950 shadow-sm border border-slate-200/60 dark:border-transparent'
-                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                    >
-                      <BookOpen className="w-4 h-4" />
-                      <span>Works</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 font-mono">
-                        {books.length}
-                      </span>
-                    </button>
-                  </div>
-                </div>
-
                 {mainMenu === 'dashboard' ? (
                   <DashboardView
                     books={books}
@@ -392,14 +360,20 @@ export function App() {
             )}
           </main>
 
-          {/* 4. Bottom Navigation when inside a Book */}
-          {currentBook && (
+          {/* 4. Bottom Navigation: Switch between Book Workspace tabs or Home (Dashboard/Works) tabs */}
+          {currentBook ? (
             <BottomNavigation
               activeTab={activeTab}
               onChangeTab={setActiveTab}
               chapterCount={bookChapters.length}
               entityCount={bookEntities.length}
               mediaCount={bookMedia.length}
+            />
+          ) : (
+            <HomeBottomNavigation
+              currentView={mainMenu}
+              onChangeView={setMainMenu}
+              worksCount={books.length}
             />
           )}
 

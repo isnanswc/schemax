@@ -189,17 +189,6 @@ export const WorksView: React.FC<WorksViewProps> = ({
           ))}
         </div>
       )}
-
-      {/* Mobile Floating Action Button (FAB) */}
-      <div className="fixed bottom-5 right-5 sm:hidden z-30">
-        <button
-          onClick={() => onOpenCreateModal(activeCategory === 'released' ? 'released' : 'draft')}
-          className="flex items-center gap-1.5 py-3 px-4 bg-gradient-to-r from-amber-500 to-amber-600 active:scale-95 text-slate-950 font-extrabold rounded-full shadow-xl shadow-amber-500/30 border border-amber-400/50 transition-transform"
-        >
-          <Plus className="w-5 h-5 stroke-[2.5]" />
-          <span className="text-xs pr-1 font-bold">Buku Baru</span>
-        </button>
-      </div>
     </div>
   );
 };

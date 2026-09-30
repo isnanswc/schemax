@@ -15,6 +15,7 @@ import {
   Sunset,
   Quote,
   Clock,
+  Calendar,
   Compass,
   Zap,
   ChevronRight
@@ -114,6 +115,30 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     setQuoteIndex((prev) => (prev + 1) % WRITING_QUOTES.length);
   };
 
+  // 🕒 Realtime Clock & Aesthetic Date State
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formattedDate = currentTime.toLocaleDateString('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+
+  const formattedTime = currentTime.toLocaleTimeString('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+
   // Determine dynamic greeting based on local time
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -186,8 +211,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <Quote className="absolute right-4 -bottom-6 w-32 h-32 text-amber-500/[0.04] dark:text-amber-400/[0.03] pointer-events-none rotate-12 transition-transform duration-700 group-hover:scale-105" />
 
         <div className="relative z-10 space-y-4">
-          {/* Header Row: Dynamic Time Badge + Rotate Quote Button */}
-          <div className="flex items-center justify-between gap-3">
+          {/* Header Row: Dynamic Time Badge + Live Realtime Clock & Date HUD + Rotate Quote Button */}
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
+            {/* Left: Dynamic Greeting Badge */}
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/50 dark:bg-white/[0.06] border border-white/60 dark:border-white/10 shadow-xs backdrop-blur-md">
               <span className={`p-1 rounded-full bg-gradient-to-br ${greeting.glow} to-transparent ${greeting.color}`}>
                 <GreetingIcon className="w-3.5 h-3.5" />
@@ -197,15 +223,32 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </span>
             </div>
 
-            <button
-              type="button"
-              onClick={handleNextQuote}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/40 dark:bg-white/[0.04] hover:bg-white/80 dark:hover:bg-white/[0.08] border border-white/40 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 transition-all active:scale-95 text-xs font-semibold backdrop-blur-md"
-              title="Ganti Kutipan Inspirasi"
-            >
-              <RotateCcw className="w-3 h-3 transition-transform duration-500 group-hover:rotate-180" />
-              <span className="hidden xs:inline">Inspirasi Lain</span>
-            </button>
+            {/* Right Group: Live Date & Time HUD + Rotate Button */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Aesthetic Live Date & Time Capsule */}
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/50 dark:bg-white/[0.06] border border-white/60 dark:border-white/10 shadow-xs backdrop-blur-md text-[11px] font-mono text-slate-700 dark:text-slate-300">
+                <div className="flex items-center gap-1 font-semibold text-slate-600 dark:text-slate-400">
+                  <Calendar className="w-3 h-3 text-amber-500 flex-shrink-0" />
+                  <span className="capitalize">{formattedDate}</span>
+                </div>
+                <span className="w-1 h-1 rounded-full bg-amber-500 animate-ping flex-shrink-0" />
+                <div className="flex items-center gap-1 font-black text-amber-600 dark:text-amber-400">
+                  <Clock className="w-3 h-3 text-amber-500 flex-shrink-0" />
+                  <span>{formattedTime}</span>
+                </div>
+              </div>
+
+              {/* Rotate Quote Button */}
+              <button
+                type="button"
+                onClick={handleNextQuote}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/40 dark:bg-white/[0.04] hover:bg-white/80 dark:hover:bg-white/[0.08] border border-white/40 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 transition-all active:scale-95 text-xs font-semibold backdrop-blur-md"
+                title="Ganti Kutipan Inspirasi"
+              >
+                <RotateCcw className="w-3 h-3 transition-transform duration-500 group-hover:rotate-180" />
+                <span className="hidden xs:inline text-[11px]">Inspirasi Lain</span>
+              </button>
+            </div>
           </div>
 
           {/* Typewriter Literary Quotation */}
