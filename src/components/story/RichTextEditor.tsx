@@ -93,6 +93,9 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false);
   const [isAISettingsOpen, setIsAISettingsOpen] = useState(false);
   const [selectedTextForAI, setSelectedTextForAI] = useState('');
+  const [aiSurroundingBefore, setAiSurroundingBefore] = useState('');
+  const [aiSurroundingAfter, setAiSurroundingAfter] = useState('');
+  const savedSelectionRangeRef = useRef<Range | null>(null);
   const [viewingEntity, setViewingEntity] = useState<WorldEntity | null>(null);
 
   // Find & Replace States
@@ -431,8 +434,38 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   };
 
   const handleOpenAIAssistant = () => {
-    const sel = window.getSelection()?.toString() || '';
-    setSelectedTextForAI(sel);
+    let selText = '';
+    let beforeText = '';
+    let afterText = '';
+
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && editorRef.current && editorRef.current.contains(sel.anchorNode)) {
+      const range = sel.getRangeAt(0);
+      savedSelectionRangeRef.current = range.cloneRange();
+      selText = sel.toString();
+    } else {
+      savedSelectionRangeRef.current = null;
+    }
+
+    const fullText = editorRef.current?.innerText || '';
+
+    if (selText.trim()) {
+      const idx = fullText.indexOf(selText);
+      if (idx !== -1) {
+        beforeText = fullText.slice(Math.max(0, idx - 400), idx);
+        afterText = fullText.slice(idx + selText.length, idx + selText.length + 400);
+      }
+    } else {
+      // Jika tidak ada teks yang diblok, ambil 600 karakter terakhir naskah untuk melanjutkan cerita
+      const trimmed = fullText.trim();
+      beforeText = trimmed.length > 600 ? trimmed.slice(-600) : trimmed;
+      selText = '';
+    }
+
+    setSelectedTextForAI(selText);
+    setAiSurroundingBefore(beforeText);
+    setAiSurroundingAfter(afterText);
+
     navStack.push('editor-ai-assistant', () => setIsAIAssistantOpen(false));
     setIsAIAssistantOpen(true);
   };
@@ -456,12 +489,49 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     if (!editorRef.current) return;
     editorRef.current.focus();
 
-    if (mode === 'replace') {
-      document.execCommand('insertText', false, aiText);
+    const sel = window.getSelection();
+
+    if (mode === 'replace' && savedSelectionRangeRef.current && !savedSelectionRangeRef.current.collapsed) {
+      try {
+        sel?.removeAllRanges();
+        sel?.addRange(savedSelectionRangeRef.current);
+        savedSelectionRangeRef.current.deleteContents();
+        const textNode = document.createTextNode(aiText);
+        savedSelectionRangeRef.current.insertNode(textNode);
+
+        const newRange = document.createRange();
+        newRange.setStartAfter(textNode);
+        newRange.collapse(true);
+        sel?.removeAllRanges();
+        sel?.addRange(newRange);
+      } catch (e) {
+        document.execCommand('insertText', false, aiText);
+      }
     } else {
-      document.execCommand('insertText', false, `\n\n${aiText}\n\n`);
+      // mode === 'insert'
+      if (savedSelectionRangeRef.current) {
+        try {
+          sel?.removeAllRanges();
+          sel?.addRange(savedSelectionRangeRef.current);
+          savedSelectionRangeRef.current.collapse(false);
+          const textNode = document.createTextNode(`\n\n${aiText}\n\n`);
+          savedSelectionRangeRef.current.insertNode(textNode);
+
+          const newRange = document.createRange();
+          newRange.setStartAfter(textNode);
+          newRange.collapse(true);
+          sel?.removeAllRanges();
+          sel?.addRange(newRange);
+        } catch (e) {
+          document.execCommand('insertText', false, `\n\n${aiText}\n\n`);
+        }
+      } else {
+        const textNode = document.createTextNode(`\n\n${aiText}\n\n`);
+        editorRef.current.appendChild(textNode);
+      }
     }
 
+    savedSelectionRangeRef.current = null;
     handleContentChange();
   };
 
@@ -1139,8 +1209,12 @@ ${afterHtml}
         isOpen={isAIAssistantOpen}
         onClose={handleCloseAIAssistant}
         selectedText={selectedTextForAI}
+        surroundingBefore={aiSurroundingBefore}
+        surroundingAfter={aiSurroundingAfter}
         chapterPremise={currentChapter.premise}
         bookTitle={bookTitle}
+        chapterTitle={currentChapter.title}
+        chapterOrder={currentChapter.order}
         entities={entities}
         onApplyResult={handleApplyAIResult}
         onOpenAISettings={handleOpenAISettings}
