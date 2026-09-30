@@ -66,14 +66,28 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
   // Copy toast state
   const [copiedSummary, setCopiedSummary] = useState(false);
 
-  // Keep summary synchronized if prop updates
+  // When switching chapter, completely reset and re-initialize state to prevent data leakage from previous chapter
   useEffect(() => {
-    if (chapter.aiSummary || chapter.premise) {
+    setSummary(chapter.aiSummary || chapter.premise || '');
+    setPlot(chapter.aiPlot || undefined);
+    setBranches([]);
+    setRoughDraft('');
+    setNextChapter(null);
+    setIsSummarizing(false);
+    setIsGeneratingPlot(false);
+    setIsGeneratingBranches(false);
+    setCreatingBranchId(null);
+    setIsGeneratingAll(false);
+    setGenerateAllStep('');
+    setCopiedSummary(false);
+  }, [chapter.id]);
+
+  // Keep summary synchronized if prop updates for the current chapter
+  useEffect(() => {
+    if (chapter.aiSummary !== undefined || chapter.premise !== undefined) {
       setSummary(chapter.aiSummary || chapter.premise || '');
     }
-    if (chapter.aiPlot) {
-      setPlot(chapter.aiPlot);
-    }
+    setPlot(chapter.aiPlot || undefined);
   }, [chapter.aiSummary, chapter.premise, chapter.aiPlot]);
 
   // Check if next chapter already exists in database

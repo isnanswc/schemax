@@ -1,13 +1,15 @@
 // Schemax PWA Service Worker
 // Handles offline caching and install prompt support
 
-const CACHE_NAME = 'schemax-v3';
+const CACHE_NAME = 'schemax-v4';
 
 // Core app shell files to cache for offline support
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png',
   '/icon-512.svg',
 ];
 

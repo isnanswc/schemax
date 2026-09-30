@@ -184,6 +184,24 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
   const [toolsadayImportSuccess, setToolsadayImportSuccess] = useState<{ wordCount: number; sessionNum: number } | null>(null);
   const [copiedToolsadayPrompt, setCopiedToolsadayPrompt] = useState(false);
 
+  // Synchronize state when switching chapter
+  useEffect(() => {
+    const newPlot =
+      chapter.rawDrafts?.find((d) => d.id === 'plot_' + chapter.id || d.title === 'Story Plot')?.content ||
+      chapter.rawDrafts?.[0]?.content ||
+      '';
+    setChapterPlotText(newPlot);
+    setTargetWords(chapter.targetWordCount || 1500);
+    setAdditionalPrompt('');
+    setIsGeneratingInternal(false);
+    setInternalGenSuccess(null);
+    setInternalGenError(null);
+    setToolsadayPastedText('');
+    setToolsadayImportSuccess(null);
+    setCopiedToolsadayPrompt(false);
+    setSaveToast(false);
+  }, [chapter.id]);
+
   const plotTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // ==========================================

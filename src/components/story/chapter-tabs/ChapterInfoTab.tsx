@@ -48,9 +48,20 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
 
+  // Synchronize all fields when switching chapters
+  useEffect(() => {
+    setPremise(chapter.premise || chapter.aiSummary || '');
+    setNotes(chapter.notes || '');
+    setTargetWordCount(chapter.targetWordCount || 1500);
+    setTargetInput(String(chapter.targetWordCount || 1500));
+    setStatus(chapter.status);
+    setIsGeneratingPremise(false);
+    setSaveStatus(null);
+  }, [chapter.id]);
+
   // Synchronize premise if chapter.premise or chapter.aiSummary updates externally
   useEffect(() => {
-    if (chapter.premise || chapter.aiSummary) {
+    if (chapter.premise !== undefined || chapter.aiSummary !== undefined) {
       setPremise(chapter.premise || chapter.aiSummary || '');
     }
   }, [chapter.premise, chapter.aiSummary]);

@@ -404,8 +404,25 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   useEffect(() => {
     if (activeTab === 'manuscript') {
       applyTensionStyling(tensionData);
+      if (!navStack.has('editor-manuscript')) {
+        navStack.push('editor-manuscript', () => {
+          handleTabChange('info');
+        });
+      }
+    } else {
+      if (navStack.has('editor-manuscript')) {
+        navStack.pop('editor-manuscript');
+      }
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    return () => {
+      if (navStack.has('editor-manuscript')) {
+        navStack.pop('editor-manuscript');
+      }
+    };
+  }, []);
 
   // Handle Tab Switch (Save manuscript immediately before switching)
   const handleTabChange = (tab: ChapterActiveTab) => {
@@ -426,6 +443,9 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const handleHeaderBack = () => {
     if (activeTab === 'manuscript') {
       // In manuscript mode, return to Chapter Info tab
+      if (navStack.has('editor-manuscript')) {
+        navStack.pop('editor-manuscript');
+      }
       handleTabChange('info');
     } else {
       // In other tabs, exit chapter workspace to story planner
@@ -661,7 +681,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
       editorRef.current.innerHTML = (editorRef.current.innerHTML || '') + formatted;
       handleContentChange();
     }
-    setActiveTab('manuscript');
+    handleTabChange('manuscript');
   };
 
   // Insert entity name at cursor position in manuscript
@@ -671,7 +691,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
       document.execCommand('insertText', false, ` ${name} `);
       handleContentChange();
     }
-    setActiveTab('manuscript');
+    handleTabChange('manuscript');
   };
 
   // 🖼️ Insert Story Image with Worldbuilding Tags
@@ -733,11 +753,25 @@ ${afterHtml}
 
   // Save and safely exit to chapter list
   const handleBack = async () => {
+    if (navStack.has('editor-manuscript')) {
+      navStack.pop('editor-manuscript');
+    }
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
     await saveToIndexedDB();
     onBack();
+  };
+
+  // Safely switch chapters after saving current chapter
+  const handleSwitchChapterSafe = async (targetChapter: StoryChapter) => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    await saveToIndexedDB();
+    if (onSwitchChapter) {
+      onSwitchChapter(targetChapter);
+    }
   };
 
   const getEffectivePlainText = (): string => {
@@ -977,7 +1011,7 @@ ${afterHtml}
             bookTitle={bookTitle}
             contentText={contentText}
             onUpdateChapter={handleUpdateChapterFields}
-            onSwitchChapter={onSwitchChapter}
+            onSwitchChapter={onSwitchChapter ? handleSwitchChapterSafe : undefined}
           />
         )}
       </main>
