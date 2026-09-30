@@ -815,7 +815,7 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
                 type="button"
                 onClick={() => setIsTTSConfigOpen(true)}
                 className="p-1.5 rounded-xl text-slate-400 hover:text-amber-500 hover:bg-amber-500/10 transition"
-                title="Pengaturan Kunci API Azure & Google Cloud (Opsional)"
+                title="Pengaturan Kunci API TTS Mandiri (Opsional)"
               >
                 <Key className="w-3.5 h-3.5" />
               </button>
@@ -878,7 +878,7 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
             </div>
           </div>
 
-          {/* Engine Switcher Bar: [ Auto ] [ Azure ] [ Google ] [ WASM ] [ Gemini ] [ Groq ] [ Browser ] */}
+          {/* Engine Switcher Bar: [ Auto ] [ WASM ] [ Gemini ] [ Groq ] [ Browser ] */}
           <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 text-[10px] overflow-x-auto no-scrollbar">
             <span className="font-bold text-slate-500 dark:text-slate-400 pl-1.5 flex-shrink-0 hidden xs:inline">
               Mesin:

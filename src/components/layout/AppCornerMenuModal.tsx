@@ -316,7 +316,7 @@ export const AppCornerMenuModal: React.FC<AppCornerMenuModalProps> = ({
               <span>Pengaturan Multi-AI</span>
             </span>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 font-mono">
-              Gemini &amp; Groq
+              Gemini, Groq &amp; OpenRouter
             </span>
           </button>
 

@@ -9,7 +9,6 @@ import { WorksView } from './components/works/WorksView';
 import { BookOverviewTab } from './components/books/BookOverviewTab';
 import { StoryPlannerView } from './components/story/StoryPlannerView';
 import { RichTextEditor } from './components/story/RichTextEditor';
-import { ChapterStudioView } from './components/story/ChapterStudioView';
 import { ChapterReaderView } from './components/story/reader/ChapterReaderView';
 import { WorldBuildingView } from './components/world/WorldBuildingView';
 import { MediaGalleryView } from './components/media/MediaGalleryView';

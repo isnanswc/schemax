@@ -76,7 +76,7 @@ export const TTSConfigModal: React.FC<TTSConfigModalProps> = ({
               <span className="font-bold text-slate-900 dark:text-slate-100 block">
                 Hemat Kuota Menulis Anda!
               </span>
-              Memasukkan kunci Azure Speech atau Google Cloud di sini membuat pembacaan naskah di HP tidak menyedot kuota Gemini sama sekali. Jika dikosongkan, sistem otomatis menggunakan mesin <strong>WASM / Mobile Free</strong> (100% gratis tanpa kuota).
+              Gunakan kunci Google AI Studio (Gemini) khusus untuk pembacaan audio agar kuota naskah cerita utama Anda tidak tersedot. Jika dikosongkan, sistem otomatis menggunakan mesin <strong>WASM / Mobile Free</strong> (100% gratis tanpa kuota).
             </div>
           </div>
 

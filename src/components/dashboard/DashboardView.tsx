@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Book, StoryChapter } from '../../types';
-import { AISparkModal } from '../books/AISparkModal';
 import { BookCard } from '../books/BookCard';
 import {
   Plus,
@@ -86,7 +85,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenAISettings,
   onNavigateToWorks,
 }) => {
-  const [isSparkModalOpen, setIsSparkModalOpen] = useState(false);
   const [quoteIndex, setQuoteIndex] = useState(() => Math.floor(Math.random() * WRITING_QUOTES.length));
   const [displayedQuote, setDisplayedQuote] = useState('');
   const [isTyping, setIsTyping] = useState(true);
@@ -134,16 +132,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const greeting = getGreeting();
   const GreetingIcon = greeting.icon;
-
-  const handleOpenSparkModal = () => {
-    navStack.push('modal-spark', () => setIsSparkModalOpen(false));
-    setIsSparkModalOpen(true);
-  };
-
-  const handleCloseSparkModal = () => {
-    navStack.pop('modal-spark');
-    setIsSparkModalOpen(false);
-  };
 
   const totalWords = allChapters.reduce((acc, c) => acc + (c.wordCount || 0), 0);
   const publishedBooks = books.filter((b) => b.status === 'released');
@@ -374,13 +362,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         )}
       </div>
-
-      {/* AI Quick Spark Modal */}
-      <AISparkModal
-        isOpen={isSparkModalOpen}
-        onClose={handleCloseSparkModal}
-        books={books}
-      />
     </div>
   );
 };

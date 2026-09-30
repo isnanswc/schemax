@@ -290,7 +290,7 @@ export interface MediaItem {
   createdAt: number;
 }
 
-export type ActiveTab = 'overview' | 'chapters' | 'world' | 'gallery' | 'sync';
+export type ActiveTab = 'overview' | 'chapters' | 'world' | 'gallery';
 
 export interface GDriveConfig {
   apiKey?: string;
