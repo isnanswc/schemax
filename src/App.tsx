@@ -281,7 +281,7 @@ export function App() {
           />
 
           {/* 3. Main Body Container - Compact & Edge-to-Edge on Mobile */}
-          <main className="flex-1 w-full max-w-4xl mx-auto px-2.5 sm:px-4 py-3 sm:py-6">
+          <main className={`flex-1 w-full max-w-4xl mx-auto px-2.5 sm:px-4 ${activeTab === 'chat' && currentBook ? 'pt-1 pb-0 overflow-hidden' : 'py-3 sm:py-6'}`}>
             {!currentBook ? (
               /* Home Screen: Toggle between Dashboard & Works */
               <div className="space-y-4">
@@ -314,7 +314,7 @@ export function App() {
               </div>
             ) : (
               /* Inside Book Workspace */
-              <div className="space-y-4">
+              <div className={activeTab === 'chat' ? 'h-full flex flex-col' : 'space-y-4'}>
                 {activeTab === 'overview' && (
                   <BookOverviewTab
                     book={currentBook}

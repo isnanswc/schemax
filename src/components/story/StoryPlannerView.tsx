@@ -120,47 +120,58 @@ export const StoryPlannerView: React.FC<StoryPlannerViewProps> = ({
 
   return (
     <div className="space-y-4 pb-24">
-      {/* 🌟 Aesthetic Panoramic Book Banner (if book has cover) */}
+      {/* 🌟 Aesthetic Panoramic Ambient Cover Banner (Blends seamlessly into canvas) */}
       {bookCoverUrl && (
         <div
           onClick={() => setIsCoverViewerOpen(true)}
-          className="relative h-44 sm:h-52 w-full rounded-3xl overflow-hidden border border-slate-200/80 dark:border-slate-800 shadow-md group/banner cursor-zoom-in transition-all duration-300 select-none"
+          className="relative h-56 sm:h-72 -mx-2.5 sm:-mx-4 -mt-3 sm:-mt-6 overflow-hidden select-none cursor-zoom-in group/banner transition-all duration-300 mb-2"
         >
-          {/* Background Blurred Ambient Glow */}
+          {/* 1. Ambient Color Glow Background */}
           <div
-            className="absolute inset-0 bg-cover bg-center scale-110 filter blur-xl opacity-40 dark:opacity-30 pointer-events-none"
+            className="absolute inset-0 bg-cover bg-center scale-110 filter blur-3xl opacity-45 dark:opacity-35 pointer-events-none"
             style={{ backgroundImage: `url(${bookCoverUrl})` }}
           />
 
-          {/* Crisp Centered / Panoramic Image */}
+          {/* 2. Panoramic Crisp Main Image */}
           <img
             src={bookCoverUrl}
             alt={book?.title || 'Sampul Buku'}
-            className={`w-full h-full object-cover object-center group-hover/banner:scale-105 transition-transform duration-500 ease-out ${getBlurImageClass()}`}
+            className={`w-full h-full object-cover object-center group-hover/banner:scale-105 transition-transform duration-700 ease-out ${getBlurImageClass()}`}
           />
 
-          {/* Aesthetic Gradient & Blur Blend towards bottom */}
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/50 to-transparent pointer-events-none backdrop-blur-[1px]" />
-          <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-slate-950/90 to-transparent pointer-events-none" />
+          {/* 3. Multi-Layer Seamless Gradient & Blur fading into background color */}
+          {/* Top subtle vignette */}
+          <div className="absolute top-0 inset-x-0 h-16 bg-gradient-to-b from-black/30 dark:from-black/50 to-transparent pointer-events-none" />
 
-          {/* Banner Overlay Content */}
-          <div className="absolute bottom-3 left-3 right-3 sm:bottom-4 sm:left-4 sm:right-4 flex items-end justify-between gap-3 text-white pointer-events-none">
+          {/* Bottom Primary Gradient: Fades to #f8fafc (light mode) or #030712 (dark mode) */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#f8fafc] dark:from-[#030712] via-[#f8fafc]/70 dark:via-[#030712]/75 via-40% to-transparent pointer-events-none" />
+
+          {/* Bottom Soft Backdrop Blur Layer: Melts image pixels smoothly */}
+          <div className="absolute bottom-0 inset-x-0 h-28 bg-gradient-to-t from-[#f8fafc] dark:from-[#030712] via-[#f8fafc]/90 dark:via-[#030712]/90 to-transparent pointer-events-none backdrop-blur-[3px]" />
+
+          {/* Bottom Solid Feathering: Guarantees 100% seamless transition with no harsh line */}
+          <div className="absolute bottom-0 inset-x-0 h-8 bg-[#f8fafc] dark:bg-[#030712] pointer-events-none" />
+
+          {/* 4. Elegant Hero Content overlayed at bottom */}
+          <div className="absolute bottom-3 left-4 right-4 sm:bottom-4 sm:left-6 sm:right-6 flex items-end justify-between gap-4 pointer-events-none z-10">
             <div className="min-w-0 pr-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-black/40 backdrop-blur-md border border-white/20 text-amber-300 mb-1.5">
-                <Sparkles className="w-3 h-3 text-amber-400" />
-                <span>{book?.genre || 'Cerita Lokal'}</span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider bg-amber-500/15 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 backdrop-blur-md shadow-xs mb-1.5">
+                <Sparkles className="w-3 h-3 text-amber-500" />
+                <span>{book?.genre || 'Karya Sastra'}</span>
               </span>
-              <h2 className={`text-base sm:text-xl font-black drop-shadow-md truncate leading-tight ${getBlurTitleClass()}`}>
+
+              <h2 className={`text-xl sm:text-3xl font-black font-serif text-slate-900 dark:text-white tracking-tight drop-shadow-sm leading-tight ${getBlurTitleClass()}`}>
                 {book?.title || 'Daftar Bab'}
               </h2>
+
               {book?.synopsis && (
-                <p className={`text-xs text-slate-300/90 drop-shadow line-clamp-1 max-w-lg mt-0.5 ${getBlurTextClass()}`}>
+                <p className={`text-xs sm:text-sm text-slate-600 dark:text-slate-300 line-clamp-2 max-w-xl mt-1 leading-relaxed ${getBlurTextClass()}`}>
                   {book.synopsis}
                 </p>
               )}
             </div>
 
-            <div className="p-2 rounded-2xl bg-black/50 backdrop-blur-md border border-white/20 text-white/90 group-hover/banner:scale-110 transition-transform shadow-lg flex-shrink-0">
+            <div className="p-2.5 rounded-2xl bg-white/70 dark:bg-slate-900/70 backdrop-blur-md border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-200 shadow-lg group-hover/banner:scale-110 transition-transform flex-shrink-0">
               <Maximize2 className="w-4 h-4" />
             </div>
           </div>

@@ -7,16 +7,13 @@ import {
   Sparkles,
   ChevronDown,
   ChevronUp,
-  Eye,
-  EyeOff,
   User,
   Shield,
-  HelpCircle,
   X,
   Plus,
   Compass,
-  RefreshCw,
-  Film
+  Film,
+  Users
 } from 'lucide-react';
 import { Book, WorldEntity, StoryChapter, MediaItem, CharacterChatMessage, CharacterChatSession } from '../../../types';
 import { useMediaUrl } from '../../../hooks/useMediaUrl';
@@ -96,25 +93,9 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
     return characters[0]?.id || '';
   });
 
-  // Carousel collapse state with persistence
-  const carouselStorageKey = `schemax_chat_carousel_hidden_${book.id}`;
-  const [isCarouselHidden, setIsCarouselHidden] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem(carouselStorageKey) === 'true';
-    } catch (_) {
-      return false;
-    }
-  });
-
-  const toggleCarousel = () => {
-    setIsCarouselHidden((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(carouselStorageKey, String(next));
-      } catch (_) {}
-      return next;
-    });
-  };
+  // Character selection drawer toggle (defaults to false for minimal, spacious view)
+  const [showCharacterDrawer, setShowCharacterDrawer] = useState(false);
+  const [showPromptsDrawer, setShowPromptsDrawer] = useState(false);
 
   // Chat Mode: in_character (in-universe) vs meta_interview (interview with author)
   const [chatMode, setChatMode] = useState<'in_character' | 'meta_interview'>('in_character');
@@ -324,143 +305,120 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-120px)] sm:h-[calc(100vh-140px)] max-w-4xl mx-auto px-2 sm:px-4">
+    <div className="flex flex-col h-[calc(100dvh-135px)] sm:h-[calc(100dvh-145px)] max-w-4xl mx-auto px-1 sm:px-2 pb-16 sm:pb-20">
       {/* ========================================================================= */}
-      {/* 1. TOP CAROUSEL & COLLAPSIBLE HEADER                                      */}
+      {/* 1. ULTRA-STREAMLINED SINGLE-ROW CONTROL BAR                               */}
       {/* ========================================================================= */}
-      <div className="flex-shrink-0 pt-2 pb-2">
-        {/* Toggle Bar */}
-        <div className="flex items-center justify-between mb-1.5 px-1">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 tracking-wide flex items-center gap-1.5">
-              <MessageSquare className="w-3.5 h-3.5 text-amber-500" />
-              <span>Studio Obrolan Karakter</span>
-            </span>
+      <div className="flex-shrink-0 mb-1.5">
+        <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-2xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800/80 backdrop-blur-md shadow-xs">
+          {/* Left: Active Character Identity */}
+          <div className="flex items-center gap-2 min-w-0 pr-1">
+            <div className="w-8 h-8 rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-800 flex items-center justify-center border border-amber-500/30 flex-shrink-0 shadow-xs">
+              {activeCharAvatarUrl ? (
+                <img src={activeCharAvatarUrl} alt={activeChar.name} className="w-full h-full object-cover" />
+              ) : (
+                <User className="w-4 h-4 text-amber-500" />
+              )}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-extrabold text-slate-900 dark:text-slate-100 truncate">
+                  {activeChar.name}
+                </span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+              </div>
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 block truncate">
+                {activeChar.shortDescription || 'Karakter'}
+              </span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            {/* Fact Vault Badge Trigger */}
+          {/* Right: Actions in one neat row */}
+          <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+            {/* Mode Switch Pill */}
+            <button
+              type="button"
+              onClick={() => setChatMode((prev) => (prev === 'in_character' ? 'meta_interview' : 'in_character'))}
+              className={`px-2 py-1 rounded-xl text-[10px] font-bold border transition flex items-center gap-1 ${
+                chatMode === 'in_character'
+                  ? 'bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-300'
+                  : 'bg-indigo-500/15 border-indigo-500/30 text-indigo-700 dark:text-indigo-300'
+              }`}
+              title="Beralih antara Mode Imersif Cerita dan Wawancara Penulis"
+            >
+              <span>{chatMode === 'in_character' ? '🎭 Imersif' : '🎬 Wawancara'}</span>
+            </button>
+
+            {/* Fact Memory Badge */}
             <button
               type="button"
               onClick={() => setIsFactVaultOpen(true)}
-              className="flex items-center gap-1 py-1 px-2.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold border border-indigo-500/20 transition"
-              title="Lihat apa yang diingat tokoh tentang Anda"
+              className="flex items-center gap-1 py-1 px-2 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold border border-indigo-500/20 transition"
+              title="Buku Memori: Fakta tentang Anda yang diingat tokoh"
             >
-              <Brain className="w-3 h-3 text-indigo-500" />
-              <span>{authorKnownFacts.length} Memori Ingatan</span>
+              <Brain className="w-3.5 h-3.5 text-indigo-500" />
+              <span>{authorKnownFacts.length}</span>
             </button>
 
-            {/* Carousel Hide/Show Toggle */}
+            {/* Choose Character Button */}
             <button
               type="button"
-              onClick={toggleCarousel}
-              className="flex items-center gap-1 py-1 px-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-[10px] font-bold transition"
+              onClick={() => setShowCharacterDrawer((prev) => !prev)}
+              className={`flex items-center gap-1 py-1 px-2 rounded-xl text-[10px] font-bold border transition ${
+                showCharacterDrawer
+                  ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                  : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+              }`}
+              title="Pilih tokoh lain"
             >
-              {isCarouselHidden ? (
-                <>
-                  <Eye className="w-3 h-3 text-amber-500" />
-                  <span className="hidden sm:inline">Pilih Tokoh</span>
-                </>
-              ) : (
-                <>
-                  <EyeOff className="w-3 h-3 text-slate-400" />
-                  <span className="hidden sm:inline">Sembunyikan</span>
-                </>
-              )}
+              <Users className="w-3.5 h-3.5" />
+              <span className="hidden xs:inline">Ganti</span>
+              {showCharacterDrawer ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
+
+            {/* Clear Chat */}
+            <button
+              type="button"
+              onClick={handleClearHistory}
+              disabled={messages.length === 0 || isLoading}
+              className="p-1 rounded-lg text-slate-400 hover:text-rose-500 disabled:opacity-20 transition"
+              title="Reset riwayat obrolan"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
 
-        {/* Expanded Carousel */}
-        {!isCarouselHidden ? (
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none pt-1 animate-in fade-in slide-in-from-top-2 duration-200">
-            {characters.map((char) => (
-              <CharacterAvatarThumb
-                key={char.id}
-                entity={char}
-                isActive={char.id === activeChar.id}
-                onClick={() => setSelectedEntityId(char.id)}
-              />
-            ))}
-          </div>
-        ) : (
-          /* Collapsed Compact Header Pill */
-          <div className="flex items-center justify-between p-2 rounded-xl bg-slate-100/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 animate-in fade-in duration-200">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-800 flex items-center justify-center border border-amber-500/30 flex-shrink-0">
-                {activeCharAvatarUrl ? (
-                  <img src={activeCharAvatarUrl} alt={activeChar.name} className="w-full h-full object-cover" />
-                ) : (
-                  <User className="w-5 h-5 text-amber-500" />
-                )}
-              </div>
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                    {activeChar.name}
-                  </span>
-                  <span className="text-[10px] text-slate-400">
-                    ({activeChar.shortDescription || 'Karakter'})
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span>Siap mengobrol • Paham konteks naskah</span>
-                </div>
-              </div>
+        {/* Collapsible Character Carousel (only drops down when "Ganti" is clicked) */}
+        {showCharacterDrawer && (
+          <div className="mt-1.5 p-2 rounded-2xl bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800 shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-150">
+            <div className="flex items-center justify-between mb-1.5 px-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Pilih Tokoh untuk Diajak Bicara:
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowCharacterDrawer(false)}
+                className="text-[10px] font-bold text-amber-600 dark:text-amber-400 hover:underline"
+              >
+                Tutup
+              </button>
             </div>
-
-            <button
-              type="button"
-              onClick={toggleCarousel}
-              className="text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline px-2 py-1"
-            >
-              Ganti Tokoh 👥
-            </button>
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+              {characters.map((char) => (
+                <CharacterAvatarThumb
+                  key={char.id}
+                  entity={char}
+                  isActive={char.id === activeChar.id}
+                  onClick={() => {
+                    setSelectedEntityId(char.id);
+                    setShowCharacterDrawer(false);
+                  }}
+                />
+              ))}
+            </div>
           </div>
         )}
-      </div>
-
-      {/* Mode Switch & Action Bar */}
-      <div className="flex items-center justify-between px-1 py-1 mb-1.5 text-[10px]">
-        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900 p-0.5 rounded-xl border border-slate-200 dark:border-slate-800">
-          <button
-            type="button"
-            onClick={() => setChatMode('in_character')}
-            className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1 ${
-              chatMode === 'in_character'
-                ? 'bg-amber-500 text-white shadow-sm'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <Shield className="w-3 h-3" />
-            <span>Mode Imersif Cerita</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setChatMode('meta_interview')}
-            className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1 ${
-              chatMode === 'meta_interview'
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <Film className="w-3 h-3" />
-            <span>Wawancara Penulis</span>
-          </button>
-        </div>
-
-        <button
-          type="button"
-          onClick={handleClearHistory}
-          disabled={messages.length === 0 || isLoading}
-          className="flex items-center gap-1 py-1 px-2 text-slate-400 hover:text-rose-500 disabled:opacity-30 transition"
-          title="Reset riwayat obrolan dengan tokoh ini"
-        >
-          <Trash2 className="w-3 h-3" />
-          <span className="hidden sm:inline">Bersihkan Chat</span>
-        </button>
       </div>
 
       {/* ========================================================================= */}
@@ -468,22 +426,22 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
       {/* ========================================================================= */}
       <div
         ref={chatContainerRef}
-        className="flex-1 overflow-y-auto px-1 py-2 space-y-3.5 rounded-2xl bg-white/40 dark:bg-slate-950/40 border border-slate-200/60 dark:border-slate-800/60 backdrop-blur-sm scroll-smooth p-2"
+        className="flex-1 overflow-y-auto min-h-0 px-2 py-3 space-y-3.5 rounded-2xl bg-white/50 dark:bg-slate-950/50 border border-slate-200/70 dark:border-slate-800/70 backdrop-blur-sm scroll-smooth"
       >
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center py-8 px-4">
-            <div className="w-14 h-14 rounded-2xl overflow-hidden bg-slate-200 dark:bg-slate-800 flex items-center justify-center border border-amber-500/20 mb-3 shadow-md">
+          <div className="flex flex-col items-center justify-center h-full text-center py-6 px-4">
+            <div className="w-12 h-12 rounded-2xl overflow-hidden bg-slate-200 dark:bg-slate-800 flex items-center justify-center border border-amber-500/20 mb-2.5 shadow-md">
               {activeCharAvatarUrl ? (
                 <img src={activeCharAvatarUrl} alt={activeChar.name} className="w-full h-full object-cover" />
               ) : (
-                <User className="w-7 h-7 text-amber-500" />
+                <User className="w-6 h-6 text-amber-500" />
               )}
             </div>
             <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">
               Mulai Percakapan dengan {activeChar.name}
             </h4>
             <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mb-4 leading-relaxed">
-              {activeChar.name} mengingat alur cerita naskah dan fakta-fakta yang Anda ceritakan kepadanya. Anda bisa mengobrol santai seputar jalan cerita maupun hal di luar cerita.
+              {activeChar.name} mengingat alur cerita naskah dan fakta-fakta yang Anda ceritakan kepadanya.
             </p>
 
             {/* Quick starter chips */}
@@ -528,7 +486,7 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
 
                 {/* Message Bubble */}
                 <div
-                  className={`max-w-[82%] sm:max-w-[75%] rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm leading-relaxed shadow-sm ${
+                  className={`max-w-[84%] sm:max-w-[76%] rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm leading-relaxed shadow-sm ${
                     isUser
                       ? 'bg-amber-500 text-white rounded-tr-none font-medium'
                       : 'bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 text-slate-800 dark:text-slate-200 rounded-tl-none'
@@ -583,34 +541,48 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
       </div>
 
       {/* ========================================================================= */}
-      {/* 4. QUICK SUGGESTION CHIPS                                                 */}
+      {/* 4. INPUT BAR - Floating safely above BottomNavigation                     */}
       {/* ========================================================================= */}
-      {messages.length > 0 && !isLoading && (
-        <div className="flex items-center gap-1 overflow-x-auto py-1.5 scrollbar-none">
-          {quickPrompts.map((chip, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => handleSendMessage(chip)}
-              className="flex-shrink-0 px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-[10px] text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 transition active:scale-95"
-            >
-              💡 {chip}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="flex-shrink-0 pt-2">
+        {/* Optional Collapsible Question Suggestions */}
+        {showPromptsDrawer && (
+          <div className="flex items-center gap-1 overflow-x-auto pb-2 scrollbar-none animate-in fade-in duration-150">
+            {quickPrompts.map((chip, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => {
+                  handleSendMessage(chip);
+                  setShowPromptsDrawer(false);
+                }}
+                className="flex-shrink-0 px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-[10px] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 transition active:scale-95 shadow-2xs"
+              >
+                💡 {chip}
+              </button>
+            ))}
+          </div>
+        )}
 
-      {/* ========================================================================= */}
-      {/* 5. INPUT BAR                                                              */}
-      {/* ========================================================================= */}
-      <div className="flex-shrink-0 pt-1 pb-2">
         <form
           onSubmit={(e) => {
             e.preventDefault();
             handleSendMessage();
           }}
-          className="flex items-end gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-1.5 shadow-lg shadow-slate-200/50 dark:shadow-none focus-within:border-amber-400 dark:focus-within:border-amber-500 transition"
+          className="flex items-end gap-1.5 sm:gap-2 bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800/90 rounded-2xl p-1.5 shadow-xl shadow-slate-200/50 dark:shadow-none focus-within:border-amber-400 dark:focus-within:border-amber-500 transition"
         >
+          <button
+            type="button"
+            onClick={() => setShowPromptsDrawer((prev) => !prev)}
+            className={`p-2 rounded-xl transition flex-shrink-0 ${
+              showPromptsDrawer
+                ? 'bg-amber-500 text-white'
+                : 'text-slate-400 hover:text-amber-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+            title="Saran Ide Pertanyaan"
+          >
+            <Sparkles className="w-4 h-4" />
+          </button>
+
           <textarea
             ref={inputRef}
             rows={1}
@@ -623,13 +595,13 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
               }
             }}
             placeholder={`Ajak bicara ${activeChar.name}... (Enter untuk mengirim)`}
-            className="flex-1 bg-transparent px-3 py-2 text-xs sm:text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none max-h-24 leading-relaxed"
+            className="flex-1 bg-transparent px-2 sm:px-3 py-1.5 text-xs sm:text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none max-h-24 leading-relaxed"
           />
 
           <button
             type="submit"
             disabled={!inputText.trim() || isLoading}
-            className="p-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white disabled:opacity-30 disabled:pointer-events-none shadow-md shadow-amber-500/20 transition active:scale-95 flex-shrink-0"
+            className="p-2 sm:p-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white disabled:opacity-30 disabled:pointer-events-none shadow-md shadow-amber-500/20 transition active:scale-95 flex-shrink-0"
           >
             <Send className="w-4 h-4" />
           </button>
@@ -637,7 +609,7 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
       </div>
 
       {/* ========================================================================= */}
-      {/* 6. FACT VAULT MODAL (LONG-TERM MEMORY INSPECTOR)                          */}
+      {/* 5. FACT VAULT MODAL (LONG-TERM MEMORY INSPECTOR)                          */}
       {/* ========================================================================= */}
       {isFactVaultOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-150">
