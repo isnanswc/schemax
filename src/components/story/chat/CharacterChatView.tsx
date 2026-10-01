@@ -544,7 +544,7 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
       {/* ========================================================================= */}
       {/* 4. CHAT INPUT BAR (MENEMPEL TEPAT DI ATAS NAVIGATION PANEL)               */}
       {/* ========================================================================= */}
-      <div className="flex-shrink-0 z-30 w-full px-2 pt-2 pb-[60px] sm:pb-[66px] bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800/80 min-w-0">
+      <div className="flex-shrink-0 z-30 w-full px-2 pt-1.5 pb-[50px] sm:pb-[52px] bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800/80 min-w-0">
         {/* Optional Collapsible Question Suggestions */}
         {showPromptsDrawer && (
           <div className="flex items-center gap-1 overflow-x-auto pb-2 scrollbar-none animate-in fade-in duration-150">

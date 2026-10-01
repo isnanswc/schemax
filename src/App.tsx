@@ -106,10 +106,14 @@ export function App() {
   }, []);
 
   const handleSelectBook = (book: Book) => {
+    setEditingChapter(null);
+    setStudioChapter(null);
+    setReadingChapter(null);
     navStack.push('book', () => {
       setCurrentBook(null);
       setStudioChapter(null);
       setEditingChapter(null);
+      setReadingChapter(null);
     });
     setCurrentBook(book);
     setActiveTab('chapters');

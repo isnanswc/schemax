@@ -69,8 +69,8 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const editorRef = useRef<HTMLDivElement>(null);
   const [currentChapter, setCurrentChapter] = useState<StoryChapter>(chapter);
 
-  // 1. Default to 'info' (Chapter Information) on first open
-  const [activeTab, setActiveTab] = useState<ChapterActiveTab>('info');
+  // 1. Default to 'manuscript' (Writing Studio / Editor) on open
+  const [activeTab, setActiveTab] = useState<ChapterActiveTab>('manuscript');
 
   const [title, setTitle] = useState(chapter.title);
   const [status, setStatus] = useState<ChapterStatus>(chapter.status);
@@ -441,16 +441,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
   // Back Navigation Handler
   const handleHeaderBack = () => {
-    if (activeTab === 'manuscript') {
-      // In manuscript mode, return to Chapter Info tab
-      if (navStack.has('editor-manuscript')) {
-        navStack.pop('editor-manuscript');
-      }
-      handleTabChange('info');
-    } else {
-      // In other tabs, exit chapter workspace to story planner
-      handleBack();
-    }
+    handleBack();
   };
 
   const handleOpenAIAssistant = () => {
