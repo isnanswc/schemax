@@ -1756,18 +1756,43 @@ export async function analyzeCharacterPhotoWithVision(
     ? `Analisis foto/gambar karakter ini secara detail, akurat, dan mendalam untuk profil tokoh cerita fiksi.
 Nama Karakter: "${characterName || 'Tokoh Cerita'}"
 
-ATURAN KETAT DARI PENULIS:
+ATURAN KRUSIAL DARI PENULIS:
 1. "gender": Tentukan jenis kelamin yang tampak ("Pria" atau "Wanita").
-2. "estimatedAge": Tentukan perkiraan usia dalam format angka pasti diikuti "tahun", contoh: "24 tahun", "17 tahun", "35 tahun", "8 tahun". DILARANG KERAS MENGGUNAKAN RENTANG seperti "20-25 tahun" atau "sekitar 30-an". Harus satu angka pasti!
-3. "physicalTraits": Jabarkan secara detail ciri fisik yang terlihat: bentuk wajah, gaya dan warna rambut, warna dan bentuk mata, warna kulit, postur/tinggi tubuh, ekspresi wajah, serta tanda khusus jika ada.
-4. "clothingAttire": Jabarkan secara detail pakaian dan busana yang dikenakan: jenis pakaian (atasan, bawahan, gaun, jubah, zirah, dll), warna kain, motif, gaya busana, serta aksesoris/senjata.
-5. "shortSummary": Rangkuman 1-2 kalimat deskripsi ringkas tokoh yang memikat untuk profil glosarium ensiklopedia.
-6. "englishVisualPrompt": Text-to-image prompt dalam Bahasa Inggris detail (Midjourney/Flux style 9:16 aspect ratio): "Full body portrait of [gender], [specific age] years old, [detailed physical traits], wearing [detailed clothing], hyper realistic, 8k resolution, cinematic lighting, photorealistic textures, vertical 9:16 aspect ratio".
+
+2. "estimatedAge": Tentukan perkiraan usia yang tampak secara akurat dan condong muda sesuai penampilan aslinya.
+   - JANGAN MENEBAK TERLALU TUA! Jika wajah tampak muda (misal remaja atau usia 20-an), tulis usia muda yang tepat (contoh: "19 tahun", "21 tahun", "23 tahun", "25 tahun").
+   - DILARANG KERAS MENGGUNAKAN RENTANG seperti "20-25 tahun" atau "sekitar 30-an". Harus satu angka pasti diikuti kata "tahun"!
+
+3. "physicalTraits": Jabarkan secara detail, presisi, dan JUJUR seluruh ciri fisik dari foto:
+   - WAJIB ANALISIS BENTUK DAN PROPORSI TUBUH SECARA DETAIL & AKURAT SESUAI FOTO:
+     * Jika karakter wanita di foto tampak semok / sintal / montok berisi / berlekuk indah / hourglass (memiliki lekuk pinggul dan dada yang penuh dan padat, lekuk pinggang ramping, paha/bokong berisi, siluet tubuh memikat dan proporsional), SEBUTKAN SECARA SPESIFIK & JELAS! Jangan disensor atau dibuat generik "postur sedang"! Tuliskan lekuk tubuhnya dengan jelas: misal "Bentuk tubuh semok dan sintal dengan siluet jam pasir (hourglass), pinggang ramping dengan lekuk pinggul dan dada yang berisi padat, proporsi tubuh feminin yang memikat".
+     * Jika ramping/langsing (slender, petite), atletis kencang (athletic, toned), atau tegap berisi, sebutkan secara presisi.
+   - Wajah & Kulit: bentuk wajah, mata (warna & tatapan), bibir, hidung, warna kulit (misal: kulit sawo matang mulus, kuning langsat, cerah berseri), kondisi kulit yang halus kencang dan tampak muda segar.
+   - Rambut: gaya rambut, panjang rambut, tekstur, dan warna rambut.
+   - Ekspresi wajah: senyuman, tatapan, atau ekspresi khas tokoh.
+
+4. "clothingAttire": Jabarkan secara detail busana dan pakaian yang tampak di foto:
+   - Jenis pakaian (atasan, bawahan, gaun, celana, jaket, kebaya, seragam, dll).
+   - Warna kain, corak/motif, potongan/kerah pakaian yang pas badan, serta aksesoris/perhiasan yang dikenakan.
+
+5. "shortSummary": Rangkuman 1-2 kalimat deskripsi ringkas tokoh yang memikat untuk profil ensiklopedia.
+
+6. "englishVisualPrompt": Text-to-image prompt dalam Bahasa Inggris dengan fidelitas visual TERTINGGI untuk AI image generator (Midjourney v6, Flux.1, SDXL, SeaArt, Leonardo).
+   ATURAN KHUSUS VISUAL PROMPT:
+   a) KEMUDAAN MUTLAK: Wajib menyertakan frase kemudaan agar karakter TIDAK di-generate lebih tua: "stunning youthful [young woman / young man], [estimatedAge] years old, fresh youthful radiant glowing skin, smooth youthful face, vibrant and energetic young appearance".
+   b) PROPORSI TUBUH FAITHFUL: Wajib menerjemahkan bentuk tubuh foto secara persis:
+      - Jika di foto tampak semok / berlekuk indah: sertakan "gorgeous voluptuous hourglass figure, full feminine hips, narrow defined waistline, shapely curves, attractive well-proportioned curvy body silhouette, feminine allure".
+      - Jika ramping: "slender graceful petite silhouette, elegant slender build".
+      - Jika atletis: "toned athletic feminine build".
+   c) DETAIL WAJAH & RAMBUT: detail mata, bibir, gaya rambut, dan warna kulit.
+   d) BUSANA & GAYA: potongan busana dan warna persis foto.
+   e) RENDER QUALITY: "full body portrait, centered, hyper realistic, photorealistic masterpiece, 8k resolution, cinematic lighting, shallow depth of field, authentic photography, vertical 9:16 aspect ratio, --ar 9:16".
+   f) DILARANG KERAS menggunakan kata-kata yang memicu render usia tua seperti "mature", "aged", "weathered", "wrinkled", "elderly".
 
 Format output HANYA JSON valid:
 {
-  "gender": "...",
-  "estimatedAge": "24 tahun",
+  "gender": "Wanita",
+  "estimatedAge": "22 tahun",
   "physicalTraits": "...",
   "clothingAttire": "...",
   "shortSummary": "...",
@@ -2003,11 +2028,12 @@ Personality & Demeanor: "${character.traits || 'Natural, expressive'}"
 
 STRICT OBJECTIVE PROMPT REQUIREMENTS:
 1. Format: Vertical mobile phone aspect ratio (9:16), full body standing upright, centered composition.
-2. Subject Description: State exact ethnicity (default to Indonesian / Southeast Asian unless story states otherwise), age, skin tone (tan, light brown, olive), facial features, hairstyle, and body posture standing straight.
-3. Authentic Clothing & Attire: Describe the specific everyday or cultural clothing faithfully according to the character's role and story setting.
-4. Emotional Expression: The facial expression and posture MUST objectively reflect the character's internal personality traits (e.g. cautious, warm, exhausted, resolute).
-5. Photography & Quality keywords: 8k resolution, photorealistic skin textures, neutral cinematic lighting, shallow depth of field, hyper realistic, vertical mobile phone aspect ratio 9:16, --ar 9:16.
-6. OUTPUT RULE: Output ONLY the English prompt string. Do NOT add preamble, quotes, or markdown codeblocks.`;
+2. Subject & Youthfulness: Depict young characters with radiant, youthful, smooth glowing skin and fresh young facial features. Never make young characters look mature, aged, weathered, or wrinkled unless specifically instructed.
+3. Accurate Body Silhouette & Proportions: Faithfully reflect the character's exact body build and curves as described in Physical Traits (e.g. if curvy, voluptuous, semok, or hourglass, describe 'gorgeous voluptuous hourglass figure, full feminine hips, defined waistline, shapely feminine curves'; if slender, describe 'slender graceful silhouette'; if athletic, describe 'toned athletic physique').
+4. Ethnicity & Details: State exact ethnicity (default to Indonesian / Southeast Asian unless story states otherwise), age, skin tone (smooth tan, golden, or olive), facial features, and hairstyle.
+5. Authentic Clothing & Attire: Describe the specific everyday or cultural clothing faithfully according to the character's role and story setting.
+6. Photography & Quality keywords: 8k resolution, photorealistic skin textures, neutral cinematic lighting, shallow depth of field, hyper realistic, vertical mobile phone aspect ratio 9:16, --ar 9:16.
+7. OUTPUT RULE: Output ONLY the English prompt string. Do NOT add preamble, quotes, or markdown codeblocks.`;
 
   const systemPrompt =
     'You are an expert AI prompt engineer. Output strictly the single final English text-to-image prompt without markdown or quotes.';

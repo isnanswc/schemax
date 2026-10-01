@@ -60,6 +60,8 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
     stageSubtitle: 'Memulai koneksi ke model AI yang dikonfigurasi.',
   });
   const [attemptHistory, setAttemptHistory] = useState<AIGenerationEvent[]>([]);
+  const [scanningCharIndex, setScanningCharIndex] = useState<number | null>(null);
+  const [scanSuccessIndex, setScanSuccessIndex] = useState<{ index: number; msg: string } | null>(null);
 
   // Ensure modal always starts on input if no blueprint is loaded yet
   React.useEffect(() => {
@@ -170,9 +172,6 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
     updateBlueprint({ characters: updated });
   };
 
-  const [scanningCharIndex, setScanningCharIndex] = useState<number | null>(null);
-  const [scanSuccessIndex, setScanSuccessIndex] = useState<{ index: number; msg: string } | null>(null);
-
   const handleScanCharacterPhoto = async (index: number, file: File) => {
     if (!blueprint) return;
     setScanningCharIndex(index);
@@ -278,15 +277,17 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-slate-900/50 dark:bg-black/80 backdrop-blur-md transition-opacity animate-in fade-in duration-200"
-        onClick={onClose}
-      />
-
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/70 dark:bg-black/80 backdrop-blur-md transition-opacity animate-in fade-in duration-200"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       {/* Main Container */}
-      <div className="relative w-full sm:max-w-4xl h-[92vh] sm:h-[86vh] max-h-[95vh] bg-white dark:bg-slate-900 border-t sm:border border-slate-200 dark:border-slate-800 rounded-t-3xl sm:rounded-3xl shadow-2xl z-10 flex flex-col overflow-hidden safe-bottom">
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full sm:max-w-4xl h-[92vh] sm:h-[86vh] max-h-[95vh] bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-t sm:border border-slate-200 dark:border-slate-800 rounded-t-3xl sm:rounded-3xl shadow-2xl z-10 flex flex-col overflow-hidden safe-bottom"
+      >
         {/* Swipe Handle for Mobile */}
         <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700/80 rounded-full mx-auto mt-3 mb-1 sm:hidden flex-shrink-0" />
 
