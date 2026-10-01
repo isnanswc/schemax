@@ -706,7 +706,6 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
   };
 
   return (
-  return (
     <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col overflow-hidden select-none">
       {/* 1. Sleek Non-Overlapping Top Bar */}
       <div className="absolute top-2 sm:top-3 inset-x-2 sm:inset-x-4 z-40 flex items-center justify-between pointer-events-none gap-1.5">
