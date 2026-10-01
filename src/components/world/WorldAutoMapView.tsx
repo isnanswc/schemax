@@ -746,7 +746,10 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
           </button>
           <button
             type="button"
-            onClick={() => setViewMode('clusters')}
+            onClick={() => {
+              setViewMode('clusters');
+              setIsToolboxOpen(false);
+            }}
             className={`px-2.5 py-1 rounded-xl transition ${
               viewMode === 'clusters'
                 ? 'bg-amber-500 text-slate-950 font-extrabold shadow-sm'
@@ -771,83 +774,87 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
       </div>
 
       {/* ========================================================================= */}
-      {/* 3. SISI KIRI (LEFT): Kontrol Zoom & Fit Screen (Vertikal di Kiri Tengah)  */}
+      {/* 3. SISI KIRI (LEFT): Kontrol Zoom (HANYA MUNCUL DI PETA RELASI)           */}
       {/* ========================================================================= */}
-      <div className="absolute top-1/2 -translate-y-1/2 left-3 sm:left-4 z-40 pointer-events-auto flex flex-col items-center gap-1 bg-slate-900/90 backdrop-blur-md p-1.5 rounded-2xl border border-slate-700/80 shadow-2xl text-xs text-white">
-        <button
-          type="button"
-          onClick={() => setZoom((z) => Math.min(3.5, z + 0.25))}
-          className="p-2 hover:text-white rounded-xl hover:bg-slate-800 text-amber-400 active:scale-90 transition"
-          title="Perbesar (Zoom In)"
-        >
-          <ZoomIn className="w-4 h-4" />
-        </button>
+      {viewMode === 'network' && (
+        <div className="absolute top-1/2 -translate-y-1/2 left-3 sm:left-4 z-40 pointer-events-auto flex flex-col items-center gap-1 bg-slate-900/90 backdrop-blur-md p-1.5 rounded-2xl border border-slate-700/80 shadow-2xl text-xs text-white">
+          <button
+            type="button"
+            onClick={() => setZoom((z) => Math.min(3.5, z + 0.25))}
+            className="p-2 hover:text-white rounded-xl hover:bg-slate-800 text-amber-400 active:scale-90 transition"
+            title="Perbesar (Zoom In)"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
 
-        <span className="text-[10px] font-mono font-bold text-slate-300 py-0.5">
-          {Math.round(zoom * 100)}%
-        </span>
+          <span className="text-[10px] font-mono font-bold text-slate-300 py-0.5">
+            {Math.round(zoom * 100)}%
+          </span>
 
-        <button
-          type="button"
-          onClick={() => setZoom((z) => Math.max(0.15, z - 0.25))}
-          className="p-2 hover:text-white rounded-xl hover:bg-slate-800 text-amber-400 active:scale-90 transition"
-          title="Perkecil (Zoom Out)"
-        >
-          <ZoomOut className="w-4 h-4" />
-        </button>
+          <button
+            type="button"
+            onClick={() => setZoom((z) => Math.max(0.15, z - 0.25))}
+            className="p-2 hover:text-white rounded-xl hover:bg-slate-800 text-amber-400 active:scale-90 transition"
+            title="Perkecil (Zoom Out)"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
 
-        <div className="w-5 h-[1px] bg-slate-700 my-0.5" />
+          <div className="w-5 h-[1px] bg-slate-700 my-0.5" />
 
-        <button
-          type="button"
-          onClick={handleFitToScreen}
-          className="p-2 hover:text-white rounded-xl hover:bg-slate-800 text-emerald-400 active:scale-90 transition"
-          title="Fokus Semua Tokoh (Fit to Screen)"
-        >
-          <Maximize2 className="w-4 h-4" />
-        </button>
+          <button
+            type="button"
+            onClick={handleFitToScreen}
+            className="p-2 hover:text-white rounded-xl hover:bg-slate-800 text-emerald-400 active:scale-90 transition"
+            title="Fokus Semua Tokoh (Fit to Screen)"
+          >
+            <Maximize2 className="w-4 h-4" />
+          </button>
 
-        <button
-          type="button"
-          onClick={handleResetView}
-          className="p-2 hover:text-white rounded-xl hover:bg-slate-800 text-cyan-400 active:scale-90 transition"
-          title="Pusatkan Ulang"
-        >
-          <Compass className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* ========================================================================= */}
-      {/* 4. BOTTOM-RIGHT: Tombol Mengambang Buka "Alat & Filter"                   */}
-      {/* ========================================================================= */}
-      <div className="absolute bottom-4 right-3 sm:bottom-5 sm:right-4 z-40 pointer-events-auto">
-        <button
-          type="button"
-          onClick={() => setIsToolboxOpen(!isToolboxOpen)}
-          className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl font-black text-xs transition active:scale-95 shadow-2xl border ${
-            isToolboxOpen
-              ? 'bg-rose-600 text-white border-rose-500'
-              : 'bg-gradient-to-r from-pink-500 to-amber-500 text-slate-950 border-amber-400/50 shadow-pink-500/20'
-          }`}
-        >
-          {isToolboxOpen ? (
-            <>
-              <X className="w-4 h-4" />
-              <span>Tutup Panel</span>
-            </>
-          ) : (
-            <>
-              <SlidersHorizontal className="w-4 h-4" />
-              <span>Alat &amp; Filter</span>
-            </>
-          )}
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={handleResetView}
+            className="p-2 hover:text-white rounded-xl hover:bg-slate-800 text-cyan-400 active:scale-90 transition"
+            title="Pusatkan Ulang"
+          >
+            <Compass className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* ========================================================================= */}
-      {/* 5. SLIDE-UP TOOLBOX (Tampil di Bawah Tengah Saat Tombol Kanan Ditekan)   */}
+      {/* 4. BOTTOM-RIGHT: Tombol Mengambang (HANYA MUNCUL DI PETA RELASI)          */}
       {/* ========================================================================= */}
-      {isToolboxOpen && (
+      {viewMode === 'network' && (
+        <div className="absolute bottom-4 right-3 sm:bottom-5 sm:right-4 z-40 pointer-events-auto">
+          <button
+            type="button"
+            onClick={() => setIsToolboxOpen(!isToolboxOpen)}
+            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl font-black text-xs transition active:scale-95 shadow-2xl border ${
+              isToolboxOpen
+                ? 'bg-rose-600 text-white border-rose-500'
+                : 'bg-gradient-to-r from-pink-500 to-amber-500 text-slate-950 border-amber-400/50 shadow-pink-500/20'
+            }`}
+          >
+            {isToolboxOpen ? (
+              <>
+                <X className="w-4 h-4" />
+                <span>Tutup Panel</span>
+              </>
+            ) : (
+              <>
+                <SlidersHorizontal className="w-4 h-4" />
+                <span>Alat &amp; Filter</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 5. SLIDE-UP TOOLBOX (HANYA MUNCUL DI PETA RELASI)                         */}
+      {/* ========================================================================= */}
+      {viewMode === 'network' && isToolboxOpen && (
         <div className="absolute bottom-16 sm:bottom-20 inset-x-3 sm:inset-x-auto sm:right-4 sm:w-[460px] z-40 pointer-events-auto bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-3xl p-3.5 shadow-2xl animate-in slide-in-from-bottom-4 duration-200 flex flex-col gap-2.5">
           {/* Baris 1: Bab & Faksi */}
           <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-2 text-xs">
@@ -1400,7 +1407,33 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
         </div>
       ) : (
         /* Visual Mode 2: Himpunan Faksi (Cluster Sets) */
-        <div className="space-y-4">
+        <div className="flex-1 w-full overflow-y-auto px-4 sm:px-8 pt-20 pb-20 max-w-7xl mx-auto space-y-6">
+          {/* Header Info Sheet Faksi (Non-Floating) */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-slate-900/80 backdrop-blur-md p-4 rounded-3xl border border-slate-800 shadow-xl">
+            <div>
+              <h2 className="text-sm sm:text-base font-black text-white flex items-center gap-2">
+                <Boxes className="w-4 h-4 text-amber-400" />
+                <span>Struktur &amp; Himpunan Faksi</span>
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Daftar kelompok faksi dan anggota tokoh di {activeChapter ? `Bab: ${activeChapter.title}` : bookTitle}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <span className="text-xs bg-slate-800 text-amber-300 font-bold px-3 py-1.5 rounded-xl border border-slate-700">
+                {factionClusters.length} Faksi Terdaftar
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsAddRelationOpen(true)}
+                className="px-3.5 py-1.5 bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-pink-500/20 active:scale-95 transition"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Relasi</span>
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {factionClusters.map((cluster) => {
               const clusterColor = cluster.color || '#ec4899';
