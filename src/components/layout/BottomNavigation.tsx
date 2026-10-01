@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActiveTab } from '../../types';
-import { BookOpen, Layers, Image as ImageIcon, Compass, Info } from 'lucide-react';
+import { BookOpen, Layers, Image as ImageIcon, Compass, Info, MessageSquare } from 'lucide-react';
 
 interface BottomNavigationProps {
   activeTab: ActiveTab;
@@ -31,6 +31,11 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
       badge: entityCount > 0 ? entityCount : undefined,
     },
     {
+      id: 'chat' as ActiveTab,
+      label: 'Chat Tokoh',
+      icon: MessageSquare,
+    },
+    {
       id: 'gallery' as ActiveTab,
       label: 'Visual Media',
       icon: ImageIcon,
@@ -45,7 +50,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 
   return (
     <nav className="fixed bottom-0 inset-x-0 z-40 bg-slate-950/90 backdrop-blur-xl border-t border-slate-800/80 px-2 py-1 safe-bottom sm:max-w-md sm:mx-auto sm:rounded-t-2xl sm:border-x">
-      <div className="grid grid-cols-4 gap-1">
+      <div className="grid grid-cols-5 gap-1">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;

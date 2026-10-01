@@ -1,11 +1,12 @@
 import Dexie, { Table } from 'dexie';
-import { Book, StoryChapter, WorldEntity, MediaItem } from '../types';
+import { Book, StoryChapter, WorldEntity, MediaItem, CharacterChatSession } from '../types';
 
 export class StoryStudioDB extends Dexie {
   books!: Table<Book>;
   chapters!: Table<StoryChapter>;
   worldEntities!: Table<WorldEntity>;
   media!: Table<MediaItem>;
+  characterChats!: Table<CharacterChatSession>;
 
   constructor() {
     super('SchemaxStoryStudioDB');
@@ -14,6 +15,9 @@ export class StoryStudioDB extends Dexie {
       chapters: 'id, bookId, order, status, updatedAt',
       worldEntities: 'id, bookId, category, updatedAt',
       media: 'id, bookId, entityId, createdAt'
+    });
+    this.version(2).stores({
+      characterChats: 'id, bookId, entityId, updatedAt'
     });
   }
 }
@@ -242,3 +246,61 @@ export async function seedInitialDataIfNeeded() {
   // Mark seed as permanently done — will never repeat even if user deletes all books
   localStorage.setItem(SEED_FLAG, '1');
 }
+
+// Character Chat Database Helpers
+export async function getCharacterChatSession(
+  bookId: string,
+  entityId: string,
+  characterName: string
+): Promise<CharacterChatSession> {
+  const id = `chat_${bookId}_${entityId}`;
+  let session = await db.characterChats.get(id);
+  if (!session) {
+    session = {
+      id,
+      bookId,
+      entityId,
+      characterName,
+      authorKnownFacts: [],
+      messages: [],
+      updatedAt: Date.now(),
+    };
+    await db.characterChats.put(session);
+  }
+  return session;
+}
+
+export async function saveCharacterChatMessage(
+  bookId: string,
+  entityId: string,
+  characterName: string,
+  newMessage: CharacterChatMessage,
+  newFacts?: string[]
+): Promise<CharacterChatSession> {
+  const session = await getCharacterChatSession(bookId, entityId, characterName);
+  session.messages.push(newMessage);
+  if (newFacts && newFacts.length > 0) {
+    const existing = new Set(session.authorKnownFacts || []);
+    newFacts.forEach((f) => {
+      const trimmed = f.trim();
+      if (trimmed && !existing.has(trimmed)) {
+        existing.add(trimmed);
+      }
+    });
+    session.authorKnownFacts = Array.from(existing);
+  }
+  session.updatedAt = Date.now();
+  await db.characterChats.put(session);
+  return session;
+}
+
+export async function clearCharacterChat(bookId: string, entityId: string): Promise<void> {
+  const id = `chat_${bookId}_${entityId}`;
+  const existing = await db.characterChats.get(id);
+  if (existing) {
+    existing.messages = [];
+    existing.updatedAt = Date.now();
+    await db.characterChats.put(existing);
+  }
+}
+

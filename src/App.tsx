@@ -13,6 +13,7 @@ import { RichTextEditor } from './components/story/RichTextEditor';
 import { ChapterReaderView } from './components/story/reader/ChapterReaderView';
 import { WorldBuildingView } from './components/world/WorldBuildingView';
 import { MediaGalleryView } from './components/media/MediaGalleryView';
+import { CharacterChatView } from './components/story/chat/CharacterChatView';
 import { CreateBookModal } from './components/books/CreateBookModal';
 import { SyncStatusModal } from './components/sync/SyncStatusModal';
 import { AISettingsModal } from './components/settings/AISettingsModal';
@@ -42,6 +43,7 @@ export function App() {
   const [isArchitectModalOpen, setIsArchitectModalOpen] = useState(false);
   const [isCornerMenuOpen, setIsCornerMenuOpen] = useState(false);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [selectedChatEntityId, setSelectedChatEntityId] = useState<string | undefined>(undefined);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -346,6 +348,21 @@ export function App() {
                     entities={bookEntities}
                     chapters={bookChapters}
                     onRefresh={triggerRefresh}
+                    onChatWithCharacter={(charId) => {
+                      setSelectedChatEntityId(charId);
+                      setActiveTab('chat');
+                    }}
+                  />
+                )}
+
+                {activeTab === 'chat' && (
+                  <CharacterChatView
+                    book={currentBook}
+                    entities={bookEntities}
+                    chapters={bookChapters}
+                    media={bookMedia}
+                    initialEntityId={selectedChatEntityId}
+                    onOpenWorldbuilding={() => setActiveTab('world')}
                   />
                 )}
 

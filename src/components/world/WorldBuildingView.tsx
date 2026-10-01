@@ -44,6 +44,7 @@ interface WorldBuildingViewProps {
   entities: WorldEntity[];
   onRefresh: () => void;
   chapters?: StoryChapter[];
+  onChatWithCharacter?: (characterId: string) => void;
 }
 
 const EntityCard: React.FC<{
@@ -252,6 +253,7 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
   entities,
   onRefresh,
   chapters = [],
+  onChatWithCharacter,
 }) => {
   // Primary View Mode: 'list' (Daftar Kartu) or 'automap' (Peta Relasi & Visual Faksi)
   const [worldMode, setWorldMode] = useState<'list' | 'automap'>('list');
@@ -537,6 +539,7 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
         isOpen={!!hologramEntity}
         onClose={handleCloseHologram}
         onEntityUpdated={() => onRefresh()}
+        onChatWithCharacter={onChatWithCharacter}
       />
 
       {/* Image Picker for Main Image */}

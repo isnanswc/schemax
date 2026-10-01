@@ -21,7 +21,8 @@ import {
   Copy,
   Maximize2,
   Bookmark,
-  BookOpen
+  BookOpen,
+  MessageSquare
 } from 'lucide-react';
 import { usePrivacy } from '../../contexts/PrivacyContext';
 import { ImageViewerModal } from '../common/ImageViewerModal';
@@ -31,6 +32,7 @@ interface WorldEntityHologramModalProps {
   isOpen: boolean;
   onClose: () => void;
   onEntityUpdated?: (updated: WorldEntity) => void;
+  onChatWithCharacter?: (characterId: string) => void;
 }
 
 export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> = ({
@@ -38,6 +40,7 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
   isOpen,
   onClose,
   onEntityUpdated,
+  onChatWithCharacter,
 }) => {
   const { getBlurImageClass, getBlurGlossaryClass } = usePrivacy();
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
@@ -357,6 +360,21 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
 
             {/* Quick Hero Buttons */}
             <div className="flex items-center justify-center sm:justify-start gap-2 pt-1 flex-wrap">
+              {activeEntity.category === 'character' && onChatWithCharacter && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onChatWithCharacter(activeEntity.id);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white border border-amber-400 text-[11px] font-bold transition active:scale-95 shadow-md shadow-amber-500/20"
+                  title="Mulai obrolan interaktif dengan tokoh ini"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>💬 Ajak Bicara Tokoh</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => setIsImagePickerOpen(true)}

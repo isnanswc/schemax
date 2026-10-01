@@ -290,7 +290,24 @@ export interface MediaItem {
   createdAt: number;
 }
 
-export type ActiveTab = 'overview' | 'chapters' | 'world' | 'gallery';
+export type ActiveTab = 'overview' | 'chapters' | 'world' | 'gallery' | 'chat';
+
+export interface CharacterChatMessage {
+  id: string;
+  sender: 'user' | 'character';
+  text: string;
+  timestamp: number;
+}
+
+export interface CharacterChatSession {
+  id: string; // chat_<bookId>_<entityId>
+  bookId: string;
+  entityId: string;
+  characterName: string;
+  authorKnownFacts: string[];
+  messages: CharacterChatMessage[];
+  updatedAt: number;
+}
 
 export interface GDriveConfig {
   apiKey?: string;
