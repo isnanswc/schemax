@@ -706,80 +706,82 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-40 bg-slate-950 flex flex-col overflow-hidden select-none">
-      {/* 1. Sleek Floating Top Status Bar */}
-      <div className="absolute top-2.5 sm:top-4 inset-x-3 sm:inset-x-6 z-30 flex items-center justify-between pointer-events-none gap-2">
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col overflow-hidden select-none">
+      {/* 1. Sleek Non-Overlapping Top Bar */}
+      <div className="absolute top-2 sm:top-3 inset-x-2 sm:inset-x-4 z-40 flex items-center justify-between pointer-events-none gap-1.5">
         {/* Left: Project / Chapter Context Pill */}
-        <div className="pointer-events-auto flex items-center gap-2 bg-slate-900/90 hover:bg-slate-900 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-slate-700/80 shadow-2xl transition">
-          <div className="p-1.5 rounded-xl bg-pink-500/20 text-pink-400">
-            <GitFork className="w-4 h-4" />
+        <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2 bg-slate-900/95 backdrop-blur-md px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-2xl border border-slate-700/80 shadow-2xl transition max-w-[55%] sm:max-w-md">
+          <div className="p-1 sm:p-1.5 rounded-xl bg-pink-500/20 text-pink-400 flex-shrink-0">
+            <GitFork className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <h3 className="text-xs font-black text-white truncate max-w-[150px] sm:max-w-[220px]">
+            <div className="flex items-center gap-1 sm:gap-1.5">
+              <h3 className="text-[11px] sm:text-xs font-black text-white truncate">
                 {activeChapter ? activeChapter.title : bookTitle}
               </h3>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-pink-500/10 text-pink-400 font-bold border border-pink-500/20">
+              <span className="text-[9px] sm:text-[10px] px-1.5 py-0.2 rounded-md bg-pink-500/10 text-pink-400 font-bold border border-pink-500/20 flex-shrink-0">
                 {viewMode === 'network' ? 'Relasi' : 'Faksi'}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Center / Right: Live AI Indicator or Active Filter Pill */}
-        {(isAiLoading || aiStatusMessage) ? (
-          <div className="pointer-events-auto flex items-center gap-2 bg-slate-900/95 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-pink-500/40 text-pink-300 text-xs shadow-2xl animate-pulse">
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-pink-400" />
-            <span className="font-semibold text-[11px] truncate max-w-[180px] sm:max-w-[260px]">
-              {aiStatusMessage || 'Menganalisis relasi...'}
-            </span>
-          </div>
-        ) : (
-          <div className="pointer-events-auto flex items-center gap-1.5">
-            {/* View Mode Toggle Pill (Garis Relasi vs Faksi) */}
-            <div className="flex items-center bg-slate-900/90 backdrop-blur-md p-1 rounded-2xl border border-slate-700/80 shadow-2xl text-[11px] font-bold">
-              <button
-                type="button"
-                onClick={() => setViewMode('network')}
-                className={`px-2.5 py-1 rounded-xl transition ${
-                  viewMode === 'network'
-                    ? 'bg-amber-500 text-slate-950 shadow-sm'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Garis Relasi
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('clusters')}
-                className={`px-2.5 py-1 rounded-xl transition ${
-                  viewMode === 'clusters'
-                    ? 'bg-amber-500 text-slate-950 shadow-sm'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Faksi
-              </button>
+        {/* Right: Controls & Actions */}
+        <div className="pointer-events-auto flex items-center gap-1.5 flex-shrink-0">
+          {/* Live AI Indicator if running */}
+          {(isAiLoading || aiStatusMessage) && (
+            <div className="flex items-center gap-1.5 bg-slate-900/95 backdrop-blur-md px-2 py-1 rounded-xl border border-pink-500/40 text-pink-300 text-[10px] shadow-lg animate-pulse">
+              <Loader2 className="w-3 h-3 animate-spin text-pink-400 flex-shrink-0" />
+              <span className="font-semibold truncate max-w-[100px] sm:max-w-[160px]">
+                {aiStatusMessage || 'AI Auto-Map...'}
+              </span>
             </div>
+          )}
 
-            {/* Back / Close Button to return to World Cards */}
-            {onClose && (
-              <button
-                type="button"
-                onClick={onClose}
-                className="p-1.5 rounded-2xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 shadow-2xl transition flex items-center gap-1 px-2.5 text-xs font-bold"
-                title="Kembali ke Ensiklopedia Kartu"
-              >
-                <X className="w-4 h-4 text-slate-400" />
-                <span className="hidden sm:inline">Tutup Peta</span>
-              </button>
-            )}
+          {/* View Mode Toggle Pill (Garis Relasi vs Faksi) */}
+          <div className="flex items-center bg-slate-900/95 backdrop-blur-md p-1 rounded-2xl border border-slate-700/80 shadow-2xl text-[10px] sm:text-[11px] font-bold">
+            <button
+              type="button"
+              onClick={() => setViewMode('network')}
+              className={`px-2 py-1 rounded-xl transition ${
+                viewMode === 'network'
+                  ? 'bg-amber-500 text-slate-950 font-extrabold shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Relasi
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('clusters')}
+              className={`px-2 py-1 rounded-xl transition ${
+                viewMode === 'clusters'
+                  ? 'bg-amber-500 text-slate-950 font-extrabold shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Faksi
+            </button>
           </div>
-        )}
+
+          {/* Close Map / Back Button */}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 sm:px-2.5 rounded-2xl bg-slate-900/95 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 shadow-2xl transition flex items-center gap-1 text-[11px] font-bold"
+              title="Kembali ke Ensiklopedia Kartu"
+            >
+              <X className="w-4 h-4 text-slate-400" />
+              <span className="hidden md:inline">Tutup</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 2. Floating Bottom Controls: Expandable Toolbox with Horizontal Slider */}
-      <div className="absolute bottom-4 sm:bottom-6 inset-x-3 sm:inset-x-6 z-30 flex flex-col items-center pointer-events-none gap-2">
+      <div className="absolute bottom-3 sm:bottom-5 inset-x-2 sm:inset-x-6 z-40 flex flex-col items-center pointer-events-none gap-2">
         {/* Expanded Floating Toolbar (Horizontal Scrollable Toolbox) */}
         {isToolboxOpen && (
           <div className="pointer-events-auto w-full max-w-2xl bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-3xl p-3 shadow-2xl animate-in slide-in-from-bottom-4 duration-200 flex flex-col gap-2.5">
@@ -794,7 +796,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                   <select
                     value={selectedTimelineChapterId}
                     onChange={(e) => setSelectedTimelineChapterId(e.target.value)}
-                    className="bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1 text-xs font-semibold text-slate-200 focus:outline-none max-w-[180px] truncate"
+                    className="bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1 text-xs font-semibold text-slate-200 focus:outline-none max-w-[150px] sm:max-w-[200px] truncate"
                   >
                     <option value="global">🌐 Baseline Global</option>
                     {chapters.map((ch) => (
@@ -812,9 +814,9 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                 <select
                   value={selectedFactionFilter}
                   onChange={(e) => setSelectedFactionFilter(e.target.value)}
-                  className="bg-slate-950 border border-slate-700 rounded-xl px-2 py-1 text-xs font-semibold text-slate-200 focus:outline-none max-w-[140px] truncate"
+                  className="bg-slate-950 border border-slate-700 rounded-xl px-2 py-1 text-xs font-semibold text-slate-200 focus:outline-none max-w-[130px] sm:max-w-[160px] truncate"
                 >
-                  <option value="all">Semua Faksi ({availableFactions.length})</option>
+                  <option value="all">Semua ({availableFactions.length})</option>
                   {availableFactions.map((f) => (
                     <option key={f} value={f}>
                       {f}
@@ -834,19 +836,19 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
             </div>
 
             {/* Bottom row of toolbox: Horizontal Slider Action Buttons */}
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
               {/* Scope Filters */}
               {[
                 { id: 'all', label: 'Semua' },
-                { id: 'character_only', label: 'Tokoh Saja' },
-                { id: 'character_location', label: 'Tokoh & Lokasi' },
-                { id: 'character_item', label: 'Tokoh & Relik' },
+                { id: 'character_only', label: 'Tokoh' },
+                { id: 'character_location', label: 'Lokasi' },
+                { id: 'character_item', label: 'Relik' },
               ].map((sc) => (
                 <button
                   key={sc.id}
                   type="button"
                   onClick={() => setEntityScopeFilter(sc.id as any)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 ${
+                  className={`px-2.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 ${
                     entityScopeFilter === sc.id
                       ? 'bg-amber-500 text-slate-950 shadow-sm'
                       : 'bg-slate-800 text-slate-300 hover:text-white'
@@ -856,7 +858,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                 </button>
               ))}
 
-              <div className="h-5 w-[1px] bg-slate-700 flex-shrink-0 mx-1" />
+              <div className="h-5 w-[1px] bg-slate-700 flex-shrink-0 mx-0.5" />
 
               {/* AI Auto-Map Button */}
               <button
@@ -876,7 +878,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                 className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-xs border border-slate-700 whitespace-nowrap flex-shrink-0 active:scale-95 transition"
               >
                 <Plus className="w-3.5 h-3.5 text-pink-400" />
-                <span>Tambah Relasi</span>
+                <span>+ Relasi</span>
               </button>
 
               {/* Auto Arrange Layout */}
@@ -893,18 +895,18 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
         )}
 
         {/* Floating Quick Navigation & Menu Trigger Bar */}
-        <div className="pointer-events-auto flex items-center gap-2 bg-slate-900/90 hover:bg-slate-900/95 backdrop-blur-xl px-3 py-2 rounded-full border border-slate-700/80 shadow-2xl text-xs text-white">
+        <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2 bg-slate-900/90 hover:bg-slate-900/95 backdrop-blur-xl px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-full border border-slate-700/80 shadow-2xl text-xs text-white">
           {/* Zoom In */}
           <button
             type="button"
             onClick={() => setZoom((z) => Math.min(3.5, z + 0.25))}
-            className="p-1.5 hover:text-white rounded-full hover:bg-slate-800 text-amber-400 active:scale-90 transition"
+            className="p-1 sm:p-1.5 hover:text-white rounded-full hover:bg-slate-800 text-amber-400 active:scale-90 transition"
             title="Perbesar"
           >
-            <ZoomIn className="w-4 h-4" />
+            <ZoomIn className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
 
-          <span className="text-[11px] font-mono font-bold px-1 text-slate-300">
+          <span className="text-[10px] sm:text-[11px] font-mono font-bold px-0.5 text-slate-300">
             {Math.round(zoom * 100)}%
           </span>
 
@@ -912,37 +914,37 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
           <button
             type="button"
             onClick={() => setZoom((z) => Math.max(0.15, z - 0.25))}
-            className="p-1.5 hover:text-white rounded-full hover:bg-slate-800 text-amber-400 active:scale-90 transition"
+            className="p-1 sm:p-1.5 hover:text-white rounded-full hover:bg-slate-800 text-amber-400 active:scale-90 transition"
             title="Perkecil"
           >
-            <ZoomOut className="w-4 h-4" />
+            <ZoomOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
 
           {/* Fit to Screen */}
           <button
             type="button"
             onClick={handleFitToScreen}
-            className="p-1.5 hover:text-white rounded-full hover:bg-slate-800 text-emerald-400 active:scale-90 transition border-l border-slate-700/80 pl-2"
+            className="p-1 sm:p-1.5 hover:text-white rounded-full hover:bg-slate-800 text-emerald-400 active:scale-90 transition border-l border-slate-700/80 pl-1.5"
             title="Fokus Semua (Fit to Screen)"
           >
-            <Maximize2 className="w-4 h-4" />
+            <Maximize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
 
           {/* Reset / Center */}
           <button
             type="button"
             onClick={handleResetView}
-            className="p-1.5 hover:text-white rounded-full hover:bg-slate-800 text-cyan-400 active:scale-90 transition"
+            className="p-1 sm:p-1.5 hover:text-white rounded-full hover:bg-slate-800 text-cyan-400 active:scale-90 transition"
             title="Pusatkan Ulang"
           >
-            <Compass className="w-4 h-4" />
+            <Compass className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
 
           {/* Main Floating Tool Trigger Button */}
           <button
             type="button"
             onClick={() => setIsToolboxOpen(!isToolboxOpen)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full font-bold text-xs transition active:scale-95 border border-slate-700/80 ml-1 ${
+            className={`flex items-center gap-1 sm:gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full font-bold text-[11px] sm:text-xs transition active:scale-95 border border-slate-700/80 ml-0.5 ${
               isToolboxOpen
                 ? 'bg-rose-500 text-white'
                 : 'bg-gradient-to-r from-pink-500 to-amber-500 text-slate-950 shadow-lg shadow-pink-500/20'
