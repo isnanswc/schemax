@@ -17,6 +17,7 @@ interface WorksViewProps {
   chapterCounts: Record<string, number>;
   onSelectBook: (book: Book) => void;
   onOpenCreateModal: (defaultStatus?: BookStatus) => void;
+  onOpenStoryArchitect?: () => void;
 }
 
 export const WorksView: React.FC<WorksViewProps> = ({
@@ -24,6 +25,7 @@ export const WorksView: React.FC<WorksViewProps> = ({
   chapterCounts,
   onSelectBook,
   onOpenCreateModal,
+  onOpenStoryArchitect,
 }) => {
   const [activeCategory, setActiveCategory] = useState<'all' | BookStatus>('released');
   const [searchQuery, setSearchQuery] = useState('');
@@ -57,13 +59,26 @@ export const WorksView: React.FC<WorksViewProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={() => onOpenCreateModal(activeCategory === 'released' ? 'released' : 'draft')}
-          className="inline-flex items-center gap-1.5 py-2 px-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold rounded-xl text-xs shadow-md shadow-amber-500/20 active:scale-95 transition flex-shrink-0"
-        >
-          <Plus className="w-4 h-4 stroke-[2.5]" />
-          <span>Buku Baru</span>
-        </button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {onOpenStoryArchitect && (
+            <button
+              onClick={onOpenStoryArchitect}
+              className="inline-flex items-center gap-1.5 py-2 px-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl text-xs shadow-md shadow-indigo-500/20 active:scale-95 transition"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span className="hidden sm:inline">AI Story Architect</span>
+              <span className="sm:hidden">AI Architect</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => onOpenCreateModal(activeCategory === 'released' ? 'released' : 'draft')}
+            className="inline-flex items-center gap-1.5 py-2 px-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold rounded-xl text-xs shadow-md shadow-amber-500/20 active:scale-95 transition flex-shrink-0"
+          >
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <span>Buku Baru</span>
+          </button>
+        </div>
       </div>
 
       {/* 📚 Category Segmented Control: Published & Draft */}
@@ -167,15 +182,26 @@ export const WorksView: React.FC<WorksViewProps> = ({
               ? 'Coba gunakan kata kunci pencarian yang lain.'
               : 'Mulai buat buku baru Anda dan atur alur cerita serta worldbuilding-nya.'}
           </p>
-          <button
-            onClick={() => onOpenCreateModal(activeCategory === 'released' ? 'released' : 'draft')}
-            className="inline-flex items-center gap-1.5 py-2 px-4 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold rounded-xl text-xs shadow-md shadow-amber-500/20 active:scale-95 transition"
-          >
-            <Plus className="w-4 h-4" />
-            <span>
-              Buat Buku Baru ({activeCategory === 'released' ? 'Published' : 'Draft'})
-            </span>
-          </button>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {onOpenStoryArchitect && (
+              <button
+                onClick={onOpenStoryArchitect}
+                className="inline-flex items-center gap-1.5 py-2 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl text-xs shadow-md shadow-indigo-500/20 active:scale-95 transition"
+              >
+                <Sparkles className="w-4 h-4 text-amber-300" />
+                <span>AI Story Architect ✨</span>
+              </button>
+            )}
+            <button
+              onClick={() => onOpenCreateModal(activeCategory === 'released' ? 'released' : 'draft')}
+              className="inline-flex items-center gap-1.5 py-2 px-4 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold rounded-xl text-xs shadow-md shadow-amber-500/20 active:scale-95 transition"
+            >
+              <Plus className="w-4 h-4" />
+              <span>
+                Buat Buku Baru ({activeCategory === 'released' ? 'Published' : 'Draft'})
+              </span>
+            </button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3.5">

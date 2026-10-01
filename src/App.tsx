@@ -306,6 +306,7 @@ export function App() {
                     chapterCounts={chapterCounts}
                     onSelectBook={handleSelectBook}
                     onOpenCreateModal={handleOpenCreateModal}
+                    onOpenStoryArchitect={handleOpenArchitect}
                   />
                 )}
               </div>
@@ -429,6 +430,7 @@ export function App() {
             onOpenSyncModal={handleOpenSyncModal}
             onOpenPinSetup={handleOpenPinSetup}
             onOpenGDriveSettings={handleOpenGDriveSettings}
+            onOpenStoryArchitect={handleOpenArchitect}
           />
 
           {/* 10. Google Drive Shared Folder Settings Modal */}

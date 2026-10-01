@@ -61,6 +61,14 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
   });
   const [attemptHistory, setAttemptHistory] = useState<AIGenerationEvent[]>([]);
 
+  // Ensure modal always starts on input if no blueprint is loaded yet
+  React.useEffect(() => {
+    if (isOpen && !blueprint) {
+      setStep('input');
+      setError(null);
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const examplePrompts = [
@@ -278,7 +286,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
       />
 
       {/* Main Container */}
-      <div className="relative w-full sm:max-w-4xl bg-white dark:bg-slate-900 border-t sm:border border-slate-200 dark:border-slate-800 rounded-t-3xl sm:rounded-3xl shadow-2xl z-10 max-h-[95vh] flex flex-col animate-in slide-in-from-bottom duration-250 safe-bottom">
+      <div className="relative w-full sm:max-w-4xl h-[92vh] sm:h-[86vh] max-h-[95vh] bg-white dark:bg-slate-900 border-t sm:border border-slate-200 dark:border-slate-800 rounded-t-3xl sm:rounded-3xl shadow-2xl z-10 flex flex-col overflow-hidden safe-bottom">
         {/* Swipe Handle for Mobile */}
         <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700/80 rounded-full mx-auto mt-3 mb-1 sm:hidden flex-shrink-0" />
 
@@ -618,7 +626,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                     : 'text-slate-600 dark:text-slate-400 hover:text-white'
                 }`}
               >
-                Karakter ({blueprint.characters.length})
+                Karakter ({(blueprint.characters || []).length})
               </button>
               <button
                 type="button"
@@ -1193,6 +1201,23 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                 Buku baru akan dibuat bersama entitas ensiklopedia dan Story Plot bab yang sudah terisi.
               </p>
             </div>
+          </div>
+        )}
+
+        {/* Recovery Fallback if step is review but blueprint is missing */}
+        {step === 'review' && !blueprint && (
+          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-3">
+            <AlertTriangle className="w-8 h-8 text-amber-500" />
+            <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+              Blueprint belum tersedia. Silakan masukkan ide cerita terlebih dahulu.
+            </p>
+            <button
+              type="button"
+              onClick={() => setStep('input')}
+              className="px-4 py-2 bg-amber-500 text-slate-950 font-bold rounded-xl text-xs shadow-md active:scale-95 transition"
+            >
+              Kembali ke Input Ide
+            </button>
           </div>
         )}
       </div>

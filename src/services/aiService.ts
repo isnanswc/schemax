@@ -190,6 +190,8 @@ export function loadAISettings(): AISettingsConfig {
   }
 }
 
+export const getAISettings = loadAISettings;
+
 export function saveAISettings(config: AISettingsConfig): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
@@ -1642,15 +1644,16 @@ export async function analyzeImageWithVision(
     existingEntities?: Array<{ id: string; name: string; category: string }>;
   }
 ): Promise<ImageVisionAnalysis> {
-  const config = getAISettings();
-  const geminiSlot = config.slots.find((s) => s.provider === 'gemini' && s.apiKey && s.apiKey.trim().length > 0);
+  const config = loadAISettings();
+  const geminiSlot = config.slots.find((s) => s.provider === 'gemini' && s.apiKey && s.apiKey.trim().length > 0)
+    || (config.geminiConfig?.apiKey ? { provider: 'gemini' as const, apiKey: config.geminiConfig.apiKey, models: config.geminiConfig.fallbackModels } : null);
 
-  if (!geminiSlot) {
+  if (!geminiSlot || !geminiSlot.apiKey) {
     throw new Error('AI Vision memerlukan API Key Gemini. Buka Pengaturan AI dan tambahkan slot API Key Gemini.');
   }
 
   const visionModels = [
-    ...(geminiSlot.models && geminiSlot.models.length > 0 ? geminiSlot.models : config.geminiConfig.fallbackModels),
+    ...(geminiSlot.models && geminiSlot.models.length > 0 ? geminiSlot.models : config.geminiConfig?.fallbackModels || []),
     'gemini-3.1-flash',
     'gemini-3.0-flash',
     'gemini-2.5-flash',
@@ -1732,11 +1735,11 @@ export async function analyzeCharacterPhotoWithVision(
   characterName?: string,
   category: string = 'character'
 ): Promise<CharacterVisionScanResult> {
-  const config = getAISettings();
+  const config = loadAISettings();
   const geminiSlot = config.slots.find((s) => s.provider === 'gemini' && s.apiKey && s.apiKey.trim().length > 0)
-    || (config.geminiConfig?.apiKey ? { provider: 'gemini', apiKey: config.geminiConfig.apiKey, models: config.geminiConfig.fallbackModels } : null);
+    || (config.geminiConfig?.apiKey ? { provider: 'gemini' as const, apiKey: config.geminiConfig.apiKey, models: config.geminiConfig.fallbackModels } : null);
 
-  if (!geminiSlot) {
+  if (!geminiSlot || !geminiSlot.apiKey) {
     throw new Error('AI Vision memerlukan API Key Gemini. Buka Pengaturan AI dan tambahkan slot API Key Gemini.');
   }
 

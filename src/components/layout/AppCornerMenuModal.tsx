@@ -30,6 +30,7 @@ interface AppCornerMenuModalProps {
   onOpenSyncModal: () => void;
   onOpenPinSetup: () => void;
   onOpenGDriveSettings: () => void;
+  onOpenStoryArchitect?: () => void;
 }
 
 export const AppCornerMenuModal: React.FC<AppCornerMenuModalProps> = ({
@@ -39,6 +40,7 @@ export const AppCornerMenuModal: React.FC<AppCornerMenuModalProps> = ({
   onOpenSyncModal,
   onOpenPinSetup,
   onOpenGDriveSettings,
+  onOpenStoryArchitect,
 }) => {
   const { settings, updateSettings, togglePrivacyMode } = usePrivacy();
   const { settings: secSettings, lockApp } = useSecurity();
@@ -300,8 +302,28 @@ export const AppCornerMenuModal: React.FC<AppCornerMenuModalProps> = ({
           </div>
         </div>
 
-        {/* 3. Action Buttons: Multi-AI & Simpan/IndexedDB */}
+        {/* 3. Action Buttons: AI Architect, Multi-AI & Simpan/IndexedDB */}
         <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+          {/* AI Story Architect Button */}
+          {onOpenStoryArchitect && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onOpenStoryArchitect();
+              }}
+              className="w-full py-2.5 px-3 rounded-2xl bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 dark:from-indigo-950/40 dark:to-purple-950/40 dark:hover:from-indigo-900/50 dark:hover:to-purple-900/50 border border-indigo-200 dark:border-indigo-500/30 text-indigo-950 dark:text-indigo-200 text-xs font-bold transition flex items-center justify-between active:scale-98 shadow-xs"
+            >
+              <span className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-indigo-500" />
+                <span>AI Story Architect</span>
+              </span>
+              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-700 dark:text-indigo-300">
+                Novel Engine
+              </span>
+            </button>
+          )}
+
           {/* AI Settings Button */}
           <button
             type="button"
