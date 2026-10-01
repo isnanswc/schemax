@@ -19,7 +19,9 @@ import {
   Loader2,
   Check,
   Copy,
-  Maximize2
+  Maximize2,
+  Bookmark,
+  BookOpen
 } from 'lucide-react';
 import { usePrivacy } from '../../contexts/PrivacyContext';
 import { ImageViewerModal } from '../common/ImageViewerModal';
@@ -163,112 +165,155 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
       />
 
       {/* Hologram Floating Card */}
-      <div className={`relative w-full max-w-2xl max-h-[92vh] flex flex-col bg-white dark:bg-slate-900/95 border border-slate-200 dark:${meta.border} rounded-3xl p-5 shadow-2xl ${meta.glow} z-10 animate-in zoom-in-95 duration-200 overflow-hidden`}>
+      <div className={`relative w-full max-w-3xl max-h-[92vh] flex flex-col bg-[#fdfbf7] dark:bg-slate-900 border border-amber-900/20 dark:${meta.border} rounded-3xl p-4 sm:p-6 shadow-2xl ${meta.glow} z-10 animate-in zoom-in-95 duration-200 overflow-hidden`}>
         {/* Glow ambient background pill */}
-        <div className="absolute -top-16 -right-16 w-36 h-36 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -top-16 -right-16 w-44 h-44 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Top Header */}
-        <div className="flex items-start justify-between gap-3 mb-4 pb-3 border-b border-slate-100 dark:border-slate-800 flex-shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
-            {/* Avatar Preview with Camera Quick Picker & Fullscreen Trigger */}
-            <div
-              onClick={() => {
-                if (url) {
-                  setIsImageViewerOpen(true);
-                } else {
-                  setIsImagePickerOpen(true);
-                }
-              }}
-              className={`relative group w-16 h-16 min-w-[4rem] min-h-[4rem] max-w-[4rem] max-h-[4rem] aspect-square rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex-shrink-0 flex items-center justify-center shadow-sm cursor-pointer ${
-                url ? 'cursor-zoom-in' : ''
-              }`}
-              title={url ? "Klik untuk melihat fullscreen (atau klik tombol kamera)" : "Klik untuk pasang / ubah gambar utama"}
-            >
-              {url ? (
-                <img src={url} alt={activeEntity.name} className={`w-full h-full object-cover aspect-square block pointer-events-none transition-transform group-hover:scale-105 ${getBlurImageClass()}`} />
-              ) : (
-                <Icon className={`w-8 h-8 ${meta.color}`} />
-              )}
-              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition gap-1">
-                {url && (
-                  <div className="p-1.5 rounded-lg bg-white/20 text-white" title="Layar Penuh">
-                    <Maximize2 className="w-4 h-4" />
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsImagePickerOpen(true);
-                  }}
-                  className="p-1.5 rounded-lg bg-white/20 hover:bg-white/40 text-white"
-                  title="Ganti Foto"
-                >
-                  <Camera className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${meta.border} ${meta.color}`}>
-                  <Icon className="w-3 h-3" />
-                  <span>{meta.label}</span>
-                </span>
-                {activeEntity.faction && (
-                  <span
-                    className="px-2 py-0.5 rounded-full text-[10px] font-bold border"
-                    style={{
-                      borderColor: `${activeEntity.factionColor || '#ec4899'}40`,
-                      color: activeEntity.factionColor || '#ec4899',
-                      backgroundColor: `${activeEntity.factionColor || '#ec4899'}15`,
-                    }}
-                  >
-                    {activeEntity.faction}
-                  </span>
-                )}
-                {/* Condition Badge */}
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${condMeta.badgeClass}`}>
-                  <span>{condMeta.emoji}</span>
-                  <span>{condMeta.label}</span>
-                </span>
-              </div>
-              <h3 className={`text-lg font-black text-slate-900 dark:text-white truncate ${getBlurGlossaryClass()}`}>
-                {activeEntity.name}
-              </h3>
-            </div>
-          </div>
-
+        {/* 🌟 Top Hero Header with Substantially Larger Photo & Scholarly Layout */}
+        <div className="relative flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-5 mb-4 pb-4 border-b border-amber-900/10 dark:border-amber-500/15 flex-shrink-0">
+          {/* Close button in top-right */}
           <button
             onClick={onClose}
-            className="p-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition active:scale-95"
+            className="absolute top-0 right-0 p-2 rounded-full bg-slate-200/70 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition active:scale-95 z-20"
+            title="Tutup Berkas"
           >
             <X className="w-4 h-4" />
           </button>
+
+          {/* Large Archival Portrait Plate */}
+          <div
+            onClick={() => {
+              if (url) {
+                setIsImageViewerOpen(true);
+              } else {
+                setIsImagePickerOpen(true);
+              }
+            }}
+            className={`relative group w-28 h-28 sm:w-36 sm:h-36 min-w-[7rem] sm:min-w-[9rem] max-w-[7rem] sm:max-w-[9rem] aspect-square rounded-3xl overflow-hidden bg-amber-50 dark:bg-slate-950 border-2 border-amber-500/40 dark:border-amber-500/30 ring-4 ring-amber-500/10 flex-shrink-0 flex items-center justify-center shadow-lg cursor-pointer ${
+              url ? 'cursor-zoom-in' : ''
+            }`}
+            title={url ? "Klik untuk melihat fullscreen (atau klik tombol kamera)" : "Klik untuk pasang / ubah gambar utama"}
+          >
+            {url ? (
+              <img src={url} alt={activeEntity.name} className={`w-full h-full object-cover aspect-square block pointer-events-none transition-transform duration-300 group-hover:scale-105 ${getBlurImageClass()}`} />
+            ) : (
+              <Icon className={`w-12 h-12 ${meta.color}`} />
+            )}
+            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition gap-2">
+              {url && (
+                <div className="p-2 rounded-xl bg-white/20 hover:bg-white/30 text-white shadow-sm" title="Layar Penuh">
+                  <Maximize2 className="w-4 h-4" />
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsImagePickerOpen(true);
+                }}
+                className="p-2 rounded-xl bg-white/20 hover:bg-white/40 text-white shadow-sm"
+                title="Ganti Foto"
+              >
+                <Camera className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Hero Details */}
+          <div className="flex-1 min-w-0 pr-8 text-center sm:text-left space-y-1.5">
+            <div className="flex items-center justify-center sm:justify-start gap-1.5 flex-wrap">
+              <span className="font-mono text-[10px] font-bold tracking-wider px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                <Bookmark className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" />
+                <span>FOLIO CODEX</span>
+              </span>
+              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[10px] font-bold border ${meta.border} ${meta.color}`}>
+                <Icon className="w-3 h-3" />
+                <span>{meta.label}</span>
+              </span>
+              {activeEntity.faction && (
+                <span
+                  className="px-2 py-0.5 rounded-md text-[10px] font-bold border"
+                  style={{
+                    borderColor: `${activeEntity.factionColor || '#f59e0b'}50`,
+                    color: activeEntity.factionColor || '#d97706',
+                    backgroundColor: `${activeEntity.factionColor || '#f59e0b'}15`,
+                  }}
+                >
+                  ⚖ {activeEntity.faction}
+                </span>
+              )}
+              {/* Condition Badge */}
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${condMeta.badgeClass}`}>
+                <span>{condMeta.emoji}</span>
+                <span>{condMeta.label}</span>
+              </span>
+            </div>
+
+            <h3 className={`text-xl sm:text-2xl font-serif font-black text-slate-900 dark:text-amber-50 tracking-tight leading-tight ${getBlurGlossaryClass()}`}>
+              {activeEntity.name}
+            </h3>
+
+            {activeEntity.shortDescription ? (
+              <p className="text-xs text-slate-600 dark:text-slate-300 font-serif italic line-clamp-2 leading-relaxed">
+                "{activeEntity.shortDescription}"
+              </p>
+            ) : (
+              <p className="text-xs text-slate-400 font-serif italic">
+                Entitas terdaftar dalam ensiklopedia dunia cerita.
+              </p>
+            )}
+
+            {/* Quick Hero Buttons */}
+            <div className="flex items-center justify-center sm:justify-start gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setIsImagePickerOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/25 text-[11px] font-bold transition active:scale-95 shadow-xs"
+              >
+                <Camera className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                <span>Ganti Foto</span>
+              </button>
+              {url && (
+                <button
+                  type="button"
+                  onClick={() => setIsImageViewerOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-[11px] font-medium transition active:scale-95 border border-slate-200 dark:border-slate-700"
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                  <span>Lihat Layar Penuh</span>
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* 5 Integrated Tabs Navigation */}
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-2 mb-3 border-b border-slate-100 dark:border-slate-800/80 flex-shrink-0 text-xs">
+        {/* 📑 5 Integrated Tabs Navigation */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-2.5 mb-3 border-b border-amber-900/10 dark:border-amber-500/15 flex-shrink-0 text-xs">
           {[
-            { id: 'info', label: 'Info Dasar' },
-            { id: 'traits', label: 'Sifat & Watak' },
-            { id: 'physical', label: 'Ciri Fisik & Prompt AI' },
-            { id: 'relations', label: 'Relasi Entitas' },
-            { id: 'chronology', label: 'Riwayat Bab' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition active:scale-95 text-xs ${
-                activeTab === tab.id
-                  ? 'bg-pink-500 text-white shadow-sm'
-                  : 'bg-slate-100 dark:bg-slate-800/70 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+            { id: 'info', label: 'Info & Atribut', icon: Info },
+            { id: 'traits', label: 'Sifat & Watak', icon: Sparkles },
+            { id: 'physical', label: 'Ciri Fisik & Visual AI', icon: Tag },
+            { id: 'relations', label: 'Relasi Tokoh', icon: User },
+            { id: 'chronology', label: 'Riwayat Bab', icon: Scroll },
+          ].map((tab) => {
+            const TabIcon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`px-3.5 py-2 rounded-xl font-bold whitespace-nowrap transition active:scale-95 text-xs flex items-center gap-1.5 ${
+                  isActive
+                    ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md shadow-amber-500/20'
+                    : 'bg-white/80 dark:bg-slate-800/70 text-slate-700 dark:text-slate-300 hover:bg-amber-50 dark:hover:bg-slate-800 border border-amber-900/10 dark:border-slate-700/60 shadow-xs'
+                }`}
+              >
+                <TabIcon className="w-3.5 h-3.5" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Scrollable Tab Body Content */}
@@ -549,20 +594,20 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
         </div>
 
         {/* Action Buttons Footer */}
-        <div className="flex items-center gap-2 pt-3 border-t border-slate-100 dark:border-slate-800 flex-shrink-0">
+        <div className="flex items-center justify-between gap-3 pt-3.5 border-t border-amber-900/10 dark:border-amber-500/15 flex-shrink-0">
           <button
             type="button"
             onClick={() => setIsImagePickerOpen(true)}
-            className="flex-1 py-2.5 px-3 rounded-xl bg-pink-500/10 hover:bg-pink-500/20 text-pink-500 dark:text-pink-400 font-bold text-xs transition active:scale-95 flex items-center justify-center gap-1.5 border border-pink-500/30"
+            className="py-2.5 px-4 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 font-bold text-xs transition active:scale-95 flex items-center gap-1.5 border border-amber-500/30 shadow-xs"
           >
-            <Camera className="w-4 h-4" />
-            <span>Pasang Gambar Utama</span>
+            <Camera className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <span>Ubah Foto Entitas</span>
           </button>
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs transition active:scale-95 text-center border border-slate-200 dark:border-slate-700 shadow-sm"
+            className="py-2.5 px-6 rounded-xl bg-slate-900 dark:bg-amber-500 hover:bg-slate-800 dark:hover:bg-amber-400 text-white dark:text-slate-950 font-bold text-xs transition active:scale-95 text-center shadow-md shadow-slate-900/10"
           >
-            Tutup Pratinjau
+            Tutup Berkas
           </button>
         </div>
       </div>
