@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Image as ImageIcon, Sparkles, Plus, Trash2, Tag, User, MapPin, Shield, Scroll, Check } from 'lucide-react';
+import { X, Image as ImageIcon, Sparkles, Plus, Trash2, Tag, User, MapPin, Shield, Scroll, Check, Loader2 } from 'lucide-react';
 import { WorldEntity, WorldCategory, WorldAttribute, MediaItem } from '../../types';
 import { db, saveMediaItem, createSvgBlob } from '../../db';
 import { ENTITY_CONDITIONS, getConditionMeta } from './entityConditionMeta';
+import { analyzeCharacterPhotoWithVision } from '../../services/aiService';
 
 interface AddWorldEntityModalProps {
   isOpen: boolean;
@@ -41,6 +42,8 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [galleryItems, setGalleryItems] = useState<Array<MediaItem & { url: string }>>([]);
   const [showGalleryPicker, setShowGalleryPicker] = useState(false);
+  const [isVisionScanning, setIsVisionScanning] = useState(false);
+  const [visionScanSuccess, setVisionScanSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -55,6 +58,89 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
   }, [isOpen, bookId]);
 
   if (!isOpen) return null;
+
+  const handleScanCharacterPhoto = async () => {
+    if (!previewUrl) return;
+    setIsVisionScanning(true);
+    setVisionScanSuccess(null);
+
+    try {
+      let base64 = '';
+      let mime = 'image/jpeg';
+
+      if (avatarFile) {
+        mime = avatarFile.type || 'image/jpeg';
+        const reader = new FileReader();
+        base64 = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(avatarFile);
+        });
+      } else if (selectedGalleryMediaId) {
+        const media = await db.media.get(selectedGalleryMediaId);
+        if (media && media.blob) {
+          mime = media.mimeType || 'image/jpeg';
+          const reader = new FileReader();
+          base64 = await new Promise<string>((resolve, reject) => {
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(media.blob);
+          });
+        }
+      } else if (previewUrl.startsWith('data:')) {
+        base64 = previewUrl;
+      }
+
+      if (!base64) {
+        alert('Pilih atau unggah file foto karakter terlebih dahulu.');
+        return;
+      }
+
+      const res = await analyzeCharacterPhotoWithVision(base64, mime, name);
+
+      // Populate physical traits & attire
+      const detailedPhysical = [
+        res.physicalTraits ? `Ciri Fisik: ${res.physicalTraits}` : '',
+        res.clothingAttire ? `Pakaian: ${res.clothingAttire}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n\n');
+
+      setPhysicalTraits(detailedPhysical);
+      if (res.englishVisualPrompt) {
+        setVisualPrompt(res.englishVisualPrompt);
+      }
+      if (!shortDescription.trim() && res.shortSummary) {
+        setShortDescription(res.shortSummary);
+      }
+
+      // Add or update attributes for Gender, Exact Age, and Clothing
+      setAttributes((prev) => {
+        const next = [...prev];
+        const updateOrAdd = (lbl: string, val: string) => {
+          const idx = next.findIndex((a) => a.label.toLowerCase() === lbl.toLowerCase());
+          if (idx !== -1) {
+            next[idx] = { ...next[idx], value: val };
+          } else {
+            next.push({ id: Date.now().toString() + Math.random(), label: lbl, value: val });
+          }
+        };
+
+        if (res.gender) updateOrAdd('Jenis Kelamin', res.gender);
+        if (res.estimatedAge) updateOrAdd('Usia', res.estimatedAge);
+        if (res.clothingAttire) updateOrAdd('Pakaian', res.clothingAttire);
+        return next;
+      });
+
+      setVisionScanSuccess(`Berhasil memindai: ${res.gender}, ${res.estimatedAge}`);
+      setTimeout(() => setVisionScanSuccess(null), 5000);
+    } catch (err: any) {
+      console.error('Vision scan error:', err);
+      alert('Gagal memindai foto dengan AI: ' + (err?.message || 'Periksa API Key Gemini Anda'));
+    } finally {
+      setIsVisionScanning(false);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -268,7 +354,38 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
                   <span>Pilih dari Galeri ({galleryItems.length})</span>
                 </button>
               )}
+
+              {/* ✨ Pindai AI Ciri Tokoh dari Foto Button */}
+              {previewUrl && category === 'character' && (
+                <button
+                  type="button"
+                  onClick={handleScanCharacterPhoto}
+                  disabled={isVisionScanning}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-purple-500/20 via-pink-500/20 to-amber-500/20 hover:from-purple-500/30 hover:to-amber-500/30 text-purple-700 dark:text-purple-300 border border-purple-500/30 text-xs font-bold rounded-xl transition active:scale-95 disabled:opacity-50 shadow-sm"
+                  title="Pindai AI untuk mendeteksi jenis kelamin, usia pasti (tanpa rentang), ciri fisik, dan pakaian"
+                >
+                  {isVisionScanning ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-500" />
+                      <span>Memindai Foto Tokoh...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 text-purple-500" />
+                      <span>✨ Pindai AI Ciri Tokoh dari Foto</span>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
+
+            {/* Vision Scan Success Banner */}
+            {visionScanSuccess && (
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs flex items-center gap-2 animate-in fade-in">
+                <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                <span className="font-semibold">{visionScanSuccess}</span>
+              </div>
+            )}
 
             {/* Gallery Picker Mini Grid */}
             {showGalleryPicker && (

@@ -28,7 +28,10 @@ import {
   Maximize2,
   Search,
   Filter,
-  X
+  X,
+  BookOpen,
+  Bookmark,
+  Library
 } from 'lucide-react';
 import { db } from '../../db';
 import { navStack } from '../../services/backNavigationService';
@@ -45,10 +48,11 @@ interface WorldBuildingViewProps {
 
 const EntityCard: React.FC<{
   entity: WorldEntity;
+  index?: number;
   onDelete: (id: string, name: string) => void;
   onOpenHologram: (entity: WorldEntity) => void;
   onOpenImagePicker: (entity: WorldEntity) => void;
-}> = ({ entity, onDelete, onOpenHologram, onOpenImagePicker }) => {
+}> = ({ entity, index = 0, onDelete, onOpenHologram, onOpenImagePicker }) => {
   const { url } = useMediaUrl(entity.avatarMediaId);
   const { getBlurImageClass, getBlurGlossaryClass, getBlurTextClass } = usePrivacy();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -73,15 +77,16 @@ const EntityCard: React.FC<{
   );
 
   const categoryMeta: Record<WorldCategory, { label: string; icon: any; color: string; badge: string }> = {
-    character: { label: 'Karakter', icon: User, color: 'text-pink-400', badge: 'bg-pink-500/10 text-pink-400 border-pink-500/30' },
-    location: { label: 'Lokasi', icon: MapPin, color: 'text-cyan-400', badge: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30' },
-    item: { label: 'Item/Relik', icon: Shield, color: 'text-yellow-400', badge: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30' },
-    lore: { label: 'Lore/Faksi', icon: Scroll, color: 'text-purple-400', badge: 'bg-purple-500/10 text-purple-400 border-purple-500/30' },
+    character: { label: 'Karakter', icon: User, color: 'text-pink-600 dark:text-pink-400', badge: 'bg-pink-500/10 text-pink-700 dark:text-pink-300 border-pink-500/30' },
+    location: { label: 'Lokasi/Latar', icon: MapPin, color: 'text-cyan-600 dark:text-cyan-400', badge: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/30' },
+    item: { label: 'Item/Relik', icon: Shield, color: 'text-amber-600 dark:text-amber-400', badge: 'bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-500/30' },
+    lore: { label: 'Lore/Kronik', icon: Scroll, color: 'text-purple-600 dark:text-purple-400', badge: 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/30' },
   };
 
   const meta = categoryMeta[entity.category] || categoryMeta.character;
   const Icon = meta.icon;
   const condMeta = getConditionMeta(entity.condition);
+  const folioCode = `FOLIO #${String(index + 1).padStart(3, '0')}`;
 
   return (
     <div
@@ -90,13 +95,53 @@ const EntityCard: React.FC<{
         e.preventDefault();
         onOpenHologram(entity);
       }}
-      className={`relative bg-white dark:bg-slate-900/90 border rounded-2xl p-3.5 transition-all duration-200 select-none shadow-sm space-y-2.5 cursor-pointer touch-pan-y ${
+      className={`relative group bg-[#fdfbf7] dark:bg-slate-900/95 border border-amber-900/15 dark:border-amber-500/20 rounded-2xl p-3.5 sm:p-4 transition-all duration-200 select-none shadow-sm hover:shadow-md hover:border-amber-600/40 dark:hover:border-amber-500/40 space-y-3 cursor-pointer touch-pan-y ${
         isPressing
-          ? 'scale-[0.98] border-pink-500/80 bg-slate-50 dark:bg-slate-900 ring-2 ring-pink-500/30'
-          : 'border-slate-200 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700/80'
+          ? 'scale-[0.98] border-amber-500 bg-amber-50/50 dark:bg-slate-800 ring-2 ring-amber-500/30'
+          : ''
       }`}
     >
-      {/* Top Header */}
+      {/* 📜 Codex Entry Header: Archival Folio # & Quick Actions */}
+      <div className="flex items-center justify-between gap-1.5 pb-2 border-b border-amber-900/10 dark:border-amber-500/15 text-[10px]">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Bookmark className="w-3 h-3 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+          <span className="font-mono font-bold tracking-wider text-amber-800 dark:text-amber-300">
+            {folioCode}
+          </span>
+          <span className="text-amber-900/20 dark:text-amber-500/30">•</span>
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${meta.badge}`}>
+            <Icon className="w-2.5 h-2.5" />
+            <span>{meta.label}</span>
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenHologram(entity);
+            }}
+            className="p-1 rounded-lg text-slate-400 hover:text-amber-600 dark:hover:text-amber-300 transition"
+            title="Intip Hologram"
+          >
+            <Eye className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(entity.id, entity.name);
+            }}
+            className="p-1 rounded-lg text-slate-400 hover:text-red-500 transition"
+            title="Hapus Entitas"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Main Body: Portrait Plate & Scholar Typography */}
       <div className="flex items-start gap-3">
         {/* Avatar / Visual preview with Quick Camera Button for Main Image */}
         <div
@@ -108,7 +153,7 @@ const EntityCard: React.FC<{
               onOpenImagePicker(entity);
             }
           }}
-          className={`relative group w-14 h-14 min-w-[3.5rem] min-h-[3.5rem] max-w-[3.5rem] max-h-[3.5rem] aspect-square rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex-shrink-0 flex items-center justify-center cursor-pointer shadow-inner ${
+          className={`relative group w-16 h-16 min-w-[4rem] min-h-[4rem] max-w-[4rem] max-h-[4rem] aspect-square rounded-2xl overflow-hidden bg-amber-50 dark:bg-slate-950 border-2 border-amber-500/30 dark:border-amber-500/30 flex-shrink-0 flex items-center justify-center cursor-pointer shadow-sm ${
             url ? 'cursor-zoom-in' : ''
           }`}
           title={url ? "Klik untuk melihat gambar fullscreen (tekan tahan kamera untuk ubah)" : "Klik untuk pasang / ubah gambar utama"}
@@ -116,7 +161,7 @@ const EntityCard: React.FC<{
           {url ? (
             <img src={url} alt={entity.name} className={`w-full h-full object-cover aspect-square block pointer-events-none transition-transform group-hover:scale-105 ${getBlurImageClass()}`} />
           ) : (
-            <Icon className={`w-6 h-6 ${meta.color}`} />
+            <Icon className={`w-7 h-7 ${meta.color}`} />
           )}
           <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition gap-1">
             {url && (
@@ -140,92 +185,60 @@ const EntityCard: React.FC<{
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-1 mb-1">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${meta.badge}`}>
-                <Icon className="w-3 h-3" />
-                <span>{meta.label}</span>
-              </span>
-
-              {/* Faction Badge if present */}
-              {entity.faction && (
-                <span
-                  className="px-2 py-0.5 rounded-full text-[10px] font-bold border"
-                  style={{
-                    borderColor: `${entity.factionColor || '#ec4899'}40`,
-                    color: entity.factionColor || '#ec4899',
-                    backgroundColor: `${entity.factionColor || '#ec4899'}15`,
-                  }}
-                >
-                  {entity.faction}
-                </span>
-              )}
-
-              {/* Condition Badge */}
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${condMeta.badgeClass}`}>
-                <span>{condMeta.emoji}</span>
-                <span>{condMeta.shortLabel}</span>
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenHologram(entity);
+          <div className="flex items-center gap-1.5 flex-wrap mb-1">
+            {/* Faction Badge if present */}
+            {entity.faction && (
+              <span
+                className="px-2 py-0.5 rounded-md text-[10px] font-bold border tracking-wide"
+                style={{
+                  borderColor: `${entity.factionColor || '#f59e0b'}50`,
+                  color: entity.factionColor || '#d97706',
+                  backgroundColor: `${entity.factionColor || '#f59e0b'}15`,
                 }}
-                className="p-1 rounded-lg text-slate-400 hover:text-amber-600 dark:hover:text-amber-300 transition"
-                title="Intip Hologram"
               >
-                <Eye className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(entity.id, entity.name);
-                }}
-                className="p-1 rounded-lg text-slate-400 hover:text-red-500 transition"
-                title="Hapus Entitas"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
+                ⚖ {entity.faction}
+              </span>
+            )}
+
+            {/* Condition Badge */}
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${condMeta.badgeClass}`}>
+              <span>{condMeta.emoji}</span>
+              <span>{condMeta.shortLabel}</span>
+            </span>
           </div>
 
-          <h4 className={`font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate ${getBlurGlossaryClass()}`}>{entity.name}</h4>
+          <h4 className={`font-serif font-bold text-base text-slate-900 dark:text-amber-50 truncate tracking-tight group-hover:text-amber-700 dark:group-hover:text-amber-300 transition ${getBlurGlossaryClass()}`}>{entity.name}</h4>
           {entity.shortDescription && (
-            <p className={`text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5 leading-snug ${getBlurTextClass()}`}>
+            <p className={`text-xs text-slate-600 dark:text-slate-300 font-serif line-clamp-2 mt-0.5 leading-relaxed italic ${getBlurTextClass()}`}>
               {entity.shortDescription}
             </p>
           )}
 
           {/* Condition Details hint if present */}
           {entity.conditionDetails && (
-            <p className="text-[10px] text-amber-500 dark:text-amber-400/90 italic line-clamp-1 mt-0.5">
-              Status: {entity.conditionDetails}
+            <p className="text-[10px] text-amber-600 dark:text-amber-400 font-serif italic line-clamp-1 mt-0.5">
+              Catatan Status: {entity.conditionDetails}
             </p>
           )}
 
           {/* Sifat Awal vs Sifat Terkini */}
           {(entity.initialTraits || entity.currentTraits) && (
-            <div className="mt-1.5 p-2 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-[11px] space-y-1">
+            <div className="mt-2 p-2 rounded-xl bg-amber-900/[0.03] dark:bg-amber-950/20 border border-amber-900/10 dark:border-amber-500/15 text-[11px] space-y-1 font-serif">
               {entity.initialTraits && (
                 <div className="flex items-start gap-1 text-slate-600 dark:text-slate-400">
-                  <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5 flex-shrink-0">🌱 Awal:</span>
-                  <span className="line-clamp-1">{entity.initialTraits}</span>
+                  <span className="font-bold font-sans text-emerald-700 dark:text-emerald-400 flex items-center gap-0.5 flex-shrink-0">🌱 Catatan Awal:</span>
+                  <span className="line-clamp-1 italic">{entity.initialTraits}</span>
                 </div>
               )}
               {entity.currentTraits && (
                 <div className="flex items-start gap-1 text-slate-800 dark:text-slate-200">
-                  <span className="font-bold text-amber-600 dark:text-amber-400 flex items-center gap-0.5 flex-shrink-0">⚡ Saat Ini:</span>
-                  <span className="line-clamp-1 font-medium">{entity.currentTraits}</span>
+                  <span className="font-bold font-sans text-amber-700 dark:text-amber-400 flex items-center gap-0.5 flex-shrink-0">⚡ Dinamika Terkini:</span>
+                  <span className="line-clamp-1 font-medium italic">{entity.currentTraits}</span>
                 </div>
               )}
               {entity.evolutionSummary && isExpanded && (
-                <div className="pt-1 border-t border-slate-200 dark:border-slate-800 text-[10px] text-amber-600 dark:text-amber-400/90 italic">
-                  <strong>Perubahan:</strong> {entity.evolutionSummary}
+                <div className="pt-1.5 border-t border-amber-900/10 dark:border-amber-500/15 text-[10px] text-amber-800 dark:text-amber-300 italic">
+                  <strong>Kronologi Evolusi:</strong> {entity.evolutionSummary}
                 </div>
               )}
             </div>
@@ -235,14 +248,14 @@ const EntityCard: React.FC<{
 
       {/* Attributes Badges / Key Values */}
       {entity.attributes && entity.attributes.length > 0 && (
-        <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+        <div className="grid grid-cols-2 gap-1.5 pt-0.5 font-serif">
           {entity.attributes.slice(0, isExpanded ? undefined : 2).map((attr) => (
             <div
               key={attr.id}
-              className="bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800/80 rounded-lg px-2 py-1 text-[11px] flex items-center justify-between"
+              className="bg-amber-900/[0.03] dark:bg-slate-950/70 border border-amber-900/10 dark:border-amber-500/15 rounded-lg px-2.5 py-1 text-[11px] flex items-center justify-between"
             >
-              <span className="text-slate-500 dark:text-slate-400 truncate mr-1">{attr.label}</span>
-              <span className="font-medium text-slate-900 dark:text-white truncate max-w-[85px]">{attr.value}</span>
+              <span className="text-slate-500 dark:text-slate-400 truncate mr-1 font-sans text-[10px] uppercase tracking-wider">{attr.label}</span>
+              <span className="font-medium text-slate-900 dark:text-white truncate max-w-[95px] italic">{attr.value}</span>
             </div>
           ))}
         </div>
@@ -250,18 +263,18 @@ const EntityCard: React.FC<{
 
       {/* Expanded Detailed Notes, Relationships & Tags */}
       {isExpanded && (
-        <div className="pt-2 border-t border-slate-200 dark:border-slate-800/80 space-y-2 text-xs animate-in fade-in">
+        <div className="pt-2 border-t border-amber-900/10 dark:border-amber-500/15 space-y-2 text-xs animate-in fade-in font-serif">
           {/* Relationships if available */}
           {entity.relationships && entity.relationships.length > 0 && (
             <div>
-              <span className="font-semibold text-slate-700 dark:text-slate-300 block mb-1 text-[11px]">
-                Relasi Tokoh:
+              <span className="font-sans font-bold text-slate-700 dark:text-slate-300 block mb-1 text-[11px]">
+                Relasi Tokoh &amp; Aliansi:
               </span>
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-1 font-sans">
                 {entity.relationships.map((rel, rIdx) => (
                   <span
                     key={rIdx}
-                    className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-medium border border-slate-200 dark:border-slate-700"
+                    className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-900 dark:text-amber-200 text-[10px] font-medium border border-amber-500/20"
                   >
                     <strong>{rel.label}:</strong> {rel.targetEntityName || 'Karakter Terkait'}
                   </span>
@@ -272,15 +285,15 @@ const EntityCard: React.FC<{
 
           {entity.detailedNotes && (
             <div>
-              <span className="font-semibold text-slate-700 dark:text-slate-300 block mb-1 text-[11px]">Catatan Lore & Latar:</span>
-              <p className="text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap bg-slate-50 dark:bg-slate-950/60 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800/60 text-xs">
+              <span className="font-sans font-bold text-slate-700 dark:text-slate-300 block mb-1 text-[11px]">Catatan Lore &amp; Latar:</span>
+              <p className="text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap bg-amber-900/[0.03] dark:bg-slate-950/60 p-2.5 rounded-xl border border-amber-900/10 dark:border-amber-500/15 text-xs italic">
                 {entity.detailedNotes}
               </p>
             </div>
           )}
 
           {entity.tags && entity.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 pt-1">
+            <div className="flex flex-wrap gap-1 pt-1 font-sans">
               {entity.tags.map((t, idx) => (
                 <span
                   key={idx}
@@ -302,9 +315,9 @@ const EntityCard: React.FC<{
             e.stopPropagation();
             setIsExpanded(!isExpanded);
           }}
-          className="w-full pt-1 flex items-center justify-center gap-1 text-[11px] font-medium text-pink-600 dark:text-pink-400/90 hover:text-pink-700 dark:hover:text-pink-300 transition"
+          className="w-full pt-1 flex items-center justify-center gap-1 text-[11px] font-semibold text-amber-700 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 transition"
         >
-          <span>{isExpanded ? 'Tutup Rincian' : 'Lihat Rincian Lore, Relasi & Atribut'}</span>
+          <span>{isExpanded ? 'Tutup Rincian' : 'Buka Rincian Folio & Spesifikasi'}</span>
           {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
         </button>
       )}
@@ -398,24 +411,24 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
     <div className="space-y-4 pb-24">
       {/* Top World Mode Switcher: Ensiklopedia Kartu vs Auto-Map Relasi */}
       <div className="flex items-center justify-between gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2 rounded-2xl shadow-sm">
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 w-full sm:w-auto">
           <button
             type="button"
             onClick={() => setWorldMode('list')}
-            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition active:scale-95 whitespace-nowrap flex-shrink-0 ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition active:scale-95 whitespace-nowrap flex-1 sm:flex-initial justify-center ${
               worldMode === 'list'
                 ? 'bg-amber-500 text-slate-950 shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <LayoutGrid className="w-4 h-4 flex-shrink-0" />
+            <BookOpen className="w-4 h-4 flex-shrink-0" />
             <span>Ensiklopedia ({entities.length})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setWorldMode('automap')}
-            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition active:scale-95 whitespace-nowrap flex-shrink-0 ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition active:scale-95 whitespace-nowrap flex-1 sm:flex-initial justify-center ${
               worldMode === 'automap'
                 ? 'bg-gradient-to-r from-pink-500 to-rose-600 text-white shadow-md shadow-pink-500/20'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -426,16 +439,6 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
             <span className="sm:hidden">Peta Relasi</span>
           </button>
         </div>
-
-        {worldMode === 'list' && (
-          <button
-            onClick={handleOpenAddModal}
-            className="inline-flex items-center gap-1.5 py-2 px-2.5 sm:px-3.5 bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 active:scale-95 text-white font-bold rounded-xl text-xs shadow-md shadow-pink-500/20 transition flex-shrink-0"
-          >
-            <Plus className="w-4 h-4 flex-shrink-0" />
-            <span className="hidden sm:inline">Tambah Entitas</span>
-          </button>
-        )}
       </div>
 
       {/* Mode 1: Auto-Map Visualizer (Network & Faction Clusters) */}
@@ -449,13 +452,44 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
           onClose={() => setWorldMode('list')}
         />
       ) : (
-        /* Mode 2: Standard Entity Cards Grid */
-        <div className="space-y-3">
-          {/* Horizontal Category Filter */}
+        /* Mode 2: Standard Entity Cards Grid - Deluxe Professional Codex Book Design */
+        <div className="space-y-3.5">
+          {/* 📖 Archival Encyclopedia Header Banner */}
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#fbf8f1] via-[#f7f2e7] to-[#ede3d1] dark:from-slate-900 dark:via-slate-900/90 dark:to-slate-950 border border-amber-900/15 dark:border-amber-500/25 p-4 sm:p-5 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 flex items-center justify-center flex-shrink-0 shadow-inner">
+                  <Library className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-serif font-black text-sm sm:text-base text-slate-900 dark:text-amber-100 tracking-wide uppercase">
+                      Kompendium &amp; Ensiklopedia Semesta
+                    </h2>
+                    <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-900 dark:text-amber-300 border border-amber-500/30">
+                      KODEX KANONIK
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 font-serif italic line-clamp-1 mt-0.5">
+                    Katalog kanonik karakter, geografi wilayah, relik pusaka, dan kronik faksi cerita
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-xs font-mono font-bold text-amber-900 dark:text-amber-300 self-start sm:self-auto bg-white/80 dark:bg-slate-800/80 px-3 py-1.5 rounded-xl border border-amber-500/25 shadow-sm">
+                <Bookmark className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                <span>{entities.length} Folio Terarsip</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Horizontal Category Filter (Codex Thumb Tabs) */}
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
             {categories.map((cat) => {
               const Icon = cat.icon;
               const isSelected = selectedCategory === cat.id;
+              const count = cat.id === 'all'
+                ? entities.length
+                : entities.filter((e) => e.category === cat.id).length;
               return (
                 <button
                   key={cat.id}
@@ -463,33 +497,29 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition active:scale-95 ${
                     isSelected
                       ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
-                      : 'bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white shadow-sm'
+                      : 'bg-white dark:bg-slate-900/90 border border-amber-900/10 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white shadow-sm'
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5" />
                   <span>
-                    {cat.label} (
-                    {cat.id === 'all'
-                      ? entities.length
-                      : entities.filter((e) => e.category === cat.id).length}
-                    )
+                    {cat.label} ({count})
                   </span>
                 </button>
               );
             })}
           </div>
 
-          {/* Quick Search & Faction Filter Bar */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 p-2.5 rounded-2xl shadow-sm">
+          {/* 🔍 Quick Search, Faction Filter & Tambah Entitas (SEJAJAR) */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-[#fdfbf7] dark:bg-slate-900/90 border border-amber-900/15 dark:border-amber-500/20 p-2.5 rounded-2xl shadow-sm">
             {/* Search Input */}
-            <div className="relative flex-1">
+            <div className="relative flex-1 min-w-[180px]">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Cari tokoh, deskripsi, faksi, sifat..."
-                className="w-full pl-9 pr-7 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-400 transition"
+                placeholder="Cari entitas, faksi, sifat, atau deskripsi..."
+                className="w-full pl-9 pr-7 py-2 bg-white dark:bg-slate-950 border border-amber-900/15 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-500 transition shadow-inner font-serif"
               />
               {searchQuery && (
                 <button
@@ -502,35 +532,49 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
               )}
             </div>
 
-            {/* Faction Filter Dropdown */}
-            {availableFactions.length > 0 && (
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <select
-                  value={selectedFaction}
-                  onChange={(e) => setSelectedFaction(e.target.value)}
-                  className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:border-amber-400"
-                >
-                  <option value="all">Semua Faksi ({availableFactions.length})</option>
-                  {availableFactions.map((f) => (
-                    <option key={f} value={f}>
-                      Faksi: {f}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            {/* Right Controls: Faction Filter & Tambah Entitas (Sejajar) */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Faction Filter Dropdown */}
+              {availableFactions.length > 0 && (
+                <div className="relative flex-shrink-0">
+                  <select
+                    value={selectedFaction}
+                    onChange={(e) => setSelectedFaction(e.target.value)}
+                    className="px-3 py-2 bg-white dark:bg-slate-950 border border-amber-900/15 dark:border-slate-800 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:border-amber-500 shadow-sm"
+                  >
+                    <option value="all">Semua Faksi ({availableFactions.length})</option>
+                    {availableFactions.map((f) => (
+                      <option key={f} value={f}>
+                        Faksi: {f}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* 🌟 Tombol Tambah Entitas Sejajar dengan Filter Faksi */}
+              <button
+                type="button"
+                onClick={handleOpenAddModal}
+                className="inline-flex items-center gap-1.5 py-2 px-3.5 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-400 hover:to-amber-600 active:scale-95 text-slate-950 font-bold rounded-xl text-xs shadow-md shadow-amber-500/20 border border-amber-400/40 transition flex-shrink-0 whitespace-nowrap"
+                title="Tambah entitas baru ke dalam ensiklopedia"
+              >
+                <Plus className="w-4 h-4 text-slate-950 stroke-[3]" />
+                <span>Tambah Entitas</span>
+              </button>
+            </div>
           </div>
 
-          {/* Micro-Hint */}
+          {/* Micro-Hint / Catalog Counter */}
           {filteredEntities.length > 0 && (
             <div className="flex items-center justify-between gap-1.5 px-1 text-[11px] text-slate-500">
               <div className="flex items-center gap-1.5 truncate">
-                <Info className="w-3.5 h-3.5 text-pink-500 dark:text-pink-400/80 flex-shrink-0" />
-                <span className="truncate">
-                  Tip: Tekan tahan kartu untuk intip hologram 3D.
+                <Info className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                <span className="truncate font-serif italic">
+                  Tip: Tekan tahan kartu untuk memunculkan intip hologram 3D.
                 </span>
               </div>
-              <span className="font-mono text-amber-500 flex-shrink-0">
+              <span className="font-mono text-amber-700 dark:text-amber-400 flex-shrink-0 font-bold">
                 {filteredEntities.length} entitas ditampilkan
               </span>
             </div>
@@ -538,26 +582,29 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
 
           {/* Entities Grid */}
           {filteredEntities.length === 0 ? (
-            <div className="text-center py-12 px-4 border border-dashed border-slate-300 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-900/30">
-              <Compass className="w-9 h-9 mx-auto text-slate-400 dark:text-slate-600 mb-2" />
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">Belum Ada Entitas di Kategori Ini</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-4">
-                Mulai bangun ensiklopedia duniamu: karakter utama, kastil tua, senjata legendaris, atau sistem sihir.
+            <div className="text-center py-12 px-4 border border-dashed border-amber-900/20 dark:border-amber-500/20 rounded-3xl bg-[#fdfbf7]/60 dark:bg-slate-900/30">
+              <BookOpen className="w-10 h-10 mx-auto text-amber-500/60 dark:text-amber-400/40 mb-2" />
+              <h3 className="text-sm font-serif font-bold text-slate-900 dark:text-amber-100 mb-1">
+                Lembar Ensiklopedia Masih Kosong
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-4 font-serif italic">
+                Mulai bangun ensiklopedia semestamu: karakter utama, kastil tua, pusaka legendaris, atau sistem sihir.
               </p>
               <button
                 onClick={handleOpenAddModal}
-                className="inline-flex items-center gap-2 py-2 px-4 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-900 dark:text-white font-semibold rounded-xl text-xs border border-slate-300 dark:border-slate-700 transition shadow-sm"
+                className="inline-flex items-center gap-2 py-2 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-95 text-slate-950 font-bold rounded-xl text-xs shadow-md shadow-amber-500/20 transition"
               >
-                <Plus className="w-4 h-4 text-pink-500 dark:text-pink-400" />
+                <Plus className="w-4 h-4 text-slate-950 stroke-[3]" />
                 <span>Tambah Entitas Baru</span>
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-              {filteredEntities.map((entity) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {filteredEntities.map((entity, idx) => (
                 <EntityCard
                   key={entity.id}
                   entity={entity}
+                  index={idx}
                   onDelete={handleDelete}
                   onOpenHologram={handleOpenHologram}
                   onOpenImagePicker={(ent) => setImagePickerEntity(ent)}

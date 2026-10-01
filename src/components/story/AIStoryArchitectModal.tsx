@@ -20,12 +20,15 @@ import {
   Sliders,
   Users,
   Feather,
-  BookMarked
+  BookMarked,
+  Image as ImageIcon,
+  Loader2
 } from 'lucide-react';
 import { StoryBlueprint, BlueprintCharacter, BlueprintLocation, BlueprintItem, BlueprintChapter } from '../../types/blueprint';
 import { Book } from '../../types';
 import { generateStoryBlueprint, seedBlueprintToDatabase, BlueprintProgressInfo } from '../../services/blueprintService';
 import { AIGenerationEvent } from '../../types/ai';
+import { analyzeCharacterPhotoWithVision } from '../../services/aiService';
 
 interface AIStoryArchitectModalProps {
   isOpen: boolean;
@@ -157,6 +160,53 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
     if (!blueprint) return;
     const updated = blueprint.characters.filter((_, idx) => idx !== index);
     updateBlueprint({ characters: updated });
+  };
+
+  const [scanningCharIndex, setScanningCharIndex] = useState<number | null>(null);
+  const [scanSuccessIndex, setScanSuccessIndex] = useState<{ index: number; msg: string } | null>(null);
+
+  const handleScanCharacterPhoto = async (index: number, file: File) => {
+    if (!blueprint) return;
+    setScanningCharIndex(index);
+    setScanSuccessIndex(null);
+    try {
+      const mime = file.type || 'image/jpeg';
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const charName = blueprint.characters[index]?.name;
+      const res = await analyzeCharacterPhotoWithVision(base64, mime, charName);
+
+      const detailedPhysical = [
+        res.physicalTraits ? `Ciri Fisik: ${res.physicalTraits}` : '',
+        res.clothingAttire ? `Pakaian: ${res.clothingAttire}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n\n');
+
+      const updated = [...blueprint.characters];
+      const curr = updated[index];
+      updated[index] = {
+        ...curr,
+        age: res.estimatedAge || curr.age,
+        physicalTraits: detailedPhysical || curr.physicalTraits,
+        visualPrompt: res.englishVisualPrompt || curr.visualPrompt,
+        shortDescription: curr.shortDescription?.trim() ? curr.shortDescription : res.shortSummary,
+      };
+
+      updateBlueprint({ characters: updated });
+      setScanSuccessIndex({ index, msg: `Berhasil dipindai: ${res.gender}, ${res.estimatedAge}` });
+      setTimeout(() => setScanSuccessIndex(null), 4500);
+    } catch (err: any) {
+      console.error('Vision scan error in AIStoryArchitectModal:', err);
+      alert('Gagal memindai foto tokoh: ' + (err?.message || 'Periksa API Key Gemini Anda'));
+    } finally {
+      setScanningCharIndex(null);
+    }
   };
 
   // Location mutations
@@ -736,6 +786,42 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                           </button>
                         )}
                       </div>
+                    </div>
+
+                    {/* Quick AI Vision Photo Scanner */}
+                    <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <Sparkles className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />
+                        <span className="text-[11px] text-purple-900 dark:text-purple-200 truncate">
+                          {scanSuccessIndex?.index === i
+                            ? scanSuccessIndex.msg
+                            : 'Pindai foto untuk deteksi jenis kelamin, usia pasti, ciri fisik, dan pakaian'}
+                        </span>
+                      </div>
+
+                      <label className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold text-[11px] cursor-pointer shadow-xs active:scale-95 transition flex-shrink-0">
+                        {scanningCharIndex === i ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin text-white" />
+                            <span>Memindai...</span>
+                          </>
+                        ) : (
+                          <>
+                            <ImageIcon className="w-3 h-3 text-white" />
+                            <span>Pindai Foto Tokoh</span>
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={scanningCharIndex !== null}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleScanCharacterPhoto(i, file);
+                          }}
+                        />
+                      </label>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">

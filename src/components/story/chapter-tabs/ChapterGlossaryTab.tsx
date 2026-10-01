@@ -47,7 +47,8 @@ import {
   generateChapterAutoScenes,
   detectWorldEntitiesInChapter,
   analyzeImageWithVision,
-  ImageVisionAnalysis
+  ImageVisionAnalysis,
+  autoMapWorldEntities
 } from '../../../services/aiService';
 import { AIGenerationEvent } from '../../../types/ai';
 import { WorldEntityHologramModal } from '../../world/WorldEntityHologramModal';
@@ -334,6 +335,123 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
       alert('Gagal memecah adegan: ' + (err.message || 'Periksa API Key di AI Config'));
     } finally {
       setIsAnalyzingScenes(false);
+    }
+  };
+
+  // 🌟 Pindai Menyeluruh Bab (Deep Scan: Entitas, Auto Scene, dan Relasi Peta/Auto-Map)
+  const [isDeepScanning, setIsDeepScanning] = useState(false);
+
+  const handleDeepScanAll = async () => {
+    const textToAnalyze = getEffectiveText();
+    if (!textToAnalyze) {
+      alert('Tuliskan naskah bab atau premis terlebih dahulu agar AI dapat memindai isi bab.');
+      return;
+    }
+
+    setIsDeepScanning(true);
+    setActiveAiAttempt(null);
+    setAiProcessStatus('Memulai Pemindaian Lengkap Bab (Entitas, Peta Relasi & Auto Scene)...');
+
+    try {
+      // 1. LANGKAH 1/3: Pindai Entitas, sebutan alias & kondisi bab
+      setAiProcessStatus('Langkah 1/3: Memindai tokoh, lokasi, item & kondisi dalam bab...');
+      const detected = await detectWorldEntitiesInChapter(
+        textToAnalyze,
+        bookTitle,
+        entities.map((e) => ({
+          id: e.id,
+          name: e.name,
+          category: e.category,
+          aliases: e.aliases,
+          initialTraits: e.initialTraits,
+          currentTraits: e.currentTraits,
+          condition: typeof e.condition === 'string' ? e.condition : undefined,
+          evolutionSummary: e.evolutionSummary,
+        })),
+        (event) => {
+          setActiveAiAttempt(event);
+          if (event.status === 'attempt') {
+            setAiProcessStatus(`Langkah 1/3 (Entitas) via [${event.provider.toUpperCase()}] ${event.slotLabel} - ${event.model}...`);
+          }
+        }
+      );
+
+      if (detected && detected.length > 0) {
+        onUpdateChapter({ aiDetectedEntities: detected });
+      }
+
+      // 2. LANGKAH 2/3: Pindai Auto Scene (adegan & visual prompt ilustrasi)
+      setAiProcessStatus('Langkah 2/3: Menganalisis pembagian adegan & prompt visual (Auto Scene)...');
+      const generatedScenes = await generateChapterAutoScenes(
+        chapter.title,
+        bookTitle,
+        textToAnalyze,
+        entities.map((e) => ({ id: e.id, name: e.name, category: e.category }))
+      );
+
+      if (generatedScenes && generatedScenes.length > 0) {
+        onUpdateChapter({ aiScenes: generatedScenes });
+      }
+
+      // 3. LANGKAH 3/3: Pindai Relasi Peta & Faksi (Auto-Map)
+      if (entities.length > 0) {
+        setAiProcessStatus('Langkah 3/3: Memetakan relasi antar entitas, faksi & tata letak peta (Auto-Map)...');
+        const storyContext = `Bab Ini: "${chapter.title}"\nPremis: ${chapter.premise || ''}\nNaskah Cerita Bab:\n${textToAnalyze.slice(0, 10000)}`;
+        const autoMapRes = await autoMapWorldEntities(
+          bookTitle,
+          entities,
+          storyContext,
+          (event) => {
+            setActiveAiAttempt(event);
+            if (event.status === 'attempt') {
+              setAiProcessStatus(`Langkah 3/3 (Peta Relasi) via [${event.provider.toUpperCase()}] ${event.slotLabel}...`);
+            }
+          }
+        );
+
+        if (autoMapRes) {
+          const nextChapterEntityStates = { ...(chapter.chapterEntityStates || {}) };
+          autoMapRes.mappedEntities.forEach((me) => {
+            if (me.condition || me.conditionDetails) {
+              nextChapterEntityStates[me.id] = {
+                condition: me.condition,
+                conditionDetails: me.conditionDetails,
+                chapterOrder: chapter.order,
+                lastSeenScene: me.conditionDetails || 'Terlihat dalam bab ini',
+              };
+            }
+          });
+
+          for (const mapped of autoMapRes.mappedEntities) {
+            const ent = entities.find((e) => e.id === mapped.id || e.name.toLowerCase() === mapped.name.toLowerCase());
+            if (ent) {
+              const updatedRels = mapped.relationships || ent.relationships;
+              await db.worldEntities.update(ent.id, {
+                relationships: updatedRels,
+                faction: mapped.faction || ent.faction,
+                factionColor: mapped.factionColor || ent.factionColor,
+                condition: mapped.condition || ent.condition,
+                conditionDetails: mapped.conditionDetails || ent.conditionDetails,
+                updatedAt: Date.now(),
+              });
+            }
+          }
+
+          onUpdateChapter({ chapterEntityStates: nextChapterEntityStates });
+        }
+      }
+
+      setAiProcessStatus('✨ Pemindaian Menyeluruh Selesai! Entitas, adegan, dan peta relasi berhasil diperbarui.');
+      showToast('Pemindaian lengkap selesai: Entitas, Auto Scene, dan Peta Relasi diperbarui.');
+    } catch (err: any) {
+      console.error('Deep scan failed:', err);
+      alert('Gagal menjalankan pemindaian menyeluruh: ' + (err.message || 'Periksa API Key AI'));
+    } finally {
+      setIsDeepScanning(false);
+      setTimeout(() => {
+        setActiveAiAttempt(null);
+        setAiProcessStatus('');
+      }, 5000);
     }
   };
 
@@ -947,20 +1065,20 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
               type="button"
-              onClick={handleDetectEntities}
-              disabled={isDetectingEntities || !getEffectiveText()}
-              className="w-full sm:w-auto flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-xl bg-gradient-to-r from-amber-500/20 via-emerald-500/20 to-indigo-500/20 hover:from-amber-500/30 hover:to-indigo-500/30 text-amber-800 dark:text-amber-300 border border-amber-500/30 text-xs font-bold transition active:scale-95 disabled:opacity-50 shadow-sm"
-              title="Pindai naskah untuk mendeteksi tokoh, latar, relik, atau sebutan alias baru"
+              onClick={handleDeepScanAll}
+              disabled={isDeepScanning || isDetectingEntities || !getEffectiveText()}
+              className="w-full sm:w-auto flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-xl bg-gradient-to-r from-amber-500/25 via-emerald-500/20 to-indigo-500/25 hover:from-amber-500/35 hover:to-indigo-500/35 text-amber-900 dark:text-amber-200 border border-amber-500/40 text-xs font-bold transition active:scale-95 disabled:opacity-50 shadow-sm"
+              title="Pindai naskah secara menyeluruh: deteksi entitas baru/alias, pembagian Auto Scene & ilustrasi, serta pemetaan relasi antar faksi/peta (Auto-Map)"
             >
-              {isDetectingEntities ? (
+              {isDeepScanning ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />
-                  <span>Memindai Entitas...</span>
+                  <span>Memindai Menyeluruh...</span>
                 </>
               ) : (
                 <>
                   <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Pindai Entitas</span>
+                  <span>Pindai Menyeluruh (Entitas, Peta &amp; Adegan)</span>
                 </>
               )}
             </button>
@@ -968,10 +1086,10 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
         </div>
 
         {/* 🚀 Real-time AI Status Indicator Bar */}
-        {(isDetectingEntities || aiProcessStatus) && (
+        {(isDeepScanning || isDetectingEntities || aiProcessStatus) && (
           <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-900 dark:text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 animate-in fade-in">
             <div className="flex items-center gap-2 min-w-0">
-              {isDetectingEntities && <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping flex-shrink-0" />}
+              {(isDeepScanning || isDetectingEntities) && <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping flex-shrink-0" />}
               <span className="font-semibold truncate">
                 {aiProcessStatus || 'Sedang memproses pemindaian naskah bab...'}
               </span>

@@ -1716,6 +1716,103 @@ Berikan output HANYA berupa JSON valid persis format ini:
   throw new Error(lastError?.message || 'Gagal menganalisis gambar dengan AI Vision.');
 }
 
+// 8b. AI Character Photo Vision Profiler (Gender, Exact Age without range, Physical Traits & Clothing)
+export interface CharacterVisionScanResult {
+  gender: string; // "Pria" | "Wanita"
+  estimatedAge: string; // Specific exact age, e.g. "24 tahun", NO RANGES!
+  physicalTraits: string; // Detailed facial, hair, eyes, skin, physique, special marks
+  clothingAttire: string; // Detailed clothing, attire, style, accessories, colors
+  shortSummary: string; // Concise evocative character description (1-2 sentences)
+  englishVisualPrompt: string; // Text-to-image prompt in English (9:16 aspect ratio)
+}
+
+export async function analyzeCharacterPhotoWithVision(
+  base64Image: string,
+  mimeType: string,
+  characterName?: string
+): Promise<CharacterVisionScanResult> {
+  const config = getAISettings();
+  const geminiSlot = config.slots.find((s) => s.provider === 'gemini' && s.apiKey && s.apiKey.trim().length > 0);
+
+  if (!geminiSlot) {
+    throw new Error('AI Vision memerlukan API Key Gemini. Buka Pengaturan AI dan tambahkan slot API Key Gemini.');
+  }
+
+  const visionModels = [
+    ...(geminiSlot.models && geminiSlot.models.length > 0 ? geminiSlot.models : config.geminiConfig.fallbackModels),
+    'gemini-2.5-flash',
+    'gemini-3.1-flash',
+    'gemini-3.0-flash',
+  ].filter((v, i, a) => a.indexOf(v) === i);
+
+  const prompt = `Analisis foto/gambar karakter ini secara detail, akurat, dan mendalam untuk profil tokoh cerita fiksi.
+Nama Karakter: "${characterName || 'Tokoh Cerita'}"
+
+ATURAN KETAT DARI PENULIS:
+1. "gender": Tentukan jenis kelamin yang tampak ("Pria" atau "Wanita").
+2. "estimatedAge": Tentukan perkiraan usia dalam format angka pasti diikuti "tahun", contoh: "24 tahun", "17 tahun", "35 tahun", "8 tahun". DILARANG KERAS MENGGUNAKAN RENTANG seperti "20-25 tahun" atau "sekitar 30-an". Harus satu angka pasti!
+3. "physicalTraits": Jabarkan secara detail ciri fisik yang terlihat: bentuk wajah, gaya dan warna rambut, warna dan bentuk mata, warna kulit, postur/tinggi tubuh, ekspresi wajah, serta tanda khusus jika ada.
+4. "clothingAttire": Jabarkan secara detail pakaian dan busana yang dikenakan: jenis pakaian (atasan, bawahan, gaun, jubah, zirah, dll), warna kain, motif, gaya busana, serta aksesoris/senjata.
+5. "shortSummary": Rangkuman 1-2 kalimat deskripsi ringkas tokoh yang memikat untuk profil glosarium ensiklopedia.
+6. "englishVisualPrompt": Text-to-image prompt dalam Bahasa Inggris detail (Midjourney/Flux style 9:16 aspect ratio): "Full body portrait of [gender], [specific age] years old, [detailed physical traits], wearing [detailed clothing], hyper realistic, 8k resolution, cinematic lighting, photorealistic textures, vertical 9:16 aspect ratio".
+
+Format output HANYA JSON valid:
+{
+  "gender": "...",
+  "estimatedAge": "24 tahun",
+  "physicalTraits": "...",
+  "clothingAttire": "...",
+  "shortSummary": "...",
+  "englishVisualPrompt": "..."
+}`;
+
+  const systemPrompt = 'Anda adalah masterclass visual profiler karakter novel dan AI Vision literary expert. Hasilkan HANYA JSON object murni tanpa markdown wrapper berlebih.';
+
+  let lastError: any = null;
+  for (const model of visionModels) {
+    try {
+      const rawText = await executeGeminiVisionRequest(
+        geminiSlot.apiKey,
+        model,
+        base64Image,
+        mimeType,
+        prompt,
+        systemPrompt
+      );
+
+      const parsed = resilientParseJsonObject<CharacterVisionScanResult>(rawText);
+      if (parsed) {
+        // Enforce exact age format (clean up any residual ranges if AI slipped)
+        let cleanAge = (parsed.estimatedAge || '').trim();
+        const rangeMatch = cleanAge.match(/(\d+)\s*[-–—]\s*(\d+)/);
+        if (rangeMatch) {
+          const avg = Math.round((parseInt(rangeMatch[1], 10) + parseInt(rangeMatch[2], 10)) / 2);
+          cleanAge = `${avg} tahun`;
+        } else if (/^\d+$/.test(cleanAge)) {
+          cleanAge = `${cleanAge} tahun`;
+        } else if (!cleanAge.includes('tahun')) {
+          const numMatch = cleanAge.match(/\d+/);
+          cleanAge = numMatch ? `${numMatch[0]} tahun` : '20 tahun';
+        }
+
+        return {
+          gender: parsed.gender || 'Pria',
+          estimatedAge: cleanAge || '20 tahun',
+          physicalTraits: parsed.physicalTraits || '',
+          clothingAttire: parsed.clothingAttire || '',
+          shortSummary: parsed.shortSummary || '',
+          englishVisualPrompt: parsed.englishVisualPrompt || '',
+        };
+      }
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`Character vision attempt with model ${model} failed:`, err);
+    }
+  }
+
+  throw new Error(lastError?.message || 'Gagal memindai foto karakter dengan AI Vision.');
+}
+
 // 12. World Building Auto-Mapping Engine (Factions, Network Relationships & Current Conditions)
 export interface AutoMapResult {
   factions: Array<{
