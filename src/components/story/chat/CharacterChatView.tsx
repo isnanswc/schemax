@@ -305,12 +305,12 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 min-w-0 w-full max-w-4xl mx-auto px-0.5 sm:px-2 pb-16 sm:pb-20 overflow-hidden">
+    <div className="flex-1 flex flex-col min-h-0 min-w-0 w-full max-w-4xl mx-auto overflow-hidden relative">
       {/* ========================================================================= */}
-      {/* 1. ULTRA-STREAMLINED SINGLE-ROW CONTROL BAR                               */}
+      {/* 1. TOP CONTROL BAR (DOCKED TEPAT DI BAWAH STATUS BAR)                     */}
       {/* ========================================================================= */}
-      <div className="flex-shrink-0 mb-1.5 min-w-0">
-        <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-2xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800/80 backdrop-blur-md shadow-xs min-w-0">
+      <div className="flex-shrink-0 z-20 w-full px-2 py-1.5 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 min-w-0 relative">
+        <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 backdrop-blur-md shadow-xs min-w-0">
           {/* Left: Active Character Identity */}
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 pr-1 flex-1">
             <div className="w-8 h-8 rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-800 flex items-center justify-center border border-amber-500/30 flex-shrink-0 shadow-xs">
@@ -390,9 +390,9 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
           </div>
         </div>
 
-        {/* Collapsible Character Carousel (only drops down when "Ganti" is clicked) */}
+        {/* Collapsible Character Carousel (Floats cleanly over chat without disrupting layout) */}
         {showCharacterDrawer && (
-          <div className="mt-1.5 p-2 rounded-2xl bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800 shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="absolute top-full inset-x-2 z-30 mt-1 p-2 rounded-2xl bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-150">
             <div className="flex items-center justify-between mb-1.5 px-1">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                 Pilih Tokoh untuk Diajak Bicara:
@@ -423,11 +423,11 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
       </div>
 
       {/* ========================================================================= */}
-      {/* 2. CHAT STREAM / MESSAGE BUBBLES                                          */}
+      {/* 2. CHAT STREAM / MESSAGE BUBBLES (SATU-SATUNYA AREA YANG SCROLL)          */}
       {/* ========================================================================= */}
       <div
         ref={chatContainerRef}
-        className="flex-1 overflow-y-auto min-h-0 px-2 py-3 space-y-3.5 rounded-2xl bg-white/50 dark:bg-slate-950/50 border border-slate-200/70 dark:border-slate-800/70 backdrop-blur-sm scroll-smooth"
+        className="flex-1 overflow-y-auto min-h-0 px-2 sm:px-4 py-3 space-y-3.5 bg-slate-50/50 dark:bg-slate-950/50 scroll-smooth overscroll-contain"
       >
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center py-6 px-4">
@@ -542,9 +542,9 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
       </div>
 
       {/* ========================================================================= */}
-      {/* 4. INPUT BAR - Floating safely above BottomNavigation                     */}
+      {/* 4. CHAT INPUT BAR (MENEMPEL TEPAT DI ATAS NAVIGATION PANEL)               */}
       {/* ========================================================================= */}
-      <div className="flex-shrink-0 pt-2">
+      <div className="flex-shrink-0 z-30 w-full px-2 pt-2 pb-[60px] sm:pb-[66px] bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800/80 min-w-0">
         {/* Optional Collapsible Question Suggestions */}
         {showPromptsDrawer && (
           <div className="flex items-center gap-1 overflow-x-auto pb-2 scrollbar-none animate-in fade-in duration-150">
@@ -556,7 +556,7 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
                   handleSendMessage(chip);
                   setShowPromptsDrawer(false);
                 }}
-                className="flex-shrink-0 px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-[10px] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 transition active:scale-95 shadow-2xs"
+                className="flex-shrink-0 px-2.5 py-1 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 text-[10px] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 transition active:scale-95 shadow-2xs"
               >
                 💡 {chip}
               </button>
@@ -569,7 +569,7 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
             e.preventDefault();
             handleSendMessage();
           }}
-          className="flex items-end gap-1.5 sm:gap-2 bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800/90 rounded-2xl p-1.5 shadow-xl shadow-slate-200/50 dark:shadow-none focus-within:border-amber-400 dark:focus-within:border-amber-500 transition min-w-0"
+          className="flex items-end gap-1.5 sm:gap-2 bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800/90 rounded-2xl p-1.5 shadow-md focus-within:border-amber-400 dark:focus-within:border-amber-500 transition min-w-0"
         >
           <button
             type="button"

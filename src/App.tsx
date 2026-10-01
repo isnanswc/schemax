@@ -239,7 +239,7 @@ export function App() {
   return (
     <div
       {...bindEmptyAreaLongPress()}
-      className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200"
+      className={`${currentBook && activeTab === 'chat' ? 'h-[100dvh] max-h-[100dvh] overflow-hidden' : 'min-h-screen'} bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200`}
     >
       {/* 1. Fullscreen Chapter Reader (Distraction-Free Reading Mode with Natural TTS) */}
       {readingChapter && currentBook ? (
@@ -281,7 +281,7 @@ export function App() {
           />
 
           {/* 3. Main Body Container - Compact & Edge-to-Edge on Mobile */}
-          <main className={`flex-1 w-full max-w-4xl mx-auto px-1.5 sm:px-4 ${activeTab === 'chat' && currentBook ? 'pt-1 pb-0 overflow-hidden flex flex-col min-h-0 min-w-0' : 'py-3 sm:py-6'}`}>
+          <main className={`flex-1 w-full max-w-4xl mx-auto ${activeTab === 'chat' && currentBook ? 'p-0 overflow-hidden flex flex-col min-h-0 min-w-0' : 'px-1.5 sm:px-4 py-3 sm:py-6'}`}>
             {!currentBook ? (
               /* Home Screen: Toggle between Dashboard & Works */
               <div className="space-y-4">
