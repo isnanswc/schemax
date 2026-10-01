@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Book, StoryChapter, ChapterStatus } from '../../types';
 import { AddPlannedStoryModal } from './AddPlannedStoryModal';
 import { ChapterCard } from './ChapterCard';
@@ -41,7 +41,22 @@ export const StoryPlannerView: React.FC<StoryPlannerViewProps> = ({
   const { url: bookCoverUrl } = useMediaUrl(book?.coverMediaId);
   const { getBlurImageClass, getBlurTitleClass, getBlurTextClass } = usePrivacy();
 
-  const handleOpenAddModal = () => {
+  const mountTimeRef = useRef(Date.now());
+
+  useEffect(() => {
+    mountTimeRef.current = Date.now();
+    setIsAddModalOpen(false);
+  }, [bookId]);
+
+  const handleOpenAddModal = (e?: React.SyntheticEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    // Block ghost click / tap-through within 600ms of mounting
+    if (Date.now() - mountTimeRef.current < 600) {
+      return;
+    }
     navStack.push('modal-add-chapter', () => setIsAddModalOpen(false));
     setIsAddModalOpen(true);
   };

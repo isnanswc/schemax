@@ -130,8 +130,7 @@ export function useLongPress(
     onMouseUp: (e: React.MouseEvent) => {
       if (Date.now() < suppressSyntheticClickUntilRef.current) return;
       if (e.button !== 0) return;
-      handleEnd(e, true);
-      suppressSyntheticClickUntilRef.current = Date.now() + 500;
+      handleEnd(e, false);
     },
     onMouseLeave: (e: React.MouseEvent) => {
       if (Date.now() < suppressSyntheticClickUntilRef.current) return;
@@ -156,7 +155,14 @@ export function useLongPress(
     },
     onTouchEnd: (e: React.TouchEvent) => {
       suppressSyntheticClickUntilRef.current = Date.now() + 600;
-      handleEnd(e, true);
+      if (!isMovedRef.current && !isLongPressRef.current) {
+        if (e.cancelable) {
+          e.preventDefault();
+        }
+        handleEnd(e, true);
+      } else {
+        handleEnd(e, false);
+      }
     },
     onTouchCancel: () => {
       clearAllTimers();
@@ -170,6 +176,10 @@ export function useLongPress(
       if (Date.now() < suppressSyntheticClickUntilRef.current) {
         e.preventDefault();
         e.stopPropagation();
+        return;
+      }
+      if (!isMovedRef.current && !isLongPressRef.current) {
+        onClick?.(e);
       }
     },
   };
