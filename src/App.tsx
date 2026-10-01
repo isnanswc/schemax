@@ -105,6 +105,19 @@ export function App() {
     return cleanup;
   }, []);
 
+  // Lock document scrolling and reset scroll offset when in full-height chat workspace
+  useEffect(() => {
+    if (activeTab === 'chat' && currentBook) {
+      window.scrollTo(0, 0);
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+        document.documentElement.style.overflow = '';
+      };
+    }
+  }, [activeTab, currentBook]);
+
   const handleSelectBook = (book: Book) => {
     setEditingChapter(null);
     setStudioChapter(null);
@@ -243,7 +256,11 @@ export function App() {
   return (
     <div
       {...bindEmptyAreaLongPress()}
-      className={`${currentBook && activeTab === 'chat' ? 'h-[100dvh] max-h-[100dvh] overflow-hidden' : 'min-h-screen'} bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200`}
+      className={`${
+        currentBook && activeTab === 'chat'
+          ? 'fixed inset-0 h-[100dvh] max-h-[100dvh] overflow-hidden'
+          : 'min-h-screen'
+      } bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200`}
     >
       {/* 1. Fullscreen Chapter Reader (Distraction-Free Reading Mode with Natural TTS) */}
       {readingChapter && currentBook ? (

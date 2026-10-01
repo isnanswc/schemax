@@ -52,7 +52,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     <nav
       className={`${
         activeTab === 'chat'
-          ? 'relative flex-shrink-0 sm:max-w-4xl sm:rounded-none sm:border-x-0'
+          ? 'relative flex-shrink-0 w-full sm:max-w-4xl sm:rounded-none sm:border-x-0'
           : 'fixed bottom-0 sm:max-w-md sm:rounded-t-2xl sm:border-x'
       } inset-x-0 z-40 bg-slate-950/90 backdrop-blur-xl border-t border-slate-800/80 px-2 py-1 safe-bottom sm:mx-auto transition-all`}
     >

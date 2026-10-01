@@ -237,7 +237,7 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
       setMessages([...updatedMessages, errorMsg]);
     } finally {
       setIsLoading(false);
-      setTimeout(() => inputRef.current?.focus(), 100);
+      setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 100);
     }
   };
 

@@ -18,7 +18,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
   const { settings, getBlurTitleClass } = usePrivacy();
 
   return (
-    <header className="sticky top-0 z-40 w-full backdrop-blur-xl bg-white/90 dark:bg-slate-950/85 border-b border-slate-200/90 dark:border-slate-800/80 px-3 sm:px-4 py-2.5 sm:py-3 safe-top transition-all">
+    <header className="sticky top-0 flex-shrink-0 z-40 w-full backdrop-blur-xl bg-white/90 dark:bg-slate-950/85 border-b border-slate-200/90 dark:border-slate-800/80 px-3 sm:px-4 py-2.5 sm:py-3 safe-top transition-all">
       <div className="max-w-4xl mx-auto flex items-center justify-between">
         {/* Left: Back button or App Logo */}
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
