@@ -128,8 +128,17 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
   const pinchStartPanRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const pinchMidpointRef = useRef<{ x: number; y: number } | null>(null);
 
+  // Storage key for persisting layout positions per book
+  const MAP_POSITIONS_STORAGE_KEY = `schemax_map_positions_${bookId}`;
+
   // Node Positions Map { [entityId]: { x, y } }
-  const [nodePositions, setNodePositions] = useState<Record<string, NodePosition>>({});
+  const [nodePositions, setNodePositions] = useState<Record<string, NodePosition>>(() => {
+    try {
+      const saved = localStorage.getItem(`schemax_map_positions_${bookId}`);
+      if (saved) return JSON.parse(saved);
+    } catch (_) {}
+    return {};
+  });
 
   // Media avatar URLs cache
   const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
@@ -283,12 +292,22 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
       }
     });
 
-    setNodePositions(newPositions);
+    setNodePositions((prev) => {
+      const merged = { ...newPositions, ...prev };
+      try {
+        localStorage.setItem(MAP_POSITIONS_STORAGE_KEY, JSON.stringify(merged));
+      } catch (_) {}
+      return merged;
+    });
   };
 
-  // Initialize or re-calculate clean layout on mount or entity count changes
+  // Initialize or re-calculate clean layout on mount if no saved positions exist or when entity count changes
   useEffect(() => {
-    arrangeNeatFactionLayout();
+    // Only arrange if positions are missing
+    const hasMissing = entities.some((e) => !nodePositions[e.id]);
+    if (hasMissing || Object.keys(nodePositions).length === 0) {
+      arrangeNeatFactionLayout();
+    }
   }, [entities.length]);
 
   // Filtered entities based on Scope, Faction, Condition, and Search
@@ -553,7 +572,12 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     setIsDraggingCanvas(false);
-    setDraggedNodeId(null);
+    if (draggedNodeId) {
+      setDraggedNodeId(null);
+      try {
+        localStorage.setItem(MAP_POSITIONS_STORAGE_KEY, JSON.stringify(nodePositions));
+      } catch (_) {}
+    }
   };
 
   // 2-Finger Touch Pinch Zoom with focal midpoint tracking

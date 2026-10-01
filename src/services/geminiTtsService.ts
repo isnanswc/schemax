@@ -441,6 +441,8 @@ export async function generateGeminiSpeechAudio(
           throw new Error(msg);
         }
 
+        const data = await response.json();
+
         // Jika respon tidak memiliki kandidat
         if (!data.candidates || data.candidates.length === 0) {
           const promptFeedback = data.promptFeedback ? JSON.stringify(data.promptFeedback) : '';

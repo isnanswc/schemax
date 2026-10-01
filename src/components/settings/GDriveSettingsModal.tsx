@@ -147,10 +147,10 @@ export const GDriveSettingsModal: React.FC<GDriveSettingsModalProps> = ({
             </div>
             <div>
               <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white leading-tight">
-                Hubungkan Folder Google Drive
+                Hubungkan Folder Media Google Drive
               </h3>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Akses semua gambar &amp; subfolder tanpa login OAuth
+                Pilih &amp; impor aset gambar, avatar entitas &amp; cover langsung dari Google Drive
               </p>
             </div>
           </div>

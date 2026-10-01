@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Upload, Image as ImageIcon, Check, Loader2, Sparkles } from 'lucide-react';
+import { X, Upload, Image as ImageIcon, Check, Loader2, Sparkles, HardDrive, Camera } from 'lucide-react';
 import { WorldEntity, MediaItem } from '../../types';
 import { db, saveMediaItem } from '../../db';
+import { GDriveMediaPickerModal } from '../media/GDriveMediaPickerModal';
 
 interface EntityImagePickerModalProps {
   isOpen: boolean;
@@ -18,12 +19,13 @@ export const EntityImagePickerModal: React.FC<EntityImagePickerModalProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const [activeTab, setActiveTab] = useState<'upload' | 'gallery'>('upload');
+  const [activeTab, setActiveTab] = useState<'upload' | 'gallery' | 'gdrive'>('upload');
   const [galleryItems, setGalleryItems] = useState<Array<MediaItem & { url: string }>>([]);
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(entity?.avatarMediaId || null);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isGDriveOpen, setIsGDriveOpen] = useState(false);
 
   useEffect(() => {
     if (entity) {
@@ -168,7 +170,15 @@ export const EntityImagePickerModal: React.FC<EntityImagePickerModalProps> = ({
             }`}
           >
             <ImageIcon className="w-4 h-4" />
-            <span>Pilih dari Galeri ({galleryItems.length})</span>
+            <span>Galeri ({galleryItems.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsGDriveOpen(true)}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg transition text-slate-500 hover:text-blue-500 hover:bg-white dark:hover:bg-slate-800"
+          >
+            <HardDrive className="w-4 h-4 text-blue-500" />
+            <span>Google Drive</span>
           </button>
         </div>
 
@@ -180,6 +190,7 @@ export const EntityImagePickerModal: React.FC<EntityImagePickerModalProps> = ({
                 <input
                   type="file"
                   accept="image/*"
+                  capture="environment"
                   onChange={handleFileChange}
                   className="hidden"
                 />
@@ -198,7 +209,7 @@ export const EntityImagePickerModal: React.FC<EntityImagePickerModalProps> = ({
                       <Upload className="w-6 h-6" />
                     </div>
                     <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                      Sentuh atau tarik berkas foto/ilustrasi ke sini
+                      Sentuh atau tarik berkas foto/kamera ke sini
                     </p>
                     <p className="text-[11px] text-slate-400">
                       Mendukung JPG, PNG, WEBP untuk foto karakter, peta lokasi, atau wujud relik
@@ -226,7 +237,7 @@ export const EntityImagePickerModal: React.FC<EntityImagePickerModalProps> = ({
                   <ImageIcon className="w-10 h-10 mx-auto text-slate-500 mb-2" />
                   <p>Belum ada gambar yang diunggah ke buku ini.</p>
                   <p className="text-[11px] text-slate-500 mt-1">
-                    Gunakan tab "Upload dari Perangkat" untuk memasukkan foto pertama.
+                    Gunakan tab "Upload dari Perangkat" atau "Google Drive" untuk memasukkan foto.
                   </p>
                 </div>
               ) : (
@@ -268,6 +279,19 @@ export const EntityImagePickerModal: React.FC<EntityImagePickerModalProps> = ({
             </div>
           )}
         </div>
+
+        {/* GDrive Picker Modal for Entities */}
+        <GDriveMediaPickerModal
+          isOpen={isGDriveOpen}
+          onClose={() => setIsGDriveOpen(false)}
+          bookId={bookId}
+          entityId={entity.id}
+          category={entity.category}
+          title={`Pilih Gambar untuk ${entity.name}`}
+          onSelectImage={(mediaId) => {
+            handleSelectGallery(mediaId);
+          }}
+        />
       </div>
     </div>
   );
