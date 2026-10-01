@@ -1718,6 +1718,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
             entities={entities}
             chapter={chapter}
             onUpdateChapter={onUpdateChapter}
+            onClose={() => setActiveSubTab('entities')}
             onRefresh={() => {
               if (onUpdateChapter) onUpdateChapter({});
             }}

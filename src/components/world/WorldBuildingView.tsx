@@ -446,6 +446,7 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
           entities={entities}
           onRefresh={onRefresh}
           chapters={chapters}
+          onClose={() => setWorldMode('list')}
         />
       ) : (
         /* Mode 2: Standard Entity Cards Grid */

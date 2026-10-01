@@ -45,7 +45,10 @@ import {
   BookOpen,
   Wand2,
   Compass,
-  CheckCircle2
+  CheckCircle2,
+  Menu,
+  ChevronLeft,
+  ChevronDown
 } from 'lucide-react';
 
 interface WorldAutoMapViewProps {
@@ -58,6 +61,7 @@ interface WorldAutoMapViewProps {
   onUpdateChapter?: (fields: Partial<StoryChapter>) => void;
   // All chapters when used inside Worldbuilding View (for Timeline Chapter Switcher)
   chapters?: StoryChapter[];
+  onClose?: () => void;
 }
 
 interface NodePosition {
@@ -73,6 +77,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
   chapter,
   onUpdateChapter,
   chapters = [],
+  onClose,
 }) => {
   // Modes: 'network' (Garis Relasi) or 'clusters' (Himpunan Faksi)
   const [viewMode, setViewMode] = useState<'network' | 'clusters'>('network');
@@ -98,8 +103,9 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
   const [selectedConditionFilter, setSelectedConditionFilter] = useState<string>('all');
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
 
-  // Mobile Fullscreen Mode
+  // Mobile Fullscreen & Floating Toolbox Mode
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isToolboxOpen, setIsToolboxOpen] = useState(false);
 
   // Modals & Popups
   const [isAiLoading, setIsAiLoading] = useState(false);
@@ -700,34 +706,97 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
   };
 
   return (
-    <div className={`space-y-3 ${isFullscreen ? 'fixed inset-0 z-50 bg-slate-950 p-2 sm:p-4 flex flex-col' : 'pb-20'}`}>
-      {/* Top Header Card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 shadow-sm space-y-3 flex-shrink-0">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-          {/* Title & Chapter Timeline Switcher */}
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="p-2 rounded-xl bg-gradient-to-r from-pink-500/20 to-amber-500/20 text-pink-500 flex-shrink-0">
-              <GitFork className="w-5 h-5" />
+    <div className="fixed inset-0 z-40 bg-slate-950 flex flex-col overflow-hidden select-none">
+      {/* 1. Sleek Floating Top Status Bar */}
+      <div className="absolute top-2.5 sm:top-4 inset-x-3 sm:inset-x-6 z-30 flex items-center justify-between pointer-events-none gap-2">
+        {/* Left: Project / Chapter Context Pill */}
+        <div className="pointer-events-auto flex items-center gap-2 bg-slate-900/90 hover:bg-slate-900 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-slate-700/80 shadow-2xl transition">
+          <div className="p-1.5 rounded-xl bg-pink-500/20 text-pink-400">
+            <GitFork className="w-4 h-4" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <h3 className="text-xs font-black text-white truncate max-w-[150px] sm:max-w-[220px]">
+                {activeChapter ? activeChapter.title : bookTitle}
+              </h3>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-pink-500/10 text-pink-400 font-bold border border-pink-500/20">
+                {viewMode === 'network' ? 'Relasi' : 'Faksi'}
+              </span>
             </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
-                  {activeChapter ? `Peta Relasi: ${activeChapter.title}` : 'Peta Relasi & Faksi Tokoh'}
-                </h3>
-              </div>
+          </div>
+        </div>
 
-              {/* Chapter Timeline Dropdown Selector (if in Worldbuilding) */}
+        {/* Center / Right: Live AI Indicator or Active Filter Pill */}
+        {(isAiLoading || aiStatusMessage) ? (
+          <div className="pointer-events-auto flex items-center gap-2 bg-slate-900/95 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-pink-500/40 text-pink-300 text-xs shadow-2xl animate-pulse">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-pink-400" />
+            <span className="font-semibold text-[11px] truncate max-w-[180px] sm:max-w-[260px]">
+              {aiStatusMessage || 'Menganalisis relasi...'}
+            </span>
+          </div>
+        ) : (
+          <div className="pointer-events-auto flex items-center gap-1.5">
+            {/* View Mode Toggle Pill (Garis Relasi vs Faksi) */}
+            <div className="flex items-center bg-slate-900/90 backdrop-blur-md p-1 rounded-2xl border border-slate-700/80 shadow-2xl text-[11px] font-bold">
+              <button
+                type="button"
+                onClick={() => setViewMode('network')}
+                className={`px-2.5 py-1 rounded-xl transition ${
+                  viewMode === 'network'
+                    ? 'bg-amber-500 text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Garis Relasi
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('clusters')}
+                className={`px-2.5 py-1 rounded-xl transition ${
+                  viewMode === 'clusters'
+                    ? 'bg-amber-500 text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Faksi
+              </button>
+            </div>
+
+            {/* Back / Close Button to return to World Cards */}
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1.5 rounded-2xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 shadow-2xl transition flex items-center gap-1 px-2.5 text-xs font-bold"
+                title="Kembali ke Ensiklopedia Kartu"
+              >
+                <X className="w-4 h-4 text-slate-400" />
+                <span className="hidden sm:inline">Tutup Peta</span>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* 2. Floating Bottom Controls: Expandable Toolbox with Horizontal Slider */}
+      <div className="absolute bottom-4 sm:bottom-6 inset-x-3 sm:inset-x-6 z-30 flex flex-col items-center pointer-events-none gap-2">
+        {/* Expanded Floating Toolbar (Horizontal Scrollable Toolbox) */}
+        {isToolboxOpen && (
+          <div className="pointer-events-auto w-full max-w-2xl bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-3xl p-3 shadow-2xl animate-in slide-in-from-bottom-4 duration-200 flex flex-col gap-2.5">
+            {/* Top row of toolbox: Timeline & Faction Selectors */}
+            <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-2 text-xs">
+              {/* Timeline Chapter Selector */}
               {!chapter && chapters.length > 0 && (
-                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                  <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">
-                    Lihat Situasi Bab:
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex-shrink-0">
+                    Bab:
                   </span>
                   <select
                     value={selectedTimelineChapterId}
                     onChange={(e) => setSelectedTimelineChapterId(e.target.value)}
-                    className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-2 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400 focus:outline-none max-w-[200px] truncate"
+                    className="bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1 text-xs font-semibold text-slate-200 focus:outline-none max-w-[180px] truncate"
                   >
-                    <option value="global">🌐 Baseline Global (Awal Cerita)</option>
+                    <option value="global">🌐 Baseline Global</option>
                     {chapters.map((ch) => (
                       <option key={ch.id} value={ch.id}>
                         Bab {ch.order}: {ch.title}
@@ -736,173 +805,165 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                   </select>
                 </div>
               )}
-            </div>
-          </div>
 
-          {/* Controls: Mode Switcher Tabs + Fullscreen Button */}
-          <div className="flex items-center gap-1.5 flex-wrap self-start sm:self-auto flex-shrink-0">
-            <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-950 rounded-xl text-xs font-semibold">
+              {/* Faction Selector */}
+              <div className="flex items-center gap-1.5 ml-auto">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Faksi:</span>
+                <select
+                  value={selectedFactionFilter}
+                  onChange={(e) => setSelectedFactionFilter(e.target.value)}
+                  className="bg-slate-950 border border-slate-700 rounded-xl px-2 py-1 text-xs font-semibold text-slate-200 focus:outline-none max-w-[140px] truncate"
+                >
+                  <option value="all">Semua Faksi ({availableFactions.length})</option>
+                  {availableFactions.map((f) => (
+                    <option key={f} value={f}>
+                      {f}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Close Toolbox Button */}
               <button
                 type="button"
-                onClick={() => setViewMode('network')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition active:scale-95 ${
-                  viewMode === 'network'
-                    ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
+                onClick={() => setIsToolboxOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
               >
-                <GitFork className="w-3.5 h-3.5" />
-                <span>Garis Relasi</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('clusters')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition active:scale-95 ${
-                  viewMode === 'clusters'
-                    ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <Boxes className="w-3.5 h-3.5" />
-                <span>Himpunan Faksi</span>
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsFullscreen(!isFullscreen)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition active:scale-95 border shadow-sm ${
-                isFullscreen
-                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-pink-500/50'
-              }`}
-              title={isFullscreen ? 'Keluar Layar Penuh' : 'Mode Layar Penuh (Mobile Imersif)'}
-            >
-              {isFullscreen ? (
-                <>
-                  <Minimize2 className="w-3.5 h-3.5 text-rose-400" />
-                  <span>Keluar Layar Penuh</span>
-                </>
-              ) : (
-                <>
-                  <Maximize2 className="w-3.5 h-3.5 text-pink-500" />
-                  <span>Layar Penuh</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
+            {/* Bottom row of toolbox: Horizontal Slider Action Buttons */}
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+              {/* Scope Filters */}
+              {[
+                { id: 'all', label: 'Semua' },
+                { id: 'character_only', label: 'Tokoh Saja' },
+                { id: 'character_location', label: 'Tokoh & Lokasi' },
+                { id: 'character_item', label: 'Tokoh & Relik' },
+              ].map((sc) => (
+                <button
+                  key={sc.id}
+                  type="button"
+                  onClick={() => setEntityScopeFilter(sc.id as any)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 ${
+                    entityScopeFilter === sc.id
+                      ? 'bg-amber-500 text-slate-950 shadow-sm'
+                      : 'bg-slate-800 text-slate-300 hover:text-white'
+                  }`}
+                >
+                  {sc.label}
+                </button>
+              ))}
 
-        {/* Filters Bar: Scope (Karakter/Tempat), Faksi, dan Live Search */}
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
-          {/* Scope Filters Pills */}
-          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
-            <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap mr-1">Tampilkan:</span>
-            {[
-              { id: 'all', label: 'Semua' },
-              { id: 'character_only', label: 'Hanya Karakter' },
-              { id: 'character_location', label: 'Karakter & Lokasi' },
-              { id: 'character_item', label: 'Karakter & Item' },
-            ].map((sc) => (
-              <button
-                key={sc.id}
-                type="button"
-                onClick={() => setEntityScopeFilter(sc.id as any)}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition active:scale-95 ${
-                  entityScopeFilter === sc.id
-                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-950 shadow-sm'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-white'
-                }`}
-              >
-                {sc.label}
-              </button>
-            ))}
-          </div>
+              <div className="h-5 w-[1px] bg-slate-700 flex-shrink-0 mx-1" />
 
-          {/* Faction Filter Dropdown */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1 text-[11px]">
-              <span className="text-slate-400 font-semibold whitespace-nowrap">Faksi:</span>
-              <select
-                value={selectedFactionFilter}
-                onChange={(e) => setSelectedFactionFilter(e.target.value)}
-                className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 text-slate-700 dark:text-slate-300 font-medium focus:outline-none"
-              >
-                <option value="all">Semua Faksi ({availableFactions.length})</option>
-                {availableFactions.map((f) => (
-                  <option key={f} value={f}>
-                    {f}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Auto Arrange & AI Actions */}
-            <div className="flex items-center gap-1.5 ml-auto flex-wrap">
-              <button
-                type="button"
-                onClick={arrangeNeatFactionLayout}
-                className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center gap-1 transition flex-shrink-0"
-                title="Atur Ulang Tata Letak agar Rapi & Tidak Tumpang Tindih"
-              >
-                <Wand2 className="w-3.5 h-3.5 text-amber-500" />
-                <span className="hidden sm:inline">Tata Rapi</span>
-              </button>
-
+              {/* AI Auto-Map Button */}
               <button
                 type="button"
                 onClick={handleTriggerAutoMap}
                 disabled={isAiLoading}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 text-white font-bold rounded-xl text-xs shadow-md shadow-pink-500/20 active:scale-95 transition disabled:opacity-50 flex-shrink-0"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 text-white font-bold rounded-xl text-xs shadow-md shadow-pink-500/20 active:scale-95 transition disabled:opacity-50 whitespace-nowrap flex-shrink-0"
               >
-                {isAiLoading ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="w-3.5 h-3.5 text-yellow-200" />
-                )}
-                <span>{activeChapter ? 'Auto-Map Bab Ini' : 'Auto-Map AI'}</span>
+                <Sparkles className="w-3.5 h-3.5 text-yellow-200" />
+                <span>{activeChapter ? 'Auto-Map Bab' : 'Auto-Map AI'}</span>
               </button>
 
+              {/* Add Relation Button */}
               <button
                 type="button"
                 onClick={() => setIsAddRelationOpen(true)}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-800 dark:text-slate-200 font-semibold rounded-xl text-xs border border-slate-200 dark:border-slate-700 flex-shrink-0"
+                className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-xs border border-slate-700 whitespace-nowrap flex-shrink-0 active:scale-95 transition"
               >
-                <Plus className="w-3.5 h-3.5 text-pink-500" />
-                <span className="hidden sm:inline">Hubungan</span>
+                <Plus className="w-3.5 h-3.5 text-pink-400" />
+                <span>Tambah Relasi</span>
+              </button>
+
+              {/* Auto Arrange Layout */}
+              <button
+                type="button"
+                onClick={arrangeNeatFactionLayout}
+                className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-xs border border-slate-700 whitespace-nowrap flex-shrink-0 active:scale-95 transition"
+              >
+                <Wand2 className="w-3.5 h-3.5 text-amber-400" />
+                <span>Tata Rapi</span>
               </button>
             </div>
           </div>
-        </div>
-
-        {/* 🚀 Real-time AI Status Indicator Bar for Auto-Map */}
-        {(isAiLoading || aiStatusMessage) && (
-          <div className="p-2.5 rounded-xl bg-pink-500/10 border border-pink-500/30 text-xs text-pink-900 dark:text-pink-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 animate-in fade-in">
-            <div className="flex items-center gap-2 min-w-0">
-              {isAiLoading && <span className="w-2 h-2 rounded-full bg-pink-500 animate-ping flex-shrink-0" />}
-              <span className="font-semibold truncate">
-                {aiStatusMessage || 'Sedang menganalisis relasi entitas & faksi...'}
-              </span>
-            </div>
-            {activeAiAttempt && (
-              <div className="flex items-center gap-1.5 text-[11px] font-mono bg-white/70 dark:bg-slate-900/80 px-2 py-0.5 rounded-lg border border-pink-500/20 flex-shrink-0 self-start sm:self-auto">
-                <span className="font-black text-pink-600 dark:text-pink-400">
-                  [{activeAiAttempt.provider.toUpperCase()}]
-                </span>
-                <span className="text-slate-700 dark:text-slate-300 truncate max-w-[140px]">
-                  {activeAiAttempt.slotLabel}
-                </span>
-                <span className="text-slate-400">•</span>
-                <span className="text-pink-600 dark:text-pink-300 font-bold truncate max-w-[170px]">
-                  {activeAiAttempt.model}
-                </span>
-              </div>
-            )}
-          </div>
         )}
+
+        {/* Floating Quick Navigation & Menu Trigger Bar */}
+        <div className="pointer-events-auto flex items-center gap-2 bg-slate-900/90 hover:bg-slate-900/95 backdrop-blur-xl px-3 py-2 rounded-full border border-slate-700/80 shadow-2xl text-xs text-white">
+          {/* Zoom In */}
+          <button
+            type="button"
+            onClick={() => setZoom((z) => Math.min(3.5, z + 0.25))}
+            className="p-1.5 hover:text-white rounded-full hover:bg-slate-800 text-amber-400 active:scale-90 transition"
+            title="Perbesar"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+
+          <span className="text-[11px] font-mono font-bold px-1 text-slate-300">
+            {Math.round(zoom * 100)}%
+          </span>
+
+          {/* Zoom Out */}
+          <button
+            type="button"
+            onClick={() => setZoom((z) => Math.max(0.15, z - 0.25))}
+            className="p-1.5 hover:text-white rounded-full hover:bg-slate-800 text-amber-400 active:scale-90 transition"
+            title="Perkecil"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+
+          {/* Fit to Screen */}
+          <button
+            type="button"
+            onClick={handleFitToScreen}
+            className="p-1.5 hover:text-white rounded-full hover:bg-slate-800 text-emerald-400 active:scale-90 transition border-l border-slate-700/80 pl-2"
+            title="Fokus Semua (Fit to Screen)"
+          >
+            <Maximize2 className="w-4 h-4" />
+          </button>
+
+          {/* Reset / Center */}
+          <button
+            type="button"
+            onClick={handleResetView}
+            className="p-1.5 hover:text-white rounded-full hover:bg-slate-800 text-cyan-400 active:scale-90 transition"
+            title="Pusatkan Ulang"
+          >
+            <Compass className="w-4 h-4" />
+          </button>
+
+          {/* Main Floating Tool Trigger Button */}
+          <button
+            type="button"
+            onClick={() => setIsToolboxOpen(!isToolboxOpen)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full font-bold text-xs transition active:scale-95 border border-slate-700/80 ml-1 ${
+              isToolboxOpen
+                ? 'bg-rose-500 text-white'
+                : 'bg-gradient-to-r from-pink-500 to-amber-500 text-slate-950 shadow-lg shadow-pink-500/20'
+            }`}
+          >
+            {isToolboxOpen ? (
+              <>
+                <X className="w-3.5 h-3.5" />
+                <span>Tutup</span>
+              </>
+            ) : (
+              <>
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span>Alat &amp; Filter</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
-      {/* Main Interactive Map Viewport */}
+      {/* 3. True Fullscreen Fixed Interactive Map Viewport */}
       {viewMode === 'network' ? (
         <div
           ref={containerRef}
@@ -916,9 +977,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
           onTouchCancel={handleTouchEnd}
           onWheel={handleWheel}
           style={{ touchAction: 'none' }}
-          className={`relative w-full bg-slate-950 rounded-3xl border border-slate-800 overflow-hidden shadow-2xl select-none cursor-grab active:cursor-grabbing ${
-            isFullscreen ? 'flex-1 h-full rounded-none border-0' : 'h-[560px] sm:h-[640px]'
-          }`}
+          className="relative w-full h-full flex-1 bg-slate-950 overflow-hidden select-none cursor-grab active:cursor-grabbing"
         >
           {/* Cyber Grid Background */}
           <div
@@ -1300,14 +1359,14 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
             </g>
           </svg>
 
-          {/* Bottom Floating Inspector Panel (Mobile Responsive Drawer) */}
+          {/* Bottom Floating Inspector Panel (Positioned above floating nav pill) */}
           {selectedEntity && (
-            <div className="absolute bottom-3 inset-x-3 sm:inset-x-auto sm:left-4 sm:w-96 bg-slate-900/95 backdrop-blur-xl border border-slate-700 rounded-2xl p-4 shadow-2xl z-20 animate-in slide-in-from-bottom-3 duration-200">
+            <div className="absolute bottom-20 inset-x-3 sm:inset-x-auto sm:left-4 sm:w-96 bg-slate-900/95 backdrop-blur-xl border border-slate-700 rounded-3xl p-4 shadow-2xl z-20 animate-in slide-in-from-bottom-3 duration-200">
               <div className="flex items-start justify-between gap-3 mb-2.5">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div
                     onClick={() => setImagePickerEntity(selectedEntity)}
-                    className="relative group w-12 h-12 rounded-xl overflow-hidden bg-slate-950 border border-slate-700 flex-shrink-0 cursor-pointer"
+                    className="relative group w-12 h-12 rounded-2xl overflow-hidden bg-slate-950 border border-slate-700 flex-shrink-0 cursor-pointer"
                     title="Ganti Gambar Utama"
                   >
                     {selectedEntity.avatarMediaId && mediaUrls[selectedEntity.avatarMediaId] ? (
