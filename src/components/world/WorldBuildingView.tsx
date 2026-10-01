@@ -25,7 +25,10 @@ import {
   GitFork,
   Boxes,
   LayoutGrid,
-  Maximize2
+  Maximize2,
+  Search,
+  Filter,
+  X
 } from 'lucide-react';
 import { db } from '../../db';
 import { navStack } from '../../services/backNavigationService';
@@ -330,9 +333,16 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
   // Primary View Mode: 'list' (Daftar Kartu) or 'automap' (Peta Relasi & Visual Faksi)
   const [worldMode, setWorldMode] = useState<'list' | 'automap'>('list');
   const [selectedCategory, setSelectedCategory] = useState<'all' | WorldCategory>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFaction, setSelectedFaction] = useState('all');
+  const [selectedCondition, setSelectedCondition] = useState('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [hologramEntity, setHologramEntity] = useState<WorldEntity | null>(null);
   const [imagePickerEntity, setImagePickerEntity] = useState<WorldEntity | null>(null);
+
+  const availableFactions = Array.from(
+    new Set(entities.map((e) => e.faction?.trim()).filter((f): f is string => Boolean(f)))
+  );
 
   const handleOpenAddModal = () => {
     navStack.push('modal-add-entity', () => setIsAddModalOpen(false));
@@ -355,8 +365,18 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
   };
 
   const filteredEntities = entities.filter((ent) => {
-    if (selectedCategory === 'all') return true;
-    return ent.category === selectedCategory;
+    if (selectedCategory !== 'all' && ent.category !== selectedCategory) return false;
+    if (selectedFaction !== 'all' && ent.faction !== selectedFaction) return false;
+    if (selectedCondition !== 'all' && ent.condition !== selectedCondition) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchName = ent.name.toLowerCase().includes(q);
+      const matchDesc = (ent.shortDescription || '').toLowerCase().includes(q);
+      const matchFaction = (ent.faction || '').toLowerCase().includes(q);
+      const matchTraits = (ent.initialTraits || ent.currentTraits || '').toLowerCase().includes(q);
+      if (!matchName && !matchDesc && !matchFaction && !matchTraits) return false;
+    }
+    return true;
   });
 
   const handleDelete = async (id: string, name: string) => {
@@ -458,12 +478,59 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
             })}
           </div>
 
+          {/* Quick Search & Faction Filter Bar */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 p-2.5 rounded-2xl shadow-sm">
+            {/* Search Input */}
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Cari tokoh, deskripsi, faksi, sifat..."
+                className="w-full pl-9 pr-7 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-400 transition"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Faction Filter Dropdown */}
+            {availableFactions.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <select
+                  value={selectedFaction}
+                  onChange={(e) => setSelectedFaction(e.target.value)}
+                  className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:border-amber-400"
+                >
+                  <option value="all">Semua Faksi ({availableFactions.length})</option>
+                  {availableFactions.map((f) => (
+                    <option key={f} value={f}>
+                      Faksi: {f}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
           {/* Micro-Hint */}
           {filteredEntities.length > 0 && (
-            <div className="flex items-center gap-1.5 px-1 text-[11px] text-slate-500">
-              <Info className="w-3.5 h-3.5 text-pink-500 dark:text-pink-400/80 flex-shrink-0" />
-              <span>
-                Tip: Klik foto avatar untuk <strong>pasang / ubah gambar utama</strong>. Tekan & tahan kartu untuk intip hologram.
+            <div className="flex items-center justify-between gap-1.5 px-1 text-[11px] text-slate-500">
+              <div className="flex items-center gap-1.5 truncate">
+                <Info className="w-3.5 h-3.5 text-pink-500 dark:text-pink-400/80 flex-shrink-0" />
+                <span className="truncate">
+                  Tip: Tekan tahan kartu untuk intip hologram 3D.
+                </span>
+              </div>
+              <span className="font-mono text-amber-500 flex-shrink-0">
+                {filteredEntities.length} entitas ditampilkan
               </span>
             </div>
           )}

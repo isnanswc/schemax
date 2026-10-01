@@ -630,7 +630,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     e.preventDefault();
     const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-    setZoom((z) => Math.min(3, Math.max(0.3, z * zoomFactor)));
+    setZoom((z) => Math.min(3.5, Math.max(0.15, z * zoomFactor)));
   };
 
   const handleNodePointerDown = (e: React.PointerEvent, entId: string) => {
@@ -650,10 +650,52 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
     (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
   };
 
-  const handleResetView = () => {
-    setZoom(1);
-    setPan({ x: 30, y: 30 });
+  // Google Maps Style: Fit All Nodes to Screen Center
+  const handleFitToScreen = () => {
+    const container = containerRef.current;
+    const nodeKeys = Object.keys(nodePositions);
+    if (!container || nodeKeys.length === 0) {
+      setZoom(1);
+      setPan({ x: 30, y: 30 });
+      return;
+    }
+
+    const rect = container.getBoundingClientRect();
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+
+    nodeKeys.forEach((id) => {
+      const p = nodePositions[id];
+      if (p) {
+        minX = Math.min(minX, p.x);
+        maxX = Math.max(maxX, p.x);
+        minY = Math.min(minY, p.y);
+        maxY = Math.max(maxY, p.y);
+      }
+    });
+
+    if (minX === Infinity) return;
+
+    const padding = 100;
+    const contentWidth = Math.max(120, maxX - minX + padding * 2);
+    const contentHeight = Math.max(120, maxY - minY + padding * 2);
+
+    const scaleX = rect.width / contentWidth;
+    const scaleY = rect.height / contentHeight;
+    const newZoom = Math.min(1.8, Math.max(0.2, Math.min(scaleX, scaleY)));
+
+    const midX = (minX + maxX) / 2;
+    const midY = (minY + maxY) / 2;
+
+    const newPanX = rect.width / 2 - midX * newZoom;
+    const newPanY = rect.height / 2 - midY * newZoom;
+
+    setZoom(newZoom);
+    setPan({ x: newPanX, y: newPanY });
     setSelectedEntityId(null);
+  };
+
+  const handleResetView = () => {
+    handleFitToScreen();
     arrangeNeatFactionLayout();
   };
 
@@ -893,7 +935,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                setZoom((z) => Math.min(3, z + 0.2));
+                setZoom((z) => Math.min(3.5, z + 0.25));
               }}
               className="p-1.5 hover:text-white rounded-lg hover:bg-slate-800 active:scale-95 transition"
               title="Perbesar (Zoom In)"
@@ -905,7 +947,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                setZoom((z) => Math.max(0.3, z - 0.2));
+                setZoom((z) => Math.max(0.15, z - 0.25));
               }}
               className="p-1.5 hover:text-white rounded-lg hover:bg-slate-800 active:scale-95 transition"
               title="Perkecil (Zoom Out)"
@@ -916,12 +958,23 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
+                handleFitToScreen();
+              }}
+              className="p-1.5 hover:text-white rounded-lg hover:bg-slate-800 active:scale-95 transition border-l border-slate-700 pl-2 text-emerald-400"
+              title="Fokus Semua / Rentang Luas (Fit to Screen)"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
                 handleResetView();
               }}
-              className="p-1.5 hover:text-white rounded-lg hover:bg-slate-800 active:scale-95 transition border-l border-slate-700 pl-2"
-              title="Reset Tampilan &amp; Tata Rapi"
+              className="p-1.5 hover:text-white rounded-lg hover:bg-slate-800 active:scale-95 transition text-cyan-400"
+              title="Tata Rapi Otomatis &amp; Reset"
             >
-              <Compass className="w-4 h-4 text-cyan-400" />
+              <Compass className="w-4 h-4" />
             </button>
             <button
               type="button"
@@ -1087,6 +1140,63 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                       (l.sourceId === selectedEntityId && l.targetId === entity.id) ||
                       (l.targetId === selectedEntityId && l.sourceId === entity.id)
                   );
+
+                // Google Maps Style Semantic Zoom (Level of Detail):
+                // If zoomed far out (< 0.55x), render sleek compressed micro-pins/dots to prevent clutter
+                const isCompressedMode = zoom < 0.55;
+
+                if (isCompressedMode) {
+                  return (
+                    <g
+                      key={entity.id}
+                      transform={`translate(${pos.x}, ${pos.y})`}
+                      className={`interactive-node pointer-events-auto cursor-pointer transition-opacity duration-100 ${
+                        isConnected ? 'opacity-100' : 'opacity-25'
+                      }`}
+                      onPointerDown={(e) => handleNodePointerDown(e, entity.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedEntityId(isSelected ? null : entity.id);
+                      }}
+                    >
+                      {/* Micro Dot Pin */}
+                      <circle
+                        cx="0"
+                        cy="0"
+                        r={isSelected ? "14" : "10"}
+                        fill={factionColor}
+                        stroke="#0f172a"
+                        strokeWidth="2.5"
+                        className={isSelected ? "animate-pulse" : ""}
+                      />
+                      <circle cx="0" cy="0" r={isSelected ? "7" : "4.5"} fill="#ffffff" />
+
+                      {/* Compact Label */}
+                      <rect
+                        x={-Math.max(22, entity.name.length * 3.8)}
+                        y="14"
+                        width={Math.max(44, entity.name.length * 7.6)}
+                        height="18"
+                        rx="9"
+                        fill="#020617"
+                        stroke={factionColor}
+                        strokeWidth="1.2"
+                        strokeOpacity="0.8"
+                      />
+                      <text
+                        x="0"
+                        y="26"
+                        fill="#ffffff"
+                        fontSize="9.5"
+                        fontWeight="bold"
+                        textAnchor="middle"
+                        className="pointer-events-none select-none font-sans"
+                      >
+                        {entity.name}
+                      </text>
+                    </g>
+                  );
+                }
 
                 return (
                   <g
