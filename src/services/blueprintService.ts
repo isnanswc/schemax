@@ -75,12 +75,22 @@ KECERDASAN ANALISA KONTEKS:
      * Keragaman Kulit & Etnis Nusantara: Jangan stereotipikal hanya 'kulit sawo matang'! Masyarakat Indonesia dan dunia sangat beragam (ada kulit kuning langsat, putih gading, sawo matang bersih, cerah berseri, kecokelatan hangat). Tokoh bisa berlatar Sunda, Jawa, Melayu, Tionghoa/Chindo, Minang, Dayak, dsb.
      * Bentuk & Proporsi Tubuh Nyata: Gambarkan siluet dan proporsi tubuh dengan jelas dan hidup (misal: proporsi tubuh sintal / semok berlekuk jam pasir (hourglass) yang memikat dan proporsional, ramping semampai, atletis berotot, tegap berisi, atau mungil petite).
      * Rambut: tekstur (lurus lembut, bergelombang, ikal), panjang (tergerai sebahu, dicepol santai, dipotong rapi), dan warna rambut.
-   - PAKAIAN MODERN SEHARI-HARI (HINDARI STEREOTIP BATIK / KEBAYA):
+   - KONTEKSTUALISASI PROFESI, PERAN & KEADAAN (BUSANA, LATAR & POSE):
+     * Gaya pakaian, latar belakang (background/setting), dan pose WAJIB disesuaikan dengan profesi, peran, dan kondisi karakter:
+       - Pedagang: apron/baju kerja berlatar kios/pasar/toko ramai.
+       - Polisi: seragam dinas polisi atau taktis dengan lencana berlatar pos/kantor polisi atau jalan patroli perkotaan.
+       - Penyihir: jubah mistis bersulam rune dengan tongkat sihir berlatar perpustakaan sihir kuno atau laboratorium alkimia penuh buku mantera dan kristal berpendar.
+       - Ksatria: baju zirah pelindung (plate armor) gagah berlatar benteng batu kuno atau halaman istana.
+       - Ilmuwan: jas lab putih bersih dengan kacamata/instrumen sains berlatar laboratorium berteknologi tinggi.
+       - Ibu Rumah Tangga: daster katun santai polos bersih atau busana kasual rumah yang nyaman berlatar dapur atau ruang keluarga hangat.
+       - Anak Sekolah / Pelajar: seragam sekolah rapi dengan tas ransel berlatar lorong loker sekolah atau ruang kelas cerah.
+       - Karakter profesi lain (dokter, seniman, bangsawan, pemburu, petani, atlet, dsb): sesuaikan secara logis dan mendalam.
      * DILARANG KERAS selalu memaksakan pakaian tradisional seperti 'batik', 'kebaya', atau baju adat jika bukan adegan upacara adat/pernikahan resmi!
-     * Gunakan pakaian modern kontemporer yang realistis, kasual, dan pas dengan peran karakter di kehidupan sehari-hari:
-       Contoh: daster rumahan sederhana katun polos atau motif modern yang nyaman, kemeja polo bermotif kotak, kemeja kasual berkancing, kaos oblong katun santai dengan jeans, blouse kasual wanita, cardigan santai, jaket hoodie, celana kulot, atau busana modern lainnya.
-   - VISUAL PROMPT TEXT-TO-IMAGE (ENGLISH 9:16) WAJIB SANGAT DETAIL:
-     * Format prompt: 'Full body portrait standing upright, centered, [ethnicity/appearance], [age] years old, youthful radiant glowing skin, [detailed facial features and expression], [hair style and color], [body shape and silhouette: e.g. curvy voluptuous hourglass silhouette with attractive feminine curves / slender graceful build / athletic toned physique], wearing [detailed modern everyday clothing, e.g. a simple comfortable cotton homedress / casual plaid polo shirt and dark trousers / minimalist t-shirt], hyper realistic, 8k resolution, cinematic lighting, photorealistic textures, vertical mobile phone aspect ratio 9:16, --ar 9:16'.
+   - ATURAN MUTLAK VISUAL PROMPT (MENGHADAP KAMERA & WAJAH JELAS):
+     * Karakter WAJIB MENGHADAP LANGSUNG KE ARAH KAMERA (standing upright facing camera directly, looking straight into lens).
+     * Postur berdiri tegap dan fitur wajah wajib jelas, tajam, terang, dan tidak terhalang (clear sharp facial features, well-lit frontal lighting).
+     * Latar belakang profesi harus memiliki efek shallow depth of field / cinematic background blur agar karakter tetap menjadi subjek utama yang paling tajam.
+     * Format visualPrompt: 'Full body portrait standing upright facing camera directly, centered composition, looking straight into lens, [ethnicity/appearance], [age] years old, youthful radiant glowing skin, [detailed facial features and sharp expression], [hair style and color], [body shape and silhouette: e.g. curvy voluptuous hourglass silhouette with attractive feminine curves / slender graceful build / athletic toned physique], wearing [role-contextual attire: e.g. police tactical uniform / merchant apron / ornate mage robe / knight plate armor / scientist lab coat / cozy simple homedress for housewife / neat student uniform], in a contextual [role-matched atmospheric setting: e.g. bustling shop / modern police station / mystic library / stone fortress / high-tech laboratory / cozy sunlit kitchen / school hallway] with shallow depth of field background blur, sharp well-lit facial features, cinematic lighting, 8k resolution, photorealistic masterpiece, vertical 9:16 aspect ratio, --ar 9:16'.
      * JANGAN gunakan kata 'mature', 'aged', 'wrinkled' untuk tokoh muda agar generator AI tidak membuat wajahnya tampak tua!
 2. PILIHAN JUDUL:
    - Berikan 3 pilihan judul buku yang puitis, memikat, dan memiliki nilai jual ("titleOptions"). Pilih satu sebagai "title" utama.
@@ -133,7 +143,7 @@ WAJIB MERESPON HANYA DENGAN FORMAT JSON VALID:
       "age": "27 Tahun",
       "physicalTraits": "Pria berwajah ramah dengan rahang tegas, tinggi 174 cm, kulit kuning langsat bersih, rambut hitam lurus bertekstur rapi, mata sayu menahan beban emosional, postur tegap berisi sehat. Mengenakan kemeja polo bermotif kotak kasual warna navy-putih dan celana panjang chino gelap.",
       "traits": "Penyayang, pekerja keras, gigih melindungi orang tersayang, mudah cemas saat keluarga dalam bahaya.",
-      "visualPrompt": "Full body portrait standing upright, centered, attractive youthful Southeast Asian Indonesian man in his late 20s, 27 years old, clear glowing youthful skin, neat straight black hair, anxious yet resolute warm brown eyes, fit healthy posture, wearing a modern casual plaid polo shirt in navy and white patterns with clean tailored dark trousers, soft cinematic rim lighting, 8k resolution, photorealistic masterpiece, vertical 9:16 aspect ratio, --ar 9:16",
+      "visualPrompt": "Full body portrait standing upright facing camera directly, centered, looking straight into lens, attractive youthful Southeast Asian Indonesian man, 27 years old, clear glowing youthful skin, neat straight black hair, anxious yet resolute warm brown eyes, fit healthy posture, wearing a modern casual plaid polo shirt in navy and white patterns with clean tailored dark trousers, standing inside a warm home living room with soft natural window rim lighting, shallow depth of field background blur, clear sharp facial features, 8k resolution, photorealistic masterpiece, vertical 9:16 aspect ratio, --ar 9:16",
       "shortDescription": "Pemuda yang menemukan benda misterius dan menjadi orang asing di rumahnya sendiri.",
       "want": "Mengembalikan ingatan keluarganya agar mengenalinya kembali.",
       "need": "Menerima bahwa kebahagiaan keluarga tidak bisa dibangun di atas kebohongan atau jalan pintas.",
@@ -150,7 +160,7 @@ WAJIB MERESPON HANYA DENGAN FORMAT JSON VALID:
       "age": "24 Tahun",
       "physicalTraits": "Wanita muda berwajah manis dengan dagu lancip, tinggi 160 cm, kulit cerah gading halus, rambut hitam bergelombang lembut sebahu yang diikat longgar, tatapan mata waspada dan defensif. Memiliki proporsi tubuh sintal dengan lekuk jam pasir (hourglass) yang feminin dan terawat. Mengenakan daster santai rumahan sederhana berwarna pastel polos yang nyaman dan bersahaja.",
       "traits": "Tegas, protektif terhadap rumah, curigaan terhadap orang asing, sebenarnya rapuh di dalam batin.",
-      "visualPrompt": "Full body portrait standing upright, centered, gorgeous youthful Indonesian woman, 24 years old, radiant youthful glowing skin, smooth beautiful face with sharp guarded eyes, wavy black hair loosely tied, stunning curvy hourglass body silhouette with attractive feminine proportions, wearing a simple modern comfortable pastel cotton house dress (simple homedress), cinematic soft ambient lighting, photorealistic skin textures, 8k resolution, vertical 9:16 aspect ratio, --ar 9:16",
+      "visualPrompt": "Full body portrait standing upright facing camera directly, centered, looking straight into lens, gorgeous youthful Indonesian woman, 24 years old, radiant youthful glowing skin, smooth beautiful face with sharp guarded eyes, wavy black hair loosely tied, stunning curvy hourglass body silhouette with attractive feminine proportions, wearing a simple modern comfortable pastel cotton house dress (simple homedress), standing in a cozy sunlit home kitchen with soft ambient cinematic lighting, shallow depth of field background blur, sharp visible facial details, photorealistic skin textures, 8k resolution, vertical 9:16 aspect ratio, --ar 9:16",
       "shortDescription": "Istri yang kehilangan ingatan tentang suaminya dan mengiranya sebagai penyusup.",
       "want": "Melindungi rumah dan ketenangannya dari pria asing yang mengaku suaminya.",
       "need": "Mengingat kembali ikatan cinta tulus yang pernah ada.",
@@ -209,8 +219,8 @@ WAJIB MERESPON HANYA DENGAN FORMAT JSON VALID:
 Instruksi Analisa Cerdas:
 - Pahami relasi karakter dalam ide tersebut secara mendalam (misal keluarga, pasangan, sahabat, dsb.).
 - CIRI FISIK SANGAT DETAIL: Setiap karakter WAJIB memiliki detail ciri fisik lengkap (bentuk wajah, mata, rambut, warna kulit beragam tanpa stereotip sawo matang saja, serta proporsi tubuh nyata seperti sintal/semok berlekuk hourglass atau ramping).
-- BUSANA MODERN SEHARI-HARI: Gunakan pakaian modern kontemporer yang realistis (misal daster sederhana rumahan, polo bermotif kotak, kemeja kasual, kaos santai). DILARANG memaksakan batik atau kebaya jika bukan acara adat!
-- VISUAL PROMPT: Sertakan text-to-image prompt English 9:16 yang detail, fotorealistik, dan mempertahankan kemudaan wajah (youthful radiant skin).
+- LATAR, BUSANA & POSE SESUAI PROFESI/KEADAAN: Sesuaikan gaya pakaian, latar belakang (background), dan pose dengan peran/profesi karakter (misal: pedagang di toko/pasar, polisi berseragam di kantor/jalan kota, penyihir berjubah di menara perpustakaan sihir, ksatria berzirah di benteng, ilmuwan berjas lab di laboratorium, ibu rumah tangga berdaster santai di dapur/ruang keluarga hangat, anak sekolah berseragam di lorong sekolah, dsb).
+- ATURAN MUTLAK KAMERA & POSE: Di visual prompt, karakter WAJIB MENGHADAP LANGSUNG KE KAMERA (facing camera directly, looking straight into lens) dengan wajah dan postur tubuh yang jelas dan terang, dengan latar bersiluet cinematic bokeh/shallow depth of field agar fokus utama tetap pada karakter. Pertahankan kemudaan wajah (youthful radiant skin). DILARANG memaksakan batik atau kebaya jika bukan acara adat!
 - Buat 3 opsi kelanjutan alur yang memikat.
 - Rancang alur bab pembuka (Bab 1) secara mendalam dan siap dipakai sebagai Story Plot.
 - Tentukan gaya penulisan (writingStyle) yang paling cocok: bisa sastra puitis, emosional realistis, modern kasual santai (slang lu-gua / diksi kekinian), atau nuansa kultural dialek daerah jika ide mengarah ke sana.

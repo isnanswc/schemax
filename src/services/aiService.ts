@@ -1240,8 +1240,10 @@ Tugas Analisis Mendalam:
       * initialTraits: Sifat & watak kepribadian dasar/awalnya (misal: "Penyayang, baik hati, santun, penurut").
       * currentDescription: Gambaran kondisi fisik/sosial/situasi saat ini di bab ini.
       * currentTraits: Sifat & watak kepribadian saat ini di bab ini (misal: "Kasar, manipulatif, penuh dendam").
-      * physicalTraits: CIRI-CIRI FISIK LENGKAP & SPESIFIK: bentuk wajah, mata, rambut, warna kulit beragam (kuning langsat, putih gading, sawo matang, cerah), serta bentuk/proporsi tubuh yang jelas (sintal/semok berlekuk hourglass, ramping, atletis, dsb). Pakaian harus modern sehari-hari yang realistis (hindari memaksakan batik/kebaya jika bukan acara adat, gunakan pakaian modern seperti daster sederhana, kemeja polo bermotif kotak, kaos santai, atau pakaian modern lainnya).
-      * visualPrompt: Text-to-Image prompt Bahasa Inggris detail: "Full body portrait standing upright, centered, youthful Indonesian [man/woman], [age] years old, fresh youthful glowing skin, [detailed facial features, hair, and exact body silhouette/curves], wearing [modern everyday clothing, e.g. simple homedress, casual polo shirt, casual wear], hyper realistic, 8k resolution, cinematic lighting, photorealistic textures, vertical 9:16 aspect ratio, --ar 9:16". Dilarang menggunakan kata 'mature/aged' untuk tokoh muda.
+      * physicalTraits: CIRI-CIRI FISIK LENGKAP & SPESIFIK: bentuk wajah, mata, rambut, warna kulit beragam (kuning langsat, putih gading, sawo matang, cerah), serta bentuk/proporsi tubuh yang jelas (sintal/semok berlekuk hourglass, ramping, atletis, tegap, dsb). Pakaian dan aksesoris wajib disesuaikan dengan profesi/peran/keadaan karakter (misal: pedagang, polisi, penyihir, ksatria, ilmuwan, ibu rumah tangga, anak sekolah, dsb. Hindari memaksakan batik/kebaya jika bukan acara adat).
+      * visualPrompt: Text-to-Image prompt Bahasa Inggris detail 9:16:
+        Format wajib: "Full body portrait standing upright facing camera directly, centered composition, looking straight into lens, [youthful Indonesian/appearance], [age] years old, fresh youthful glowing skin, [detailed facial features, hair, and exact body silhouette/curves], wearing [profession-appropriate attire: e.g. police tactical uniform / merchant apron and attire / ornate mage robe / knight plate armor / scientist white lab coat / cozy simple homedress for housewife / neat school uniform with backpack for student], in a contextual [role-matched atmospheric setting: e.g. bustling shop stall / modern police station / arcana magic library / medieval stone castle / high-tech laboratory / cozy sunlit kitchen / school hallway] with shallow depth of field background blur, sharp well-lit facial features, confident or natural posture, cinematic lighting, 8k resolution, photorealistic, vertical 9:16 aspect ratio, --ar 9:16".
+        ATURAN MUTLAK: Karakter WAJIB menghadap langsung ke arah kamera dengan wajah dan postur yang jelas dan terang. Latar belakang harus memiliki efek cinematic blur halus agar karakter tetap menjadi subjek utama yang tajam. Dilarang menggunakan kata 'mature/aged' untuk tokoh muda.
       * evolutionSummary: Ringkasan titik balik atau penyebab perubahannya jika ada.
       * condition: Status kondisi saat ini ("aktif", "luka", "gugur", "hilang", "berkhianat", "terkutuk", "ditawan", "pelarian", "koma", atau "spesial").
       * conditionDetails: Detail singkat kondisi.
@@ -1772,8 +1774,9 @@ ATURAN KRUSIAL DARI PENULIS:
    - Ekspresi wajah: senyuman, tatapan, atau ekspresi khas tokoh.
 
 4. "clothingAttire": Jabarkan secara detail busana dan pakaian yang tampak di foto:
-   - Jenis pakaian (atasan, bawahan, gaun, celana, jaket, kebaya, seragam, dll).
+   - Jenis pakaian (atasan, bawahan, gaun, celana, jaket, kebaya, seragam dinas, jubah, baju pelindung zirah, jas lab, seragam sekolah, daster santai, dll).
    - Warna kain, corak/motif, potongan/kerah pakaian yang pas badan, serta aksesoris/perhiasan yang dikenakan.
+   - Analisis peran/profesi/keadaan karakter berdasarkan pakaian dan penampilannya (misal: pedagang, polisi, penyihir, ksatria, ilmuwan, ibu rumah tangga, anak sekolah, pekerja kantoran, petualang, dll).
 
 5. "shortSummary": Rangkuman 1-2 kalimat deskripsi ringkas tokoh yang memikat untuk profil ensiklopedia.
 
@@ -1785,9 +1788,11 @@ ATURAN KRUSIAL DARI PENULIS:
       - Jika ramping: "slender graceful petite silhouette, elegant slender build".
       - Jika atletis: "toned athletic feminine build".
    c) DETAIL WAJAH & RAMBUT: detail mata, bibir, gaya rambut, dan warna kulit.
-   d) BUSANA & GAYA: potongan busana dan warna persis foto.
-   e) RENDER QUALITY: "full body portrait, centered, hyper realistic, photorealistic masterpiece, 8k resolution, cinematic lighting, shallow depth of field, authentic photography, vertical 9:16 aspect ratio, --ar 9:16".
-   f) DILARANG KERAS menggunakan kata-kata yang memicu render usia tua seperti "mature", "aged", "weathered", "wrinkled", "elderly".
+   d) BUSANA & ATRIBUT PROFESI: potongan busana, warna, dan atribut sesuai foto dan peran/keadaannya (misal: tactical officer uniform, shopkeeper attire with apron, wizard robes, knight armor, white lab coat, cozy homedress, neat student uniform).
+   e) LATAR BELAKANG KONTEKSTUAL (ENVIRONMENT): Sertakan latar belakang atmosferik yang sesuai dengan profesi/keadaan karakter (misal: modern police office, lively merchant shop, arcane library, stone fortress, high-tech lab, warm sunlit kitchen/living room, school corridor) dengan subtle bokeh / shallow depth of field halus agar karakter tetap menjadi subjek utama yang tajam di depan.
+   f) POSE MENGHADAP KAMERA & WAJAH JELAS (MUTLAK): Karakter WAJIB menghadap langsung ke arah kamera ("standing upright facing camera directly, looking straight into lens"), dengan postur tegap/natural yang jelas serta fitur wajah yang tajam, terang, dan tidak tertutupi ("clear sharp well-lit facial features, expressive eyes").
+   g) RENDER QUALITY: "full body portrait, centered, hyper realistic, photorealistic masterpiece, 8k resolution, cinematic lighting, shallow depth of field, authentic photography, vertical 9:16 aspect ratio, --ar 9:16".
+   h) DILARANG KERAS menggunakan kata-kata yang memicu render usia tua seperti "mature", "aged", "weathered", "wrinkled", "elderly".
 
 Format output HANYA JSON valid:
 {
@@ -2031,9 +2036,22 @@ STRICT OBJECTIVE PROMPT REQUIREMENTS:
 2. Subject & Youthfulness: Depict young characters with radiant, youthful, smooth glowing skin and fresh young facial features. Never make young characters look mature, aged, weathered, or wrinkled unless specifically instructed.
 3. Accurate Body Silhouette & Proportions: Faithfully reflect the character's exact body build and curves as described in Physical Traits (e.g. if curvy, voluptuous, semok, or hourglass, describe 'gorgeous voluptuous hourglass figure, full feminine hips, defined waistline, shapely feminine curves'; if slender, describe 'slender graceful silhouette'; if athletic, describe 'toned athletic physique').
 4. Ethnicity & Details: State exact ethnicity (default to Indonesian / Southeast Asian unless story states otherwise), age, skin tone (smooth tan, golden, or olive), facial features, and hairstyle.
-5. Authentic Clothing & Attire: Describe the specific everyday or cultural clothing faithfully according to the character's role and story setting.
-6. Photography & Quality keywords: 8k resolution, photorealistic skin textures, neutral cinematic lighting, shallow depth of field, hyper realistic, vertical mobile phone aspect ratio 9:16, --ar 9:16.
-7. OUTPUT RULE: Output ONLY the English prompt string. Do NOT add preamble, quotes, or markdown codeblocks.`;
+5. Role-Contextual Attire, Pose, and Setting:
+   - Match the attire, equipment, and background environment to the character's specific role, occupation, or condition:
+     * Merchant / Pedagang: shopkeeper attire / apron, in front of a lively market stall or shop.
+     * Police / Polisi: crisp police / tactical officer uniform with badge, modern police precinct or urban patrol street.
+     * Mage / Wizard / Penyihir: ornate mystic robes with arcane symbols and magic staff/focus, in an ancient arcane library or potion laboratory with glowing runes.
+     * Knight / Ksatria: polished medieval plate armor with sheathed sword, in a stone fortress courtyard or grand castle hall.
+     * Scientist / Ilmuwan: crisp white laboratory coat with lab tools/glasses, inside a high-tech science laboratory with futuristic instruments.
+     * Housewife / Ibu Rumah Tangga: simple comfortable pastel loungewear or clean cotton homedress, inside a warm cozy sunlit home kitchen or living room.
+     * School Student / Anak Sekolah: neat modern school uniform with a backpack, in a bright school corridor or classroom.
+     * Or adapt faithfully to any other specific role / occupation mentioned.
+6. STRICT FRONTAL CAMERA POSE & CLEAR VISIBLE FACE (MANDATORY):
+   - Regardless of the occupation or equipment, the character MUST BE FACING THE CAMERA DIRECTLY ('standing upright facing camera directly, looking straight into the camera lens').
+   - Facial features must be razor-sharp, well-lit, unobstructed, and clearly visible with natural expressive eyes.
+   - The contextual background must have a shallow depth of field (subtle bokeh / cinematic background blur) so the character remains the sharp, striking main focal point.
+7. Photography & Quality keywords: 8k resolution, photorealistic skin textures, neutral cinematic lighting, shallow depth of field, hyper realistic, vertical mobile phone aspect ratio 9:16, --ar 9:16.
+8. OUTPUT RULE: Output ONLY the English prompt string. Do NOT add preamble, quotes, or markdown codeblocks.`;
 
   const systemPrompt =
     'You are an expert AI prompt engineer. Output strictly the single final English text-to-image prompt without markdown or quotes.';

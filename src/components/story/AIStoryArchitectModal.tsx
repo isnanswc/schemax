@@ -160,7 +160,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
       physicalTraits: 'Wajah ramah segar, kulit cerah alami, proporsi tubuh seimbang, mengenakan busana kasual modern (kemeja polo atau daster katun santai polos).',
       traits: 'Setia kawan, jujur, protektif terhadap orang tersayang.',
       shortDescription: 'Anggota keluarga atau kerabat dekat yang terlibat dalam insiden.',
-      visualPrompt: 'Full length portrait standing upright, centered, 25-year-old Indonesian person, youthful radiant face, natural realistic body proportions, wearing neat everyday casual modern clothing, soft cinematic lighting, ultra-realistic 8k, vertical 9:16 portrait.',
+      visualPrompt: 'Full length portrait standing upright facing camera directly, centered, looking straight into lens, 25-year-old Indonesian person, youthful radiant face, natural realistic body proportions, wearing neat everyday casual modern clothing, standing in a cozy contextual room with shallow depth of field background blur, clear sharp facial features, soft cinematic lighting, ultra-realistic 8k, vertical 9:16 portrait.',
       attributes: [{ label: 'Peran', value: 'Pendukung' }],
       tags: ['Karakter'],
     };
@@ -904,7 +904,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                         rows={3}
                         value={char.visualPrompt || ''}
                         onChange={(e) => handleUpdateCharacter(i, 'visualPrompt', e.target.value)}
-                        placeholder="Full length portrait standing upright, centered, realistic 26-year-old Indonesian woman, smooth fair warm skin, natural feminine hourglass curves, wearing casual plaid polo shirt and denim jeans, soft indoor lighting, photorealistic 8k, aspect ratio 9:16..."
+                        placeholder="Full length portrait standing upright facing camera directly, centered, looking straight into lens, realistic 26-year-old Indonesian woman, smooth fair warm skin, natural feminine hourglass curves, wearing casual plaid polo shirt and denim jeans, standing inside a warm sunlit room with shallow depth of field background blur, clear sharp facial features, cinematic lighting, photorealistic 8k, aspect ratio 9:16..."
                         className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-400 resize-y leading-relaxed min-h-[68px]"
                       />
                     </div>
