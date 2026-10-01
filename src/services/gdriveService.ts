@@ -56,6 +56,28 @@ export function getGDriveDirectImageUrl(fileId: string): string {
   return `https://lh3.googleusercontent.com/d/${fileId}`;
 }
 
+// URL Thumbnail ringan (lebar ~320px) untuk pemuatan super cepat di grid picker
+export function getGDriveThumbnailUrl(fileId: string, size: number = 320): string {
+  if (!fileId) return '';
+  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w${size}`;
+}
+
+// In-Memory Folder Cache untuk navigasi instan (0ms) antar folder & subfolder
+interface FolderCacheEntry {
+  timestamp: number;
+  items: GDriveItem[];
+}
+const gdriveFolderCache = new Map<string, FolderCacheEntry>();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 menit
+
+export function clearGDriveFolderCache(folderId?: string): void {
+  if (folderId) {
+    gdriveFolderCache.delete(folderId);
+  } else {
+    gdriveFolderCache.clear();
+  }
+}
+
 // Muat konfigurasi Google Drive dari localStorage
 export function loadGDriveConfig(): GDriveConfig {
   try {
@@ -165,14 +187,26 @@ export async function testAndFetchGDriveFolder(
   };
 }
 
-// Ambil isi subfolder & file gambar dari folder tertentu
+// Ambil isi subfolder & file gambar dari folder tertentu (dengan cache & thumbnail ringan)
 export async function listGDriveFolderContents(
   folderId: string,
-  apiKeyOrScriptUrl: string
+  apiKeyOrScriptUrl: string,
+  forceRefresh: boolean = false
 ): Promise<GDriveItem[]> {
   if (!folderId || !apiKeyOrScriptUrl) return [];
 
   const trimmed = apiKeyOrScriptUrl.trim();
+  const cacheKey = `${folderId}_${trimmed.slice(-8)}`;
+
+  // Periksa cache in-memory jika bukan force refresh
+  if (!forceRefresh) {
+    const cached = gdriveFolderCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+      return cached.items;
+    }
+  }
+
+  let resultItems: GDriveItem[] = [];
 
   // Mode 1: Google Apps Script Web App URL
   if (trimmed.includes('script.google.com')) {
@@ -186,51 +220,64 @@ export async function listGDriveFolderContents(
       throw new Error(data.error);
     }
     const rawFiles: any[] = data.files || [];
-    return rawFiles.map((f: any) => ({
+    resultItems = rawFiles.map((f: any) => ({
       id: f.id,
       name: f.name,
       mimeType: f.mimeType,
       isFolder: Boolean(f.isFolder),
       size: f.size,
       directUrl: f.isFolder ? undefined : getGDriveDirectImageUrl(f.id),
-      thumbnailUrl: f.isFolder ? undefined : getGDriveDirectImageUrl(f.id),
+      thumbnailUrl: f.isFolder ? undefined : (f.thumbnailUrl || getGDriveThumbnailUrl(f.id, 320)),
     }));
+  } else {
+    // Mode 2: Google Cloud API Key
+    const query = `'${folderId}' in parents and trashed = false`;
+    const fields = 'files(id, name, mimeType, size, thumbnailLink, webContentLink)';
+    const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=${encodeURIComponent(fields)}&pageSize=100&orderBy=folder,name&key=${trimmed}`;
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Gagal memuat isi folder (${response.status})`);
+    }
+
+    const data = await response.json();
+    const rawFiles: any[] = data.files || [];
+
+    resultItems = rawFiles
+      .map((f: any) => {
+        const isFolder = f.mimeType === 'application/vnd.google-apps.folder';
+        const isImage = f.mimeType?.startsWith('image/');
+
+        if (!isFolder && !isImage) return null; // Hanya tampilkan folder atau gambar
+
+        const directUrl = isFolder ? undefined : getGDriveDirectImageUrl(f.id);
+        const thumbUrl = isFolder
+          ? undefined
+          : f.thumbnailLink
+          ? f.thumbnailLink.replace(/=s\d+/, '=s320')
+          : getGDriveThumbnailUrl(f.id, 320);
+
+        return {
+          id: f.id,
+          name: f.name,
+          mimeType: f.mimeType,
+          isFolder,
+          size: f.size ? parseInt(f.size, 10) : undefined,
+          thumbnailUrl: thumbUrl,
+          directUrl,
+        } as GDriveItem;
+      })
+      .filter((item): item is GDriveItem => item !== null);
   }
 
-  // Mode 2: Google Cloud API Key
-  const query = `'${folderId}' in parents and trashed = false`;
-  const fields = 'files(id, name, mimeType, size, thumbnailLink, webContentLink)';
-  const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=${encodeURIComponent(fields)}&pageSize=100&orderBy=folder,name&key=${trimmed}`;
+  // Simpan ke cache
+  gdriveFolderCache.set(cacheKey, {
+    timestamp: Date.now(),
+    items: resultItems,
+  });
 
-  const response = await fetch(url);
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.error?.message || `Gagal memuat isi folder (${response.status})`);
-  }
-
-  const data = await response.json();
-  const rawFiles: any[] = data.files || [];
-
-  return rawFiles
-    .map((f: any) => {
-      const isFolder = f.mimeType === 'application/vnd.google-apps.folder';
-      const isImage = f.mimeType?.startsWith('image/');
-
-      if (!isFolder && !isImage) return null; // Hanya tampilkan folder atau gambar
-
-      const directUrl = isFolder ? undefined : getGDriveDirectImageUrl(f.id);
-
-      return {
-        id: f.id,
-        name: f.name,
-        mimeType: f.mimeType,
-        isFolder,
-        size: f.size ? parseInt(f.size, 10) : undefined,
-        thumbnailUrl: f.thumbnailLink || directUrl,
-        directUrl,
-      } as GDriveItem;
-    })
-    .filter((item): item is GDriveItem => item !== null);
+  return resultItems;
 }
 
 // Unduh file gambar dari Google Drive dan jadikan Blob lokal untuk disimpan ke IndexedDB

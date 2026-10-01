@@ -15,13 +15,15 @@ import {
   Check,
   Trash2,
   X,
-  Maximize2
+  Maximize2,
+  HardDrive
 } from 'lucide-react';
 import { StoryChapter, ChapterStatus, MediaItem } from '../../../types';
 import { db, saveMediaItem } from '../../../db';
 import { generateRefinedPremise } from '../../../services/aiService';
 import { usePrivacy } from '../../../contexts/PrivacyContext';
 import { ImageViewerModal } from '../../common/ImageViewerModal';
+import { GDriveMediaPickerModal } from '../../media/GDriveMediaPickerModal';
 
 interface ChapterInfoTabProps {
   chapter: StoryChapter;
@@ -69,6 +71,7 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
   // Chapter Cover States
   const [coverUrl, setCoverUrl] = useState<string | null>(chapter.coverImageUrl || null);
   const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
+  const [isGDrivePickerOpen, setIsGDrivePickerOpen] = useState(false);
   const [bookMediaItems, setBookMediaItems] = useState<Array<MediaItem & { url: string }>>([]);
 
   const words = chapter.wordCount || 0;
@@ -217,6 +220,28 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
     }
   };
 
+  const handleSelectCoverFromGDrive = async (mediaId: string, directUrl?: string) => {
+    let url = directUrl;
+    if (mediaId) {
+      const m = await db.media.get(mediaId);
+      if (m) {
+        url = URL.createObjectURL(m.blob);
+      }
+    }
+    if (url) {
+      setCoverUrl(url);
+      await db.chapters.update(chapter.id, {
+        coverMediaId: mediaId,
+        coverImageUrl: url,
+        updatedAt: Date.now(),
+      });
+      onUpdateChapter({ coverMediaId: mediaId, coverImageUrl: url });
+      showSavedIndicator();
+    }
+    setIsGDrivePickerOpen(false);
+    setIsMediaPickerOpen(false);
+  };
+
   const handleRemoveCover = async () => {
     setCoverUrl(null);
     await db.chapters.update(chapter.id, {
@@ -230,75 +255,87 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
 
   return (
     <div className="space-y-4 pb-28 max-w-3xl mx-auto animate-fade-in-up px-1 sm:px-2">
-      {/* 1. Header Card with Status, Meta & Cover Preview */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
-        {/* Cover Banner if set - Aesthetic & Panoramic with Blur Blend */}
-        {coverUrl && (
+      {/* 🌟 Aesthetic Panoramic Ambient Cover Banner (Blends seamlessly into canvas background) */}
+      {coverUrl && (
+        <div
+          onClick={() => setIsImageViewerOpen(true)}
+          className="relative h-56 sm:h-72 -mx-2 sm:-mx-4 -mt-3 sm:-mt-4 overflow-hidden select-none cursor-zoom-in group/banner transition-all duration-300 mb-2 shadow-xs"
+        >
+          {/* 1. Ambient Color Glow Background */}
           <div
-            onClick={() => setIsImageViewerOpen(true)}
-            className="relative h-48 sm:h-56 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 group/banner cursor-zoom-in shadow-md select-none transition-all duration-300"
-          >
-            {/* Background Ambient Glow */}
-            <div
-              className="absolute inset-0 bg-cover bg-center scale-110 filter blur-xl opacity-40 dark:opacity-30 pointer-events-none"
-              style={{ backgroundImage: `url(${coverUrl})` }}
-            />
+            className="absolute inset-0 bg-cover bg-center scale-110 filter blur-3xl opacity-45 dark:opacity-35 pointer-events-none"
+            style={{ backgroundImage: `url(${coverUrl})` }}
+          />
 
-            {/* Crisp Cover Image */}
-            <img
-              src={coverUrl}
-              alt="Sampul Bab"
-              className={`w-full h-full object-cover group-hover/banner:scale-105 transition-transform duration-500 ease-out ${getBlurImageClass()}`}
-            />
+          {/* 2. Panoramic Crisp Main Image */}
+          <img
+            src={coverUrl}
+            alt={chapter.title || `Bab ${chapter.order}`}
+            className={`w-full h-full object-cover object-center group-hover/banner:scale-105 transition-transform duration-700 ease-out ${getBlurImageClass()}`}
+          />
 
-            {/* Aesthetic Gradient & Blur Blend towards bottom */}
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/40 to-transparent pointer-events-none backdrop-blur-[1px]" />
-            <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-slate-950/90 to-transparent pointer-events-none" />
+          {/* 3. Multi-Layer Seamless Gradient & Blur fading into background color */}
+          {/* Top subtle vignette */}
+          <div className="absolute top-0 inset-x-0 h-16 bg-gradient-to-b from-black/30 dark:from-black/50 to-transparent pointer-events-none" />
 
-            <div className="absolute bottom-3 left-3 right-3 sm:bottom-4 sm:left-4 sm:right-4 flex items-end justify-between text-white">
-              <div className="min-w-0 pr-2">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-black/50 backdrop-blur-md border border-white/20 text-amber-300">
-                  Sampul Bab {chapter.order}
-                </span>
-                <h3 className={`text-sm sm:text-base font-black drop-shadow mt-1 truncate ${getBlurTitleClass()}`}>
-                  {chapter.title || `Bab ${chapter.order}`}
-                </h3>
-              </div>
+          {/* Bottom Primary Gradient: Fades to #f8fafc (light mode) or #030712 (dark mode) */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#f8fafc] dark:from-[#030712] via-[#f8fafc]/70 dark:via-[#030712]/75 via-40% to-transparent pointer-events-none" />
 
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    loadMediaItems();
-                    setIsMediaPickerOpen(true);
-                  }}
-                  className="py-1.5 px-3 rounded-xl bg-black/60 hover:bg-black/90 text-white text-[11px] font-bold backdrop-blur-md border border-white/20 transition active:scale-95 shadow-sm"
-                >
-                  Ganti
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRemoveCover();
-                  }}
-                  className="p-1.5 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white text-[11px] transition active:scale-95 shadow-sm"
-                  title="Hapus Sampul"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-                <div
-                  className="p-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/20 text-white hover:bg-black/90 transition shadow-sm"
-                  title="Perbesar Layar Penuh"
-                >
-                  <Maximize2 className="w-3.5 h-3.5" />
-                </div>
+          {/* Bottom Soft Backdrop Blur Layer: Melts image pixels smoothly */}
+          <div className="absolute bottom-0 inset-x-0 h-28 bg-gradient-to-t from-[#f8fafc] dark:from-[#030712] via-[#f8fafc]/90 dark:via-[#030712]/90 to-transparent pointer-events-none backdrop-blur-[3px]" />
+
+          {/* Bottom Solid Feathering: Guarantees 100% seamless transition with no harsh line */}
+          <div className="absolute bottom-0 inset-x-0 h-8 bg-[#f8fafc] dark:bg-[#030712] pointer-events-none" />
+
+          {/* 4. Elegant Hero Content overlayed at bottom */}
+          <div className="absolute bottom-3 left-4 right-4 sm:bottom-4 sm:left-6 sm:right-6 flex items-end justify-between gap-4 pointer-events-none z-10">
+            <div className="min-w-0 pr-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider bg-amber-500/15 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 backdrop-blur-md shadow-xs mb-1.5">
+                <Sparkles className="w-3 h-3 text-amber-500" />
+                <span>Sampul Bab {chapter.order}</span>
+              </span>
+              <h2 className={`text-xl sm:text-2xl font-black text-slate-900 dark:text-white drop-shadow-md truncate ${getBlurTitleClass()}`}>
+                {chapter.title || `Bab ${chapter.order}`}
+              </h2>
+            </div>
+
+            {/* Quick Action buttons */}
+            <div className="flex items-center gap-1.5 flex-shrink-0 pointer-events-auto">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  loadMediaItems();
+                  setIsMediaPickerOpen(true);
+                }}
+                className="py-1.5 px-3 rounded-xl bg-white/80 dark:bg-slate-900/80 hover:bg-white dark:hover:bg-slate-900 text-slate-900 dark:text-white text-xs font-bold backdrop-blur-md border border-slate-200 dark:border-slate-700 transition shadow-sm active:scale-95"
+              >
+                Ganti
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemoveCover();
+                }}
+                className="p-1.5 rounded-xl bg-rose-500/80 hover:bg-rose-600 text-white text-xs transition active:scale-95 shadow-sm"
+                title="Hapus Sampul"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+              <div
+                className="p-1.5 rounded-xl bg-black/40 hover:bg-black/60 backdrop-blur-md text-white/90 transition shadow-sm"
+                title="Lihat Gambar Penuh"
+              >
+                <Maximize2 className="w-4 h-4" />
               </div>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
+      {/* 1. Header Card with Status & Meta */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <span className="p-1.5 rounded-xl bg-amber-500/15 text-amber-500 font-bold">
@@ -311,17 +348,27 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
 
           <div className="flex items-center gap-2">
             {!coverUrl && (
-              <button
-                type="button"
-                onClick={() => {
-                  loadMediaItems();
-                  setIsMediaPickerOpen(true);
-                }}
-                className="py-1 px-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-slate-700 dark:text-slate-300 text-xs font-bold transition flex items-center gap-1"
-              >
-                <ImageIcon className="w-3.5 h-3.5 text-amber-500" />
-                <span>+ Sampul Bab</span>
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    loadMediaItems();
+                    setIsMediaPickerOpen(true);
+                  }}
+                  className="py-1 px-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-slate-700 dark:text-slate-300 text-xs font-bold transition flex items-center gap-1"
+                >
+                  <ImageIcon className="w-3.5 h-3.5 text-amber-500" />
+                  <span>+ Sampul Bab</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsGDrivePickerOpen(true)}
+                  className="py-1 px-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500 hover:text-slate-950 text-amber-700 dark:text-amber-400 text-xs font-bold transition flex items-center gap-1 border border-amber-500/20"
+                >
+                  <HardDrive className="w-3.5 h-3.5 text-amber-500" />
+                  <span>+ Google Drive</span>
+                </button>
+              </div>
             )}
 
             {saveStatus && (
@@ -534,17 +581,36 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
               </button>
             </div>
 
-            {/* Upload New Button */}
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-500/20">
-              <div className="text-xs">
-                <p className="font-bold text-amber-900 dark:text-amber-200">Upload Sampul Baru dari Perangkat</p>
-                <p className="text-[10px] text-amber-700 dark:text-amber-300">File PNG, JPG, WebP</p>
+            {/* Options: Upload File & Google Drive */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {/* Upload New Button */}
+              <div className="flex items-center justify-between p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-500/20">
+                <div className="text-xs">
+                  <p className="font-bold text-amber-900 dark:text-amber-200">Upload dari Perangkat</p>
+                  <p className="text-[10px] text-amber-700 dark:text-amber-300">File PNG, JPG, WebP</p>
+                </div>
+                <label className="py-1.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs cursor-pointer flex items-center gap-1 shadow-sm active:scale-95 transition">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Upload</span>
+                  <input type="file" accept="image/*" onChange={handleUploadCoverFile} className="hidden" />
+                </label>
               </div>
-              <label className="py-1.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs cursor-pointer flex items-center gap-1 shadow-sm active:scale-95 transition">
-                <Upload className="w-3.5 h-3.5" />
-                <span>Upload</span>
-                <input type="file" accept="image/*" onChange={handleUploadCoverFile} className="hidden" />
-              </label>
+
+              {/* Google Drive Option */}
+              <div className="flex items-center justify-between p-3 rounded-2xl bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-500/20">
+                <div className="text-xs">
+                  <p className="font-bold text-indigo-900 dark:text-indigo-200">Dari Google Drive</p>
+                  <p className="text-[10px] text-indigo-700 dark:text-indigo-300">Folder sinkronisasi</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsGDrivePickerOpen(true)}
+                  className="py-1.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95 transition"
+                >
+                  <HardDrive className="w-3.5 h-3.5" />
+                  <span>Buka Drive</span>
+                </button>
+              </div>
             </div>
 
             {/* Existing Media Grid */}
@@ -601,6 +667,17 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
           onClose={() => setIsImageViewerOpen(false)}
         />
       )}
+
+      {/* Google Drive Media Picker Modal for Chapter Cover */}
+      <GDriveMediaPickerModal
+        isOpen={isGDrivePickerOpen}
+        onClose={() => setIsGDrivePickerOpen(false)}
+        onSelectImage={handleSelectCoverFromGDrive}
+        bookId={chapter.bookId}
+        entityId={chapter.id}
+        category="cover_chapter"
+        title={`Pilih Sampul Bab ${chapter.order} dari Google Drive`}
+      />
     </div>
   );
 };

@@ -87,7 +87,7 @@ export const GDriveMediaPickerModal: React.FC<GDriveMediaPickerModalProps> = ({
     }
   }, [isOpen]);
 
-  const loadFolder = async (folderId: string, keyToUse: string) => {
+  const loadFolder = async (folderId: string, keyToUse: string, forceRefresh: boolean = false) => {
     if (!folderId) return;
     if (!keyToUse) {
       setError('Google API Key belum terpasang. Masukkan API Key di Pengaturan AI atau Pengaturan Google Drive.');
@@ -97,7 +97,7 @@ export const GDriveMediaPickerModal: React.FC<GDriveMediaPickerModalProps> = ({
     setIsLoading(true);
     setError(null);
     try {
-      const fetchedItems = await listGDriveFolderContents(folderId, keyToUse);
+      const fetchedItems = await listGDriveFolderContents(folderId, keyToUse, forceRefresh);
       setItems(fetchedItems);
     } catch (err: any) {
       setError(err?.message || 'Gagal memuat isi folder Google Drive.');
@@ -296,16 +296,27 @@ export const GDriveMediaPickerModal: React.FC<GDriveMediaPickerModalProps> = ({
             })}
           </div>
 
-          {/* Search Box */}
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari nama gambar atau folder..."
-              className="w-full pl-9 pr-4 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-400 shadow-sm"
-            />
+          {/* Search Box & Refresh */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Cari nama gambar atau folder..."
+                className="w-full pl-9 pr-4 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-400 shadow-sm"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => loadFolder(currentFolderId, apiKey, true)}
+              disabled={isLoading || !currentFolderId}
+              className="p-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-amber-500 hover:border-amber-400 transition shadow-sm active:scale-95 disabled:opacity-40"
+              title="Segarkan Folder (Muat Ulang)"
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-amber-500' : ''}`} />
+            </button>
           </div>
         </div>
 
@@ -386,11 +397,12 @@ export const GDriveMediaPickerModal: React.FC<GDriveMediaPickerModalProps> = ({
                     onPointerLeave={handlePointerCancel}
                     className="group relative aspect-square rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-amber-400 dark:hover:border-amber-500 cursor-pointer transition shadow-sm hover:shadow-md select-none touch-manipulation"
                   >
-                    {item.directUrl ? (
+                    {item.thumbnailUrl || item.directUrl ? (
                       <img
-                        src={item.directUrl}
+                        src={item.thumbnailUrl || item.directUrl}
                         alt={item.name}
                         loading="lazy"
+                        decoding="async"
                         draggable={false}
                         className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ${
                           isCardPrivacyBlur
