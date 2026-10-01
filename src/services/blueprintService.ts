@@ -68,10 +68,20 @@ export async function generateStoryBlueprint(
 Tugasmu: Menganalisa satu ide/premis mentah dari penulis dan merancang BLUEPRINT PROYEK CERITA NOVEL LENGKAP berstandar sastra profesional.
 
 KECERDASAN ANALISA KONTEKS:
-1. DETEKSI ENTITAS & RELASI KELUARGA:
-   - Jika premis menyebut nama seseorang (misal: "Agung") dan "istrinya Santi" atau keluarga yang hilang ingatan, kenali dinamika keluarga ini secara cerdas.
-   - Sarankan karakter-karakter yang terlibat secara utuh (misal: Suami/Kepala Keluarga, Istri, Anak/Orang Tua/Mertua, atau Tetangga/Sahabat).
-   - Berikan informasi CIRI FISIK konkret (wajah, tinggi/postur, warna kulit, gaya rambut, pakaian khas bernuansa lokal Indonesia jika latar Indonesia), USIA, dan SIFAT/WATAK (kepribadian, kelebihan, kelemahan batin/wound).
+1. DETEKSI ENTITAS & PROFIL KARAKTER MENDALAM:
+   - Pahami relasi karakter secara utuh (misal: Suami/Kepala Keluarga, Istri, Anak, Orang Tua/Mertua, atau Sahabat/Rival).
+   - CIRI FISIK WAJIB SANGAT DETAIL (walaupun tanpa foto referensi):
+     * Wajah & Mata: bentuk wajah (oval, tirus, rahang tegas), bentuk dan sorot mata, alis, bentuk hidung, bibir, serta ekspresi wajah.
+     * Keragaman Kulit & Etnis Nusantara: Jangan stereotipikal hanya 'kulit sawo matang'! Masyarakat Indonesia dan dunia sangat beragam (ada kulit kuning langsat, putih gading, sawo matang bersih, cerah berseri, kecokelatan hangat). Tokoh bisa berlatar Sunda, Jawa, Melayu, Tionghoa/Chindo, Minang, Dayak, dsb.
+     * Bentuk & Proporsi Tubuh Nyata: Gambarkan siluet dan proporsi tubuh dengan jelas dan hidup (misal: proporsi tubuh sintal / semok berlekuk jam pasir (hourglass) yang memikat dan proporsional, ramping semampai, atletis berotot, tegap berisi, atau mungil petite).
+     * Rambut: tekstur (lurus lembut, bergelombang, ikal), panjang (tergerai sebahu, dicepol santai, dipotong rapi), dan warna rambut.
+   - PAKAIAN MODERN SEHARI-HARI (HINDARI STEREOTIP BATIK / KEBAYA):
+     * DILARANG KERAS selalu memaksakan pakaian tradisional seperti 'batik', 'kebaya', atau baju adat jika bukan adegan upacara adat/pernikahan resmi!
+     * Gunakan pakaian modern kontemporer yang realistis, kasual, dan pas dengan peran karakter di kehidupan sehari-hari:
+       Contoh: daster rumahan sederhana katun polos atau motif modern yang nyaman, kemeja polo bermotif kotak, kemeja kasual berkancing, kaos oblong katun santai dengan jeans, blouse kasual wanita, cardigan santai, jaket hoodie, celana kulot, atau busana modern lainnya.
+   - VISUAL PROMPT TEXT-TO-IMAGE (ENGLISH 9:16) WAJIB SANGAT DETAIL:
+     * Format prompt: 'Full body portrait standing upright, centered, [ethnicity/appearance], [age] years old, youthful radiant glowing skin, [detailed facial features and expression], [hair style and color], [body shape and silhouette: e.g. curvy voluptuous hourglass silhouette with attractive feminine curves / slender graceful build / athletic toned physique], wearing [detailed modern everyday clothing, e.g. a simple comfortable cotton homedress / casual plaid polo shirt and dark trousers / minimalist t-shirt], hyper realistic, 8k resolution, cinematic lighting, photorealistic textures, vertical mobile phone aspect ratio 9:16, --ar 9:16'.
+     * JANGAN gunakan kata 'mature', 'aged', 'wrinkled' untuk tokoh muda agar generator AI tidak membuat wajahnya tampak tua!
 2. PILIHAN JUDUL:
    - Berikan 3 pilihan judul buku yang puitis, memikat, dan memiliki nilai jual ("titleOptions"). Pilih satu sebagai "title" utama.
    - Berikan 3 pilihan judul bab pertama ("firstChapterTitleOptions").
@@ -118,12 +128,12 @@ WAJIB MERESPON HANYA DENGAN FORMAT JSON VALID:
   "settingTimeAndTone": "Indonesia Kontemporer / Realitas Lokal bernuansa Misteri Hangat",
   "characters": [
     {
-      "name": "Nama Karakter",
+      "name": "Agung",
       "role": "Protagonis / Suami",
-      "age": "28 Tahun",
-      "physicalTraits": "Pria berwajah teduh namun lelah, tinggi 172 cm, kulit sawo matang, rambut ikal pendek agak berantakan, mengenakan jaket katun lusuh.",
-      "traits": "Penyayang, pekerja keras, keras kepala, mudah cemas saat keluarga dalam bahaya.",
-      "visualPrompt": "Full body portrait standing upright, centered, Indonesian man in his late 20s, tan skin, short wavy black hair, exhausted and anxious gaze reflecting emotional turmoil, wearing a weathered brown cotton jacket over a plain t-shirt and dark jeans, neutral cinematic studio lighting, photorealistic skin textures, 8k resolution, vertical mobile phone aspect ratio 9:16",
+      "age": "27 Tahun",
+      "physicalTraits": "Pria berwajah ramah dengan rahang tegas, tinggi 174 cm, kulit kuning langsat bersih, rambut hitam lurus bertekstur rapi, mata sayu menahan beban emosional, postur tegap berisi sehat. Mengenakan kemeja polo bermotif kotak kasual warna navy-putih dan celana panjang chino gelap.",
+      "traits": "Penyayang, pekerja keras, gigih melindungi orang tersayang, mudah cemas saat keluarga dalam bahaya.",
+      "visualPrompt": "Full body portrait standing upright, centered, attractive youthful Southeast Asian Indonesian man in his late 20s, 27 years old, clear glowing youthful skin, neat straight black hair, anxious yet resolute warm brown eyes, fit healthy posture, wearing a modern casual plaid polo shirt in navy and white patterns with clean tailored dark trousers, soft cinematic rim lighting, 8k resolution, photorealistic masterpiece, vertical 9:16 aspect ratio, --ar 9:16",
       "shortDescription": "Pemuda yang menemukan benda misterius dan menjadi orang asing di rumahnya sendiri.",
       "want": "Mengembalikan ingatan keluarganya agar mengenalinya kembali.",
       "need": "Menerima bahwa kebahagiaan keluarga tidak bisa dibangun di atas kebohongan atau jalan pintas.",
@@ -135,12 +145,12 @@ WAJIB MERESPON HANYA DENGAN FORMAT JSON VALID:
       "tags": ["Protagonis", "Keluarga"]
     },
     {
-      "name": "Nama Istri / Pasangan",
+      "name": "Santi",
       "role": "Istri Protagonis",
-      "age": "26 Tahun",
-      "physicalTraits": "Wanita berparas manis khas nusantara, rambut sebahu diikat sederhana, tatapan mata waspada dan defensif, daster batik rapi.",
+      "age": "24 Tahun",
+      "physicalTraits": "Wanita muda berwajah manis dengan dagu lancip, tinggi 160 cm, kulit cerah gading halus, rambut hitam bergelombang lembut sebahu yang diikat longgar, tatapan mata waspada dan defensif. Memiliki proporsi tubuh sintal dengan lekuk jam pasir (hourglass) yang feminin dan terawat. Mengenakan daster santai rumahan sederhana berwarna pastel polos yang nyaman dan bersahaja.",
       "traits": "Tegas, protektif terhadap rumah, curigaan terhadap orang asing, sebenarnya rapuh di dalam batin.",
-      "visualPrompt": "Full body portrait standing upright, centered, Indonesian woman in her mid 20s, light brown skin, shoulder-length black hair tied in a simple ponytail, guarded defensive facial expression with sharp suspicious eyes, wearing a tidy traditional patterned batik homedress (daster batik), soft cinematic lighting, 8k resolution, photorealistic textures, vertical mobile phone aspect ratio 9:16",
+      "visualPrompt": "Full body portrait standing upright, centered, gorgeous youthful Indonesian woman, 24 years old, radiant youthful glowing skin, smooth beautiful face with sharp guarded eyes, wavy black hair loosely tied, stunning curvy hourglass body silhouette with attractive feminine proportions, wearing a simple modern comfortable pastel cotton house dress (simple homedress), cinematic soft ambient lighting, photorealistic skin textures, 8k resolution, vertical 9:16 aspect ratio, --ar 9:16",
       "shortDescription": "Istri yang kehilangan ingatan tentang suaminya dan mengiranya sebagai penyusup.",
       "want": "Melindungi rumah dan ketenangannya dari pria asing yang mengaku suaminya.",
       "need": "Mengingat kembali ikatan cinta tulus yang pernah ada.",
@@ -198,7 +208,9 @@ WAJIB MERESPON HANYA DENGAN FORMAT JSON VALID:
 
 Instruksi Analisa Cerdas:
 - Pahami relasi karakter dalam ide tersebut secara mendalam (misal keluarga, pasangan, sahabat, dsb.).
-- Buat karakter lengkap dengan usia, ciri fisik konkret, dan watak/sifat.
+- CIRI FISIK SANGAT DETAIL: Setiap karakter WAJIB memiliki detail ciri fisik lengkap (bentuk wajah, mata, rambut, warna kulit beragam tanpa stereotip sawo matang saja, serta proporsi tubuh nyata seperti sintal/semok berlekuk hourglass atau ramping).
+- BUSANA MODERN SEHARI-HARI: Gunakan pakaian modern kontemporer yang realistis (misal daster sederhana rumahan, polo bermotif kotak, kemeja kasual, kaos santai). DILARANG memaksakan batik atau kebaya jika bukan acara adat!
+- VISUAL PROMPT: Sertakan text-to-image prompt English 9:16 yang detail, fotorealistik, dan mempertahankan kemudaan wajah (youthful radiant skin).
 - Buat 3 opsi kelanjutan alur yang memikat.
 - Rancang alur bab pembuka (Bab 1) secara mendalam dan siap dipakai sebagai Story Plot.
 - Tentukan gaya penulisan (writingStyle) yang paling cocok: bisa sastra puitis, emosional realistis, modern kasual santai (slang lu-gua / diksi kekinian), atau nuansa kultural dialek daerah jika ide mengarah ke sana.

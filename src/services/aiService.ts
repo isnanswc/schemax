@@ -1240,8 +1240,8 @@ Tugas Analisis Mendalam:
       * initialTraits: Sifat & watak kepribadian dasar/awalnya (misal: "Penyayang, baik hati, santun, penurut").
       * currentDescription: Gambaran kondisi fisik/sosial/situasi saat ini di bab ini.
       * currentTraits: Sifat & watak kepribadian saat ini di bab ini (misal: "Kasar, manipulatif, penuh dendam").
-      * physicalTraits: CIRI-CIRI FISIK LENGKAP & SPESIFIK (perawakan, wajah, rambut, kulit, busana/kostum, aksesoris, luka). Default Nusantara/lokal jika naskah lokal.
-      * visualPrompt: Text-to-Image prompt Bahasa Inggris: "Full body portrait standing upright, centered, Indonesian/Southeast Asian ethnicity (sesuaikan naskah), [deskripsi fisik detail, pakaian, dan rambut], hyper realistic, 8k resolution, cinematic lighting, photorealistic textures, 9:16 aspect ratio".
+      * physicalTraits: CIRI-CIRI FISIK LENGKAP & SPESIFIK: bentuk wajah, mata, rambut, warna kulit beragam (kuning langsat, putih gading, sawo matang, cerah), serta bentuk/proporsi tubuh yang jelas (sintal/semok berlekuk hourglass, ramping, atletis, dsb). Pakaian harus modern sehari-hari yang realistis (hindari memaksakan batik/kebaya jika bukan acara adat, gunakan pakaian modern seperti daster sederhana, kemeja polo bermotif kotak, kaos santai, atau pakaian modern lainnya).
+      * visualPrompt: Text-to-Image prompt Bahasa Inggris detail: "Full body portrait standing upright, centered, youthful Indonesian [man/woman], [age] years old, fresh youthful glowing skin, [detailed facial features, hair, and exact body silhouette/curves], wearing [modern everyday clothing, e.g. simple homedress, casual polo shirt, casual wear], hyper realistic, 8k resolution, cinematic lighting, photorealistic textures, vertical 9:16 aspect ratio, --ar 9:16". Dilarang menggunakan kata 'mature/aged' untuk tokoh muda.
       * evolutionSummary: Ringkasan titik balik atau penyebab perubahannya jika ada.
       * condition: Status kondisi saat ini ("aktif", "luka", "gugur", "hilang", "berkhianat", "terkutuk", "ditawan", "pelarian", "koma", atau "spesial").
       * conditionDetails: Detail singkat kondisi.

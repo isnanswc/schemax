@@ -157,9 +157,10 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
       name: 'Karakter Baru',
       role: 'Pendukung / Keluarga',
       age: '25 Tahun',
-      physicalTraits: 'Wajah ramah, perawakan sedang, busana kasual rapi.',
+      physicalTraits: 'Wajah ramah segar, kulit cerah alami, proporsi tubuh seimbang, mengenakan busana kasual modern (kemeja polo atau daster katun santai polos).',
       traits: 'Setia kawan, jujur, protektif terhadap orang tersayang.',
       shortDescription: 'Anggota keluarga atau kerabat dekat yang terlibat dalam insiden.',
+      visualPrompt: 'Full length portrait standing upright, centered, 25-year-old Indonesian person, youthful radiant face, natural realistic body proportions, wearing neat everyday casual modern clothing, soft cinematic lighting, ultra-realistic 8k, vertical 9:16 portrait.',
       attributes: [{ label: 'Peran', value: 'Pendukung' }],
       tags: ['Karakter'],
     };
@@ -872,7 +873,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                         rows={3}
                         value={char.physicalTraits || ''}
                         onChange={(e) => handleUpdateCharacter(i, 'physicalTraits', e.target.value)}
-                        placeholder="Contoh: Pria berwajah ramah khas nusantara, kulit sawo matang, rambut pendek ikal, mengenakan jaket katun lusuh..."
+                        placeholder="Contoh: Wanita 26 tahun keturunan Tionghoa-Sunda, kulit kuning langsat mulus, mata ekspresif lembut, tubuh sintal berpostur pas, mengenakan kemeja polo motif kotak kasual dan celana jeans rapi..."
                         className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-amber-400 resize-y leading-relaxed min-h-[64px]"
                       />
                     </div>
@@ -903,7 +904,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                         rows={3}
                         value={char.visualPrompt || ''}
                         onChange={(e) => handleUpdateCharacter(i, 'visualPrompt', e.target.value)}
-                        placeholder="Full body portrait standing upright, centered, Indonesian person, authentic everyday attire, natural expression, cinematic lighting, 8k resolution, vertical 9:16..."
+                        placeholder="Full length portrait standing upright, centered, realistic 26-year-old Indonesian woman, smooth fair warm skin, natural feminine hourglass curves, wearing casual plaid polo shirt and denim jeans, soft indoor lighting, photorealistic 8k, aspect ratio 9:16..."
                         className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-400 resize-y leading-relaxed min-h-[68px]"
                       />
                     </div>
