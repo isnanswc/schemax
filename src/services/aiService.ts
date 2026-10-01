@@ -1729,23 +1729,28 @@ export interface CharacterVisionScanResult {
 export async function analyzeCharacterPhotoWithVision(
   base64Image: string,
   mimeType: string,
-  characterName?: string
+  characterName?: string,
+  category: string = 'character'
 ): Promise<CharacterVisionScanResult> {
   const config = getAISettings();
-  const geminiSlot = config.slots.find((s) => s.provider === 'gemini' && s.apiKey && s.apiKey.trim().length > 0);
+  const geminiSlot = config.slots.find((s) => s.provider === 'gemini' && s.apiKey && s.apiKey.trim().length > 0)
+    || (config.geminiConfig?.apiKey ? { provider: 'gemini', apiKey: config.geminiConfig.apiKey, models: config.geminiConfig.fallbackModels } : null);
 
   if (!geminiSlot) {
     throw new Error('AI Vision memerlukan API Key Gemini. Buka Pengaturan AI dan tambahkan slot API Key Gemini.');
   }
 
   const visionModels = [
-    ...(geminiSlot.models && geminiSlot.models.length > 0 ? geminiSlot.models : config.geminiConfig.fallbackModels),
+    ...(geminiSlot.models && geminiSlot.models.length > 0 ? geminiSlot.models : config.geminiConfig?.fallbackModels || []),
     'gemini-2.5-flash',
     'gemini-3.1-flash',
     'gemini-3.0-flash',
   ].filter((v, i, a) => a.indexOf(v) === i);
 
-  const prompt = `Analisis foto/gambar karakter ini secara detail, akurat, dan mendalam untuk profil tokoh cerita fiksi.
+  const isChar = category === 'character';
+
+  const prompt = isChar
+    ? `Analisis foto/gambar karakter ini secara detail, akurat, dan mendalam untuk profil tokoh cerita fiksi.
 Nama Karakter: "${characterName || 'Tokoh Cerita'}"
 
 ATURAN KETAT DARI PENULIS:
@@ -1760,6 +1765,27 @@ Format output HANYA JSON valid:
 {
   "gender": "...",
   "estimatedAge": "24 tahun",
+  "physicalTraits": "...",
+  "clothingAttire": "...",
+  "shortSummary": "...",
+  "englishVisualPrompt": "..."
+}`
+    : `Analisis foto/gambar ${category.toUpperCase()} ini secara detail dan mendalam untuk profil ensiklopedia fiksi.
+Nama Entitas: "${characterName || 'Entitas Dunia'}"
+Kategori: "${category}"
+
+TUGAS ANDA:
+1. "gender": Kosongkan ("-") jika bukan manusia.
+2. "estimatedAge": Jika tempat kuno/relik, perkirakan era/abad (misal: "Kuno 300 tahun"), atau kosongkan jika tidak relevan.
+3. "physicalTraits": Jabarkan bentuk visual, material pembentuk/arsitektur/geografi, ornamen, warna, dan aura fisik yang terlihat.
+4. "clothingAttire": Jabarkan elemen pelindung, perhiasan, tata letak arsitektur, atau ornamen yang melekat.
+5. "shortSummary": Rangkuman 1-2 kalimat deskriptif ensiklopedia yang memikat.
+6. "englishVisualPrompt": Text-to-image prompt dalam Bahasa Inggris detail visual cinematic.
+
+Format output HANYA JSON valid:
+{
+  "gender": "",
+  "estimatedAge": "",
   "physicalTraits": "...",
   "clothingAttire": "...",
   "shortSummary": "...",

@@ -5,7 +5,7 @@ import { getConditionMeta } from './entityConditionMeta';
 import { EntityImagePickerModal } from './EntityImagePickerModal';
 import { ChapterSceneChronologyAccordion } from './ChapterSceneChronologyAccordion';
 import { db } from '../../db';
-import { generateSmartCharacterVisualPrompt } from '../../services/aiService';
+import { generateSmartCharacterVisualPrompt, analyzeCharacterPhotoWithVision } from '../../services/aiService';
 import {
   X,
   User,
@@ -116,6 +116,98 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
       alert('Gagal menghasilkan prompt: ' + (err.message || 'Error'));
     } finally {
       setIsGeneratingPrompt(false);
+    }
+  };
+
+  const [isVisionScanning, setIsVisionScanning] = useState(false);
+  const [visionScanSuccess, setVisionScanSuccess] = useState<string | null>(null);
+
+  const handleScanPhotoVision = async () => {
+    if (!activeEntity || !url) {
+      alert('Entitas ini belum memiliki foto utama. Pasang foto terlebih dahulu.');
+      return;
+    }
+
+    setIsVisionScanning(true);
+    setVisionScanSuccess(null);
+
+    try {
+      let base64 = '';
+      let mime = 'image/jpeg';
+
+      if (activeEntity.avatarMediaId) {
+        const media = await db.media.get(activeEntity.avatarMediaId);
+        if (media && media.blob) {
+          mime = media.mimeType || 'image/jpeg';
+          const reader = new FileReader();
+          base64 = await new Promise<string>((resolve, reject) => {
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(media.blob);
+          });
+        }
+      }
+
+      if (!base64 && url) {
+        const resp = await fetch(url);
+        const blob = await resp.blob();
+        mime = blob.type || 'image/jpeg';
+        const reader = new FileReader();
+        base64 = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      }
+
+      if (!base64) {
+        alert('Gagal membaca gambar entitas.');
+        return;
+      }
+
+      const res = await analyzeCharacterPhotoWithVision(base64, mime, activeEntity.name, activeEntity.category);
+
+      const detailedPhysical = [
+        res.physicalTraits ? `Ciri Fisik: ${res.physicalTraits}` : '',
+        res.clothingAttire ? `Pakaian: ${res.clothingAttire}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n\n');
+
+      const updatedAttrs = [...(activeEntity.attributes || [])];
+      const updateOrAdd = (lbl: string, val: string) => {
+        const idx = updatedAttrs.findIndex((a) => a.label.toLowerCase() === lbl.toLowerCase());
+        if (idx !== -1) {
+          updatedAttrs[idx] = { ...updatedAttrs[idx], value: val };
+        } else {
+          updatedAttrs.push({ id: Date.now().toString() + Math.random(), label: lbl, value: val });
+        }
+      };
+
+      if (res.gender && res.gender !== '-') updateOrAdd('Jenis Kelamin', res.gender);
+      if (res.estimatedAge && res.estimatedAge !== '-') updateOrAdd('Usia', res.estimatedAge);
+      if (res.clothingAttire && activeEntity.category === 'character') updateOrAdd('Pakaian', res.clothingAttire);
+
+      const updated = {
+        ...activeEntity,
+        physicalTraits: detailedPhysical || activeEntity.physicalTraits,
+        visualPrompt: res.englishVisualPrompt || activeEntity.visualPrompt,
+        shortDescription: (!activeEntity.shortDescription?.trim() && res.shortSummary) ? res.shortSummary : activeEntity.shortDescription,
+        attributes: updatedAttrs,
+        updatedAt: Date.now(),
+      };
+
+      await db.worldEntities.update(activeEntity.id, updated);
+      setCurrentEntity(updated);
+      onEntityUpdated?.(updated);
+
+      setVisionScanSuccess(`Berhasil memindai foto: ${res.gender || ''} ${res.estimatedAge || ''}`.trim() || 'Berhasil memindai foto!');
+      setTimeout(() => setVisionScanSuccess(null), 5000);
+    } catch (err: any) {
+      console.error('Vision scan error in detail modal:', err);
+      alert('Gagal memindai foto: ' + (err?.message || 'Error AI Vision'));
+    } finally {
+      setIsVisionScanning(false);
     }
   };
 
@@ -264,7 +356,7 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
             )}
 
             {/* Quick Hero Buttons */}
-            <div className="flex items-center justify-center sm:justify-start gap-2 pt-1">
+            <div className="flex items-center justify-center sm:justify-start gap-2 pt-1 flex-wrap">
               <button
                 type="button"
                 onClick={() => setIsImagePickerOpen(true)}
@@ -273,6 +365,29 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
                 <Camera className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
                 <span>Ganti Foto</span>
               </button>
+
+              {url && (
+                <button
+                  type="button"
+                  onClick={handleScanPhotoVision}
+                  disabled={isVisionScanning}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-500/20 via-pink-500/20 to-amber-500/20 hover:from-purple-500/30 hover:to-amber-500/30 text-purple-700 dark:text-purple-300 border border-purple-500/30 text-[11px] font-bold transition active:scale-95 disabled:opacity-50 shadow-xs"
+                  title="Pindai AI untuk mengekstrak jenis kelamin, usia pasti, ciri fisik, pakaian, dan prompt visual"
+                >
+                  {isVisionScanning ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-500" />
+                      <span>Memindai Foto...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 text-purple-500" />
+                      <span>✨ Ekstrak Ciri Foto AI</span>
+                    </>
+                  )}
+                </button>
+              )}
+
               {url && (
                 <button
                   type="button"
@@ -284,6 +399,14 @@ export const WorldEntityHologramModal: React.FC<WorldEntityHologramModalProps> =
                 </button>
               )}
             </div>
+
+            {/* Vision Scan Success Banner in Detail Modal */}
+            {visionScanSuccess && (
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-200 text-xs flex items-center gap-2 animate-in fade-in">
+                <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                <span className="font-semibold">{visionScanSuccess}</span>
+              </div>
+            )}
           </div>
         </div>
 

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X, Image as ImageIcon, Sparkles, Plus, Trash2, Tag, User, MapPin, Shield, Scroll, Check, Loader2 } from 'lucide-react';
+import { X, Image as ImageIcon, Sparkles, Plus, Trash2, Tag, User, MapPin, Shield, Scroll, Check, Loader2, HardDrive } from 'lucide-react';
 import { WorldEntity, WorldCategory, WorldAttribute, MediaItem } from '../../types';
 import { db, saveMediaItem, createSvgBlob } from '../../db';
 import { ENTITY_CONDITIONS, getConditionMeta } from './entityConditionMeta';
 import { analyzeCharacterPhotoWithVision } from '../../services/aiService';
+import { GDriveMediaPickerModal } from '../media/GDriveMediaPickerModal';
 
 interface AddWorldEntityModalProps {
   isOpen: boolean;
@@ -42,6 +43,7 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [galleryItems, setGalleryItems] = useState<Array<MediaItem & { url: string }>>([]);
   const [showGalleryPicker, setShowGalleryPicker] = useState(false);
+  const [isGDriveOpen, setIsGDriveOpen] = useState(false);
   const [isVisionScanning, setIsVisionScanning] = useState(false);
   const [visionScanSuccess, setVisionScanSuccess] = useState<string | null>(null);
 
@@ -89,19 +91,29 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
         }
       } else if (previewUrl.startsWith('data:')) {
         base64 = previewUrl;
+      } else if (previewUrl.startsWith('blob:') || previewUrl.startsWith('http')) {
+        const resp = await fetch(previewUrl);
+        const blob = await resp.blob();
+        mime = blob.type || 'image/jpeg';
+        const reader = new FileReader();
+        base64 = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
       }
 
       if (!base64) {
-        alert('Pilih atau unggah file foto karakter terlebih dahulu.');
+        alert('Pilih atau unggah file foto entitas terlebih dahulu.');
         return;
       }
 
-      const res = await analyzeCharacterPhotoWithVision(base64, mime, name);
+      const res = await analyzeCharacterPhotoWithVision(base64, mime, name, category);
 
       // Populate physical traits & attire
       const detailedPhysical = [
-        res.physicalTraits ? `Ciri Fisik: ${res.physicalTraits}` : '',
-        res.clothingAttire ? `Pakaian: ${res.clothingAttire}` : '',
+        res.physicalTraits ? `Ciri Fisik / Bentuk: ${res.physicalTraits}` : '',
+        res.clothingAttire ? `Pakaian / Ornamen: ${res.clothingAttire}` : '',
       ]
         .filter(Boolean)
         .join('\n\n');
@@ -114,7 +126,7 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
         setShortDescription(res.shortSummary);
       }
 
-      // Add or update attributes for Gender, Exact Age, and Clothing
+      // Add or update attributes for Gender, Exact Age, and Clothing if applicable
       setAttributes((prev) => {
         const next = [...prev];
         const updateOrAdd = (lbl: string, val: string) => {
@@ -126,13 +138,17 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
           }
         };
 
-        if (res.gender) updateOrAdd('Jenis Kelamin', res.gender);
-        if (res.estimatedAge) updateOrAdd('Usia', res.estimatedAge);
-        if (res.clothingAttire) updateOrAdd('Pakaian', res.clothingAttire);
+        if (res.gender && res.gender !== '-') updateOrAdd('Jenis Kelamin', res.gender);
+        if (res.estimatedAge && res.estimatedAge !== '-') updateOrAdd('Usia', res.estimatedAge);
+        if (res.clothingAttire && category === 'character') updateOrAdd('Pakaian', res.clothingAttire);
         return next;
       });
 
-      setVisionScanSuccess(`Berhasil memindai: ${res.gender}, ${res.estimatedAge}`);
+      const successLabel = category === 'character'
+        ? `Berhasil mengekstrak profil tokoh: ${res.gender}, ${res.estimatedAge}`
+        : `Berhasil mengekstrak ciri visual & deskripsi ${category.toUpperCase()}`;
+
+      setVisionScanSuccess(successLabel);
       setTimeout(() => setVisionScanSuccess(null), 5000);
     } catch (err: any) {
       console.error('Vision scan error:', err);
@@ -355,33 +371,86 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
                 </button>
               )}
 
-              {/* ✨ Pindai AI Ciri Tokoh dari Foto Button */}
-              {previewUrl && category === 'character' && (
+              {/* 🌐 Pilih dari Google Drive Button */}
+              <button
+                type="button"
+                onClick={() => setIsGDriveOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/40 active:scale-95 text-blue-700 dark:text-blue-300 text-xs font-semibold rounded-xl border border-blue-200 dark:border-blue-800 transition shadow-sm"
+              >
+                <HardDrive className="w-3.5 h-3.5 text-blue-500" />
+                <span>Pilih dari Google Drive</span>
+              </button>
+            </div>
+
+            {/* 🌟 Permanent, High-Visibility AI Vision Scanner Card */}
+            {!previewUrl ? (
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-500/5 via-indigo-500/5 to-amber-500/5 border border-dashed border-purple-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center flex-shrink-0">
+                    <Sparkles className="w-4 h-4 text-purple-500" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                      Ekstrak &amp; Pindai Ciri Entitas dengan AI
+                    </span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Unggah foto atau pilih dari Google Drive / Galeri di atas untuk mengekstrak jenis kelamin, usia pasti (tanpa rentang), ciri fisik, pakaian &amp; prompt visual secara otomatis.
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled
+                  className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 text-xs font-semibold whitespace-nowrap cursor-not-allowed border border-slate-200 dark:border-slate-700"
+                >
+                  Pilih Foto Dahulu
+                </button>
+              </div>
+            ) : (
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-500/15 via-pink-500/15 to-amber-500/15 border-2 border-purple-500/40 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-600 dark:text-purple-300 flex items-center justify-center flex-shrink-0 shadow-inner">
+                    <Sparkles className="w-5 h-5 animate-pulse text-purple-500" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-extrabold text-purple-900 dark:text-purple-200">
+                        Ekstrak &amp; Pindai Ciri Entitas dari Foto (AI Vision)
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-700 dark:text-purple-300">
+                        SIAP PINDAI
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5">
+                      AI Vision akan mengekstrak jenis kelamin, usia pasti (tanpa rentang), ciri fisik, pakaian/material, dan prompt visual secara otomatis.
+                    </p>
+                  </div>
+                </div>
+
                 <button
                   type="button"
                   onClick={handleScanCharacterPhoto}
                   disabled={isVisionScanning}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-purple-500/20 via-pink-500/20 to-amber-500/20 hover:from-purple-500/30 hover:to-amber-500/30 text-purple-700 dark:text-purple-300 border border-purple-500/30 text-xs font-bold rounded-xl transition active:scale-95 disabled:opacity-50 shadow-sm"
-                  title="Pindai AI untuk mendeteksi jenis kelamin, usia pasti (tanpa rentang), ciri fisik, dan pakaian"
+                  className="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-purple-600 via-pink-600 to-amber-600 hover:from-purple-500 hover:to-amber-500 active:scale-95 text-white text-xs font-bold rounded-xl transition shadow-md shadow-purple-500/20 flex items-center justify-center gap-2 flex-shrink-0 whitespace-nowrap disabled:opacity-50"
                 >
                   {isVisionScanning ? (
                     <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-500" />
-                      <span>Memindai Foto Tokoh...</span>
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <span>Sedang Memindai Foto...</span>
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-3.5 h-3.5 text-purple-500" />
-                      <span>✨ Pindai AI Ciri Tokoh dari Foto</span>
+                      <Sparkles className="w-4 h-4 text-amber-200" />
+                      <span>✨ Pindai &amp; Ekstrak Ciri Foto Sekarang</span>
                     </>
                   )}
                 </button>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Vision Scan Success Banner */}
             {visionScanSuccess && (
-              <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs flex items-center gap-2 animate-in fade-in">
+              <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-200 text-xs flex items-center gap-2 animate-in fade-in">
                 <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
                 <span className="font-semibold">{visionScanSuccess}</span>
               </div>
@@ -663,6 +732,24 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
             </button>
           </div>
         </form>
+
+        {/* Google Drive Media Picker Modal */}
+        <GDriveMediaPickerModal
+          isOpen={isGDriveOpen}
+          onClose={() => setIsGDriveOpen(false)}
+          bookId={bookId}
+          category={category}
+          title={`Pilih Gambar untuk ${name || 'Entitas Baru'}`}
+          onSelectImage={async (mediaId) => {
+            setIsGDriveOpen(false);
+            setSelectedGalleryMediaId(mediaId);
+            setAvatarFile(null);
+            const media = await db.media.get(mediaId);
+            if (media && media.blob) {
+              setPreviewUrl(URL.createObjectURL(media.blob));
+            }
+          }}
+        />
       </div>
     </div>
   );
