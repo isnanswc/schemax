@@ -103,8 +103,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
   const [selectedConditionFilter, setSelectedConditionFilter] = useState<string>('all');
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
 
-  // Mobile Fullscreen & Floating Toolbox Mode
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  // Floating Toolbox Mode
   const [isToolboxOpen, setIsToolboxOpen] = useState(false);
 
   // Modals & Popups
@@ -707,262 +706,242 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col overflow-hidden select-none">
-      {/* 1. Sleek Non-Overlapping Top Bar */}
-      <div className="absolute top-2 sm:top-3 inset-x-2 sm:inset-x-4 z-40 flex items-center justify-between pointer-events-none gap-1.5">
-        {/* Left: Project / Chapter Context Pill */}
-        <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2 bg-slate-900/95 backdrop-blur-md px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-2xl border border-slate-700/80 shadow-2xl transition max-w-[55%] sm:max-w-md">
-          <div className="p-1 sm:p-1.5 rounded-xl bg-pink-500/20 text-pink-400 flex-shrink-0">
+      {/* ========================================================================= */}
+      {/* 1. TOP-LEFT: Judul & Context Pill                                         */}
+      {/* ========================================================================= */}
+      <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-40 pointer-events-auto">
+        <div className="flex items-center gap-2 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-slate-700/80 shadow-2xl transition max-w-[200px] sm:max-w-xs">
+          <div className="p-1.5 rounded-xl bg-pink-500/20 text-pink-400 flex-shrink-0">
             <GitFork className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-1 sm:gap-1.5">
-              <h3 className="text-[11px] sm:text-xs font-black text-white truncate">
-                {activeChapter ? activeChapter.title : bookTitle}
-              </h3>
-              <span className="text-[9px] sm:text-[10px] px-1.5 py-0.2 rounded-md bg-pink-500/10 text-pink-400 font-bold border border-pink-500/20 flex-shrink-0">
-                {viewMode === 'network' ? 'Relasi' : 'Faksi'}
-              </span>
+            <h3 className="text-xs font-black text-white truncate">
+              {activeChapter ? activeChapter.title : bookTitle}
+            </h3>
+            <div className="flex items-center gap-1.5 text-[9px] text-slate-400 font-bold truncate">
+              <span className="text-pink-400">{viewMode === 'network' ? 'Peta Relasi' : 'Peta Faksi'}</span>
+              <span>•</span>
+              <span>{filteredEntities.length} Entitas</span>
             </div>
           </div>
-        </div>
-
-        {/* Right: Controls & Actions */}
-        <div className="pointer-events-auto flex items-center gap-1.5 flex-shrink-0">
-          {/* Live AI Indicator if running */}
-          {(isAiLoading || aiStatusMessage) && (
-            <div className="flex items-center gap-1.5 bg-slate-900/95 backdrop-blur-md px-2 py-1 rounded-xl border border-pink-500/40 text-pink-300 text-[10px] shadow-lg animate-pulse">
-              <Loader2 className="w-3 h-3 animate-spin text-pink-400 flex-shrink-0" />
-              <span className="font-semibold truncate max-w-[100px] sm:max-w-[160px]">
-                {aiStatusMessage || 'AI Auto-Map...'}
-              </span>
-            </div>
-          )}
-
-          {/* View Mode Toggle Pill (Garis Relasi vs Faksi) */}
-          <div className="flex items-center bg-slate-900/95 backdrop-blur-md p-1 rounded-2xl border border-slate-700/80 shadow-2xl text-[10px] sm:text-[11px] font-bold">
-            <button
-              type="button"
-              onClick={() => setViewMode('network')}
-              className={`px-2 py-1 rounded-xl transition ${
-                viewMode === 'network'
-                  ? 'bg-amber-500 text-slate-950 font-extrabold shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Relasi
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('clusters')}
-              className={`px-2 py-1 rounded-xl transition ${
-                viewMode === 'clusters'
-                  ? 'bg-amber-500 text-slate-950 font-extrabold shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Faksi
-            </button>
-          </div>
-
-          {/* Close Map / Back Button */}
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1.5 sm:px-2.5 rounded-2xl bg-slate-900/95 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 shadow-2xl transition flex items-center gap-1 text-[11px] font-bold"
-              title="Kembali ke Ensiklopedia Kartu"
-            >
-              <X className="w-4 h-4 text-slate-400" />
-              <span className="hidden md:inline">Tutup</span>
-            </button>
-          )}
         </div>
       </div>
 
-      {/* 2. Floating Bottom Controls: Expandable Toolbox with Horizontal Slider */}
-      <div className="absolute bottom-3 sm:bottom-5 inset-x-2 sm:inset-x-6 z-40 flex flex-col items-center pointer-events-none gap-2">
-        {/* Expanded Floating Toolbar (Horizontal Scrollable Toolbox) */}
-        {isToolboxOpen && (
-          <div className="pointer-events-auto w-full max-w-2xl bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-3xl p-3 shadow-2xl animate-in slide-in-from-bottom-4 duration-200 flex flex-col gap-2.5">
-            {/* Top row of toolbox: Timeline & Faction Selectors */}
-            <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-2 text-xs">
-              {/* Timeline Chapter Selector */}
-              {!chapter && chapters.length > 0 && (
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex-shrink-0">
-                    Bab:
-                  </span>
-                  <select
-                    value={selectedTimelineChapterId}
-                    onChange={(e) => setSelectedTimelineChapterId(e.target.value)}
-                    className="bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1 text-xs font-semibold text-slate-200 focus:outline-none max-w-[150px] sm:max-w-[200px] truncate"
-                  >
-                    <option value="global">🌐 Baseline Global</option>
-                    {chapters.map((ch) => (
-                      <option key={ch.id} value={ch.id}>
-                        Bab {ch.order}: {ch.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+      {/* ========================================================================= */}
+      {/* 2. TOP-RIGHT: Mode Switcher & Tombol Tutup Peta                           */}
+      {/* ========================================================================= */}
+      <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-40 pointer-events-auto flex items-center gap-1.5">
+        {/* Toggle Mode: Relasi / Faksi */}
+        <div className="flex items-center bg-slate-900/90 backdrop-blur-md p-1 rounded-2xl border border-slate-700/80 shadow-2xl text-[11px] font-bold">
+          <button
+            type="button"
+            onClick={() => setViewMode('network')}
+            className={`px-2.5 py-1 rounded-xl transition ${
+              viewMode === 'network'
+                ? 'bg-amber-500 text-slate-950 font-extrabold shadow-sm'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Relasi
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('clusters')}
+            className={`px-2.5 py-1 rounded-xl transition ${
+              viewMode === 'clusters'
+                ? 'bg-amber-500 text-slate-950 font-extrabold shadow-sm'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Faksi
+          </button>
+        </div>
 
-              {/* Faction Selector */}
-              <div className="flex items-center gap-1.5 ml-auto">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Faksi:</span>
+        {/* Tutup Peta Button */}
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 rounded-2xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 shadow-2xl transition flex items-center justify-center active:scale-95"
+            title="Tutup Peta & Kembali ke Ensiklopedia"
+          >
+            <X className="w-4 h-4 text-slate-400" />
+          </button>
+        )}
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 3. SISI KIRI (LEFT): Kontrol Zoom & Fit Screen (Vertikal di Kiri Tengah)  */}
+      {/* ========================================================================= */}
+      <div className="absolute top-1/2 -translate-y-1/2 left-3 sm:left-4 z-40 pointer-events-auto flex flex-col items-center gap-1 bg-slate-900/90 backdrop-blur-md p-1.5 rounded-2xl border border-slate-700/80 shadow-2xl text-xs text-white">
+        <button
+          type="button"
+          onClick={() => setZoom((z) => Math.min(3.5, z + 0.25))}
+          className="p-2 hover:text-white rounded-xl hover:bg-slate-800 text-amber-400 active:scale-90 transition"
+          title="Perbesar (Zoom In)"
+        >
+          <ZoomIn className="w-4 h-4" />
+        </button>
+
+        <span className="text-[10px] font-mono font-bold text-slate-300 py-0.5">
+          {Math.round(zoom * 100)}%
+        </span>
+
+        <button
+          type="button"
+          onClick={() => setZoom((z) => Math.max(0.15, z - 0.25))}
+          className="p-2 hover:text-white rounded-xl hover:bg-slate-800 text-amber-400 active:scale-90 transition"
+          title="Perkecil (Zoom Out)"
+        >
+          <ZoomOut className="w-4 h-4" />
+        </button>
+
+        <div className="w-5 h-[1px] bg-slate-700 my-0.5" />
+
+        <button
+          type="button"
+          onClick={handleFitToScreen}
+          className="p-2 hover:text-white rounded-xl hover:bg-slate-800 text-emerald-400 active:scale-90 transition"
+          title="Fokus Semua Tokoh (Fit to Screen)"
+        >
+          <Maximize2 className="w-4 h-4" />
+        </button>
+
+        <button
+          type="button"
+          onClick={handleResetView}
+          className="p-2 hover:text-white rounded-xl hover:bg-slate-800 text-cyan-400 active:scale-90 transition"
+          title="Pusatkan Ulang"
+        >
+          <Compass className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 4. BOTTOM-RIGHT: Tombol Mengambang Buka "Alat & Filter"                   */}
+      {/* ========================================================================= */}
+      <div className="absolute bottom-4 right-3 sm:bottom-5 sm:right-4 z-40 pointer-events-auto">
+        <button
+          type="button"
+          onClick={() => setIsToolboxOpen(!isToolboxOpen)}
+          className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl font-black text-xs transition active:scale-95 shadow-2xl border ${
+            isToolboxOpen
+              ? 'bg-rose-600 text-white border-rose-500'
+              : 'bg-gradient-to-r from-pink-500 to-amber-500 text-slate-950 border-amber-400/50 shadow-pink-500/20'
+          }`}
+        >
+          {isToolboxOpen ? (
+            <>
+              <X className="w-4 h-4" />
+              <span>Tutup Panel</span>
+            </>
+          ) : (
+            <>
+              <SlidersHorizontal className="w-4 h-4" />
+              <span>Alat &amp; Filter</span>
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 5. SLIDE-UP TOOLBOX (Tampil di Bawah Tengah Saat Tombol Kanan Ditekan)   */}
+      {/* ========================================================================= */}
+      {isToolboxOpen && (
+        <div className="absolute bottom-16 sm:bottom-20 inset-x-3 sm:inset-x-auto sm:right-4 sm:w-[460px] z-40 pointer-events-auto bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-3xl p-3.5 shadow-2xl animate-in slide-in-from-bottom-4 duration-200 flex flex-col gap-2.5">
+          {/* Baris 1: Bab & Faksi */}
+          <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-2 text-xs">
+            {!chapter && chapters.length > 0 && (
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex-shrink-0">
+                  Bab:
+                </span>
                 <select
-                  value={selectedFactionFilter}
-                  onChange={(e) => setSelectedFactionFilter(e.target.value)}
-                  className="bg-slate-950 border border-slate-700 rounded-xl px-2 py-1 text-xs font-semibold text-slate-200 focus:outline-none max-w-[130px] sm:max-w-[160px] truncate"
+                  value={selectedTimelineChapterId}
+                  onChange={(e) => setSelectedTimelineChapterId(e.target.value)}
+                  className="bg-slate-950 border border-slate-700 rounded-xl px-2 py-1 text-xs font-semibold text-slate-200 focus:outline-none max-w-[130px] sm:max-w-[170px] truncate"
                 >
-                  <option value="all">Semua ({availableFactions.length})</option>
-                  {availableFactions.map((f) => (
-                    <option key={f} value={f}>
-                      {f}
+                  <option value="global">🌐 Baseline Global</option>
+                  {chapters.map((ch) => (
+                    <option key={ch.id} value={ch.id}>
+                      Bab {ch.order}: {ch.title}
                     </option>
                   ))}
                 </select>
               </div>
+            )}
 
-              {/* Close Toolbox Button */}
-              <button
-                type="button"
-                onClick={() => setIsToolboxOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+            <div className="flex items-center gap-1.5 ml-auto">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Faksi:</span>
+              <select
+                value={selectedFactionFilter}
+                onChange={(e) => setSelectedFactionFilter(e.target.value)}
+                className="bg-slate-950 border border-slate-700 rounded-xl px-2 py-1 text-xs font-semibold text-slate-200 focus:outline-none max-w-[130px] sm:max-w-[160px] truncate"
               >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Bottom row of toolbox: Horizontal Slider Action Buttons */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
-              {/* Scope Filters */}
-              {[
-                { id: 'all', label: 'Semua' },
-                { id: 'character_only', label: 'Tokoh' },
-                { id: 'character_location', label: 'Lokasi' },
-                { id: 'character_item', label: 'Relik' },
-              ].map((sc) => (
-                <button
-                  key={sc.id}
-                  type="button"
-                  onClick={() => setEntityScopeFilter(sc.id as any)}
-                  className={`px-2.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 ${
-                    entityScopeFilter === sc.id
-                      ? 'bg-amber-500 text-slate-950 shadow-sm'
-                      : 'bg-slate-800 text-slate-300 hover:text-white'
-                  }`}
-                >
-                  {sc.label}
-                </button>
-              ))}
-
-              <div className="h-5 w-[1px] bg-slate-700 flex-shrink-0 mx-0.5" />
-
-              {/* AI Auto-Map Button */}
-              <button
-                type="button"
-                onClick={handleTriggerAutoMap}
-                disabled={isAiLoading}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 text-white font-bold rounded-xl text-xs shadow-md shadow-pink-500/20 active:scale-95 transition disabled:opacity-50 whitespace-nowrap flex-shrink-0"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-yellow-200" />
-                <span>{activeChapter ? 'Auto-Map Bab' : 'Auto-Map AI'}</span>
-              </button>
-
-              {/* Add Relation Button */}
-              <button
-                type="button"
-                onClick={() => setIsAddRelationOpen(true)}
-                className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-xs border border-slate-700 whitespace-nowrap flex-shrink-0 active:scale-95 transition"
-              >
-                <Plus className="w-3.5 h-3.5 text-pink-400" />
-                <span>+ Relasi</span>
-              </button>
-
-              {/* Auto Arrange Layout */}
-              <button
-                type="button"
-                onClick={arrangeNeatFactionLayout}
-                className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-xs border border-slate-700 whitespace-nowrap flex-shrink-0 active:scale-95 transition"
-              >
-                <Wand2 className="w-3.5 h-3.5 text-amber-400" />
-                <span>Tata Rapi</span>
-              </button>
+                <option value="all">Semua ({availableFactions.length})</option>
+                {availableFactions.map((f) => (
+                  <option key={f} value={f}>
+                    {f}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
-        )}
 
-        {/* Floating Quick Navigation & Menu Trigger Bar */}
-        <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2 bg-slate-900/90 hover:bg-slate-900/95 backdrop-blur-xl px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-full border border-slate-700/80 shadow-2xl text-xs text-white">
-          {/* Zoom In */}
-          <button
-            type="button"
-            onClick={() => setZoom((z) => Math.min(3.5, z + 0.25))}
-            className="p-1 sm:p-1.5 hover:text-white rounded-full hover:bg-slate-800 text-amber-400 active:scale-90 transition"
-            title="Perbesar"
-          >
-            <ZoomIn className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          </button>
+          {/* Baris 2: Filter Lingkup Entitas (Slider Horizontal) */}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+            {[
+              { id: 'all', label: 'Semua' },
+              { id: 'character_only', label: 'Tokoh' },
+              { id: 'character_location', label: 'Lokasi' },
+              { id: 'character_item', label: 'Relik' },
+            ].map((sc) => (
+              <button
+                key={sc.id}
+                type="button"
+                onClick={() => setEntityScopeFilter(sc.id as any)}
+                className={`px-2.5 py-1 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 ${
+                  entityScopeFilter === sc.id
+                    ? 'bg-amber-500 text-slate-950 shadow-sm'
+                    : 'bg-slate-800 text-slate-300 hover:text-white'
+                }`}
+              >
+                {sc.label}
+              </button>
+            ))}
+          </div>
 
-          <span className="text-[10px] sm:text-[11px] font-mono font-bold px-0.5 text-slate-300">
-            {Math.round(zoom * 100)}%
-          </span>
+          {/* Baris 3: Tombol Aksi Cepat */}
+          <div className="flex items-center gap-2 pt-1 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={handleTriggerAutoMap}
+              disabled={isAiLoading}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 text-white font-bold rounded-xl text-xs shadow-md shadow-pink-500/20 active:scale-95 transition disabled:opacity-50"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-yellow-200" />
+              <span>{activeChapter ? 'Auto-Map Bab' : 'Auto-Map AI'}</span>
+            </button>
 
-          {/* Zoom Out */}
-          <button
-            type="button"
-            onClick={() => setZoom((z) => Math.max(0.15, z - 0.25))}
-            className="p-1 sm:p-1.5 hover:text-white rounded-full hover:bg-slate-800 text-amber-400 active:scale-90 transition"
-            title="Perkecil"
-          >
-            <ZoomOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          </button>
+            <button
+              type="button"
+              onClick={() => setIsAddRelationOpen(true)}
+              className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs border border-slate-700 active:scale-95 transition"
+            >
+              + Relasi
+            </button>
 
-          {/* Fit to Screen */}
-          <button
-            type="button"
-            onClick={handleFitToScreen}
-            className="p-1 sm:p-1.5 hover:text-white rounded-full hover:bg-slate-800 text-emerald-400 active:scale-90 transition border-l border-slate-700/80 pl-1.5"
-            title="Fokus Semua (Fit to Screen)"
-          >
-            <Maximize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          </button>
-
-          {/* Reset / Center */}
-          <button
-            type="button"
-            onClick={handleResetView}
-            className="p-1 sm:p-1.5 hover:text-white rounded-full hover:bg-slate-800 text-cyan-400 active:scale-90 transition"
-            title="Pusatkan Ulang"
-          >
-            <Compass className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          </button>
-
-          {/* Main Floating Tool Trigger Button */}
-          <button
-            type="button"
-            onClick={() => setIsToolboxOpen(!isToolboxOpen)}
-            className={`flex items-center gap-1 sm:gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full font-bold text-[11px] sm:text-xs transition active:scale-95 border border-slate-700/80 ml-0.5 ${
-              isToolboxOpen
-                ? 'bg-rose-500 text-white'
-                : 'bg-gradient-to-r from-pink-500 to-amber-500 text-slate-950 shadow-lg shadow-pink-500/20'
-            }`}
-          >
-            {isToolboxOpen ? (
-              <>
-                <X className="w-3.5 h-3.5" />
-                <span>Tutup</span>
-              </>
-            ) : (
-              <>
-                <SlidersHorizontal className="w-3.5 h-3.5" />
-                <span>Alat &amp; Filter</span>
-              </>
-            )}
-          </button>
+            <button
+              type="button"
+              onClick={arrangeNeatFactionLayout}
+              className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs border border-slate-700 active:scale-95 transition text-amber-400"
+              title="Atur Ulang Rapi"
+            >
+              <Wand2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 3. True Fullscreen Fixed Interactive Map Viewport */}
       {viewMode === 'network' ? (
@@ -988,73 +967,6 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
               backgroundSize: '24px 24px',
             }}
           />
-
-          {/* Floating Canvas Controls (Zoom In, Zoom Out, Reset, Fullscreen) */}
-          <div className="absolute top-3 left-3 z-20 flex items-center gap-1 bg-slate-900/90 backdrop-blur-md p-1.5 rounded-xl border border-slate-700 text-xs text-slate-200 shadow-lg">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setZoom((z) => Math.min(3.5, z + 0.25));
-              }}
-              className="p-1.5 hover:text-white rounded-lg hover:bg-slate-800 active:scale-95 transition"
-              title="Perbesar (Zoom In)"
-            >
-              <ZoomIn className="w-4 h-4 text-amber-400" />
-            </button>
-            <span className="text-[11px] font-mono px-1 font-bold">{Math.round(zoom * 100)}%</span>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setZoom((z) => Math.max(0.15, z - 0.25));
-              }}
-              className="p-1.5 hover:text-white rounded-lg hover:bg-slate-800 active:scale-95 transition"
-              title="Perkecil (Zoom Out)"
-            >
-              <ZoomOut className="w-4 h-4 text-amber-400" />
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleFitToScreen();
-              }}
-              className="p-1.5 hover:text-white rounded-lg hover:bg-slate-800 active:scale-95 transition border-l border-slate-700 pl-2 text-emerald-400"
-              title="Fokus Semua / Rentang Luas (Fit to Screen)"
-            >
-              <Maximize2 className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleResetView();
-              }}
-              className="p-1.5 hover:text-white rounded-lg hover:bg-slate-800 active:scale-95 transition text-cyan-400"
-              title="Tata Rapi Otomatis &amp; Reset"
-            >
-              <Compass className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsFullscreen(!isFullscreen);
-              }}
-              className="p-1.5 hover:text-white rounded-lg hover:bg-slate-800 active:scale-95 transition border-l border-slate-700 pl-2 text-pink-400"
-              title={isFullscreen ? 'Keluar Layar Penuh' : 'Layar Penuh (Mobile Optimized)'}
-            >
-              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-            </button>
-          </div>
-
-          {/* Quick Stats Banner */}
-          <div className="absolute top-3 right-3 z-20 flex items-center gap-2 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700 text-[10px] text-slate-300 shadow-lg">
-            <span>{filteredEntities.length} Entitas</span>
-            <span className="text-slate-500">•</span>
-            <span className="text-pink-400 font-bold">{allRelationshipLinks.length} Garis Hubungan</span>
-          </div>
 
           {/* Active SVG Canvas */}
           <svg className="w-full h-full pointer-events-none">
@@ -1360,9 +1272,9 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
             </g>
           </svg>
 
-          {/* Bottom Floating Inspector Panel (Positioned above floating nav pill) */}
+          {/* Bottom Floating Inspector Panel */}
           {selectedEntity && (
-            <div className="absolute bottom-20 inset-x-3 sm:inset-x-auto sm:left-4 sm:w-96 bg-slate-900/95 backdrop-blur-xl border border-slate-700 rounded-3xl p-4 shadow-2xl z-20 animate-in slide-in-from-bottom-3 duration-200">
+            <div className="absolute bottom-20 inset-x-3 sm:inset-x-auto sm:left-4 sm:bottom-5 sm:w-96 bg-slate-900/95 backdrop-blur-xl border border-slate-700 rounded-3xl p-4 shadow-2xl z-20 animate-in slide-in-from-bottom-3 duration-200">
               <div className="flex items-start justify-between gap-3 mb-2.5">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div
