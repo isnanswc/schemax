@@ -178,7 +178,8 @@ export function App() {
   const handleReadBook = async (book: Book) => {
     setCurrentBook(book);
     try {
-      const chapters = await db.storyChapters.where('bookId').equals(book.id).sortBy('orderIndex');
+      const chapters = await db.chapters.where('bookId').equals(book.id).toArray();
+      chapters.sort((a, b) => (a.order || 0) - (b.order || 0));
       if (chapters.length > 0) {
         handleOpenReader(chapters[0]);
       } else {

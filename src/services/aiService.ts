@@ -161,23 +161,18 @@ export function loadAISettings(): AISettingsConfig {
       defaults: [string, string, string],
       defaultCached: AIModelOption[]
     ): { fallbackModels: [string, string, string]; cachedModels: AIModelOption[]; lastFetchedAt?: number } => {
-      let cached = (existing?.cachedModels && Array.isArray(existing.cachedModels) && existing.cachedModels.length > 0)
+      // 1. Preserve user-fetched live API models, or use defaults if never fetched
+      const cached = (existing?.cachedModels && Array.isArray(existing.cachedModels) && existing.cachedModels.length > 0)
         ? existing.cachedModels
         : defaultCached;
 
-      // Filter out non-existent 3.8 models from cache
-      if (cached.some((m: any) => m.id?.includes('3.8'))) {
-        cached = defaultCached;
-      }
-
+      // 2. Preserve user-selected fallback models exactly as chosen
       let fb = Array.isArray(existing?.fallbackModels) ? [...existing.fallbackModels] : [];
-      // Clean non-existent 3.8 or 3.1
-      fb = fb.map((m: string) => (m && (m.includes('3.8') || m.includes('3.1')) ? defaults[0] : m));
 
-      // Guarantee fallback models are never empty
-      const m0 = fb[0] && fb[0].trim().length > 0 ? fb[0] : defaults[0];
-      const m1 = fb[1] && fb[1].trim().length > 0 ? fb[1] : defaults[1];
-      const m2 = fb[2] && fb[2].trim().length > 0 ? fb[2] : defaults[2];
+      // Guarantee model 0 has a valid value, while model 1 and 2 can be empty string (disabled) or user's choice
+      const m0 = (typeof fb[0] === 'string' && fb[0].trim().length > 0) ? fb[0].trim() : defaults[0];
+      const m1 = (typeof fb[1] === 'string') ? fb[1].trim() : defaults[1];
+      const m2 = (typeof fb[2] === 'string') ? fb[2].trim() : defaults[2];
 
       return {
         fallbackModels: [m0, m1, m2],

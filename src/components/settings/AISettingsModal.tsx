@@ -527,6 +527,12 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
                   className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-2 text-xs text-amber-800 dark:text-amber-300 font-bold focus:outline-none focus:border-amber-400 shadow-sm"
                 >
                   <option value="">-- Pilih Model Utama --</option>
+                  {currentGlobalConfig.fallbackModels[0] &&
+                    !currentGlobalConfig.cachedModels.some((m) => m.id === currentGlobalConfig.fallbackModels[0]) && (
+                      <option value={currentGlobalConfig.fallbackModels[0]}>
+                        {currentGlobalConfig.fallbackModels[0]} (Tersimpan)
+                      </option>
+                    )}
                   {currentGlobalConfig.cachedModels.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name}
@@ -546,6 +552,12 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
                   className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-2 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-amber-400 shadow-sm"
                 >
                   <option value="">-- Nonaktif (Opsional) --</option>
+                  {currentGlobalConfig.fallbackModels[1] &&
+                    !currentGlobalConfig.cachedModels.some((m) => m.id === currentGlobalConfig.fallbackModels[1]) && (
+                      <option value={currentGlobalConfig.fallbackModels[1]}>
+                        {currentGlobalConfig.fallbackModels[1]} (Tersimpan)
+                      </option>
+                    )}
                   {currentGlobalConfig.cachedModels.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name}
@@ -565,6 +577,12 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
                   className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-2 text-xs text-slate-700 dark:text-slate-300 focus:outline-none focus:border-amber-400 shadow-sm"
                 >
                   <option value="">-- Nonaktif (Opsional) --</option>
+                  {currentGlobalConfig.fallbackModels[2] &&
+                    !currentGlobalConfig.cachedModels.some((m) => m.id === currentGlobalConfig.fallbackModels[2]) && (
+                      <option value={currentGlobalConfig.fallbackModels[2]}>
+                        {currentGlobalConfig.fallbackModels[2]} (Tersimpan)
+                      </option>
+                    )}
                   {currentGlobalConfig.cachedModels.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name}
@@ -765,9 +783,6 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
             type="button"
             onClick={() => {
               saveAISettings(config);
-              // Re-read with loadAISettings sanitization to ensure state permanence
-              const ensured = loadAISettings();
-              saveAISettings(ensured);
               onSaved?.();
               onClose();
             }}
