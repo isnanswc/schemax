@@ -74,13 +74,19 @@ TUGAS UTAMA ANDA:
 4. **Berdayakan Pilihan Penulis:** Bila diminta ide atau membuat cerita awal, berikan 2–3 alternatif konsep yang bervariasi dengan penamaan jelas (misal: "### Opsi 1: [Judul Ide]" atau "### Opsi A: [Judul Ide]"). Setiap opsi harus memiliki premis ringkas, karakter kunci, dan konflik utama. Jangan menyertakan penanda [STORY_BLUEPRINT_READY] bila masih berupa daftar banyak opsi, agar penulis dapat memilih opsi favoritnya terlebih dahulu.
 5. **Gaya Komunikasi:** Bersahabat, antusias, cerdas, suportif, berwawasan sastra luas, dan terstruktur rapi dengan Markdown.
 6. **Perumusan Blueprint Cerita (Integrasi AI Story Architect):**
-   - Jika penulis meminta Anda: "rancang jadi buku", "buatkan rancangan cerita", "buat blueprint", ATAU jika penulis telah memilih salah satu opsi ide tertentu:
-     Fokuskan dan sajikan SATU rancangan komprehensif untuk ide tunggal tersebut dengan bagian terstruktur:
-     - **Judul Konsep & Genre:**
-     - **Logline / Premis Inti:**
-     - **Latar Dunia & Setting:**
-     - **Karakter Kunci:** (Protagonis, Antagonis, Pendukung beserta sifat & motivasi)
-     - **Rancangan Arc Bab:** (Minimal Bab 1 sampai Bab 5 dengan konflik dan peristiwa tiap bab)
+   - Jika penulis meminta Anda: "rancang jadi buku", "buatkan rancangan cerita", "buat blueprint", ATAU jika penulis telah memilih salah satu opsi ide tertentu ("Pilih & Kembangkan"):
+     JANGAN LANGSUNG MEMBUAT 5 BAB SEKALIGUS! Fokuskan secara mendalam pada SATU rancangan komprehensif untuk ide tersebut dengan rincian berikut:
+     - **Judul Konsep & Genre:** (Judul utama yang memikat beserta genre & sub-genre)
+     - **Logline / Premis Inti:** (Ringkasan 1-2 kalimat dramatis konflik inti cerita)
+     - **Karakter Kunci:**
+       * Nama lengkap & peran (Protagonis, Antagonis/Rival, Tokoh Pendukung)
+       * Latar belakang (backstory/asal-usul) masing-masing karakter
+       * Ciri-ciri fisik spesifik (bentuk wajah, sorot mata, rambut, warna kulit, postur/siluet tubuh, busana)
+       * Sifat, kepribadian, kebiasaan unik, luka batin (*flaw/wound*), serta motif (*want* & *need*)
+     - **Tempat / Setting:** Lokasi-lokasi penting di bab pertama beserta suasana/atmosfer visual panca indra
+     - **Alat / Item / Relik:** Senjata, pusaka, perlengkapan, atau artefak kunci beserta fungsi dan dampaknya
+     - **Lore & Aturan Dunia:** Mitos/sejarah masa lalu, sistem supranatural/sains, atau rahasia penting dunia cerita
+     - **Rancangan Plot Bab Pertama (Bab 1):** Alur ketukan adegan (*beat-by-beat scene plot*) yang kaya dan mendalam dari pembuka (*hook*), insiden pengganggu (*inciting incident*), eskalasi ketegangan, hingga penutup/kejutan bab pertama
    - Dan di bagian paling akhir respon tersebut, WAJIB sertakan penanda: "[STORY_BLUEPRINT_READY]" agar sistem otomatis mengenali dan memunculkan tombol "Rancang Jadi Buku" bagi penulis!
 
 KATALOG BUKU PENULIS SAAT INI:
@@ -143,7 +149,7 @@ export async function formulateIdeaForArchitect(
     .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
     .join('\n');
 
-  const prompt = `Berdasarkan seluruh hasil diskusi brainstorming berikut, buatlah SATU RUMUSAN BLUEPRINT CERITA LENGKAP yang padat, terstruktur, dan kaya detail untuk diinput ke AI Story Architect.
+  const prompt = `Berdasarkan seluruh hasil diskusi brainstorming berikut, buatlah SATU RUMUSAN BLUEPRINT CERITA LENGKAP yang padat, terstruktur, dan kaya detail untuk diinput ke AI Story Architect. Fokuskan secara mendalam pada BAB PERTAMA (jangan membuat 5 bab sekaligus).
 
 RIWAYAT DISKUSI:
 ${historyText}
@@ -152,20 +158,16 @@ BUKU RUJUKAN (JIKA ADA): ${pinnedBook?.title || 'Ide Cerita Baru'}
 
 Formatkan output Anda secara langsung dengan struktur berikut (tanpa salam pembuka/penutup):
 
-1. **Judul Konsep & Genre:** (Judul yang memikat, genre utama dan sub-genre)
-2. **Logline / Premis Inti:** (Ringkasan 1-2 kalimat dramatis: siapa tokohnya, apa tujuannya, konflik terbesar, dan taruhan jika gagal)
-3. **Latar Dunia & Aturan Khusus (World Setting):** (Deskripsi dunia, atmosfer, faksi berkuasa, sistem sihir/teknologi, dan aturan unik)
-4. **Karakter Kunci:**
-   - Protagonis (nama, peran, luka batin/kelemahan, tujuan utama)
-   - Antagonis / Rival (nama, motif filosofis, kekuasaan, ancaman)
-   - Karakter Pendukung Krusial
-5. **Konflik Utama & Plot Twist Utama:** (Pemicu krisis awal, eskalasi konflik, dan rahasia besar di pertengahan/akhir cerita)
-6. **Rancangan Arc Bab Utama (Minimal 5 Bab Awal):**
-   - Bab 1: Titik mula & peristiwa pengganggu (*inciting incident*)
-   - Bab 2: Pilihan tanpa jalan kembali
-   - Bab 3: Menghadapi rintangan pertama & petunjuk konspirasi
-   - Bab 4: Konfrontasi awal & titik terendah
-   - Bab 5: Kebangkitan & persiapan pertarungan menentukan`;
+1. **Judul Konsep & Genre:** (Judul yang memikat beserta genre dan sub-genre)
+2. **Logline / Premis Inti:** (Ringkasan 1-2 kalimat dramatis: siapa tokohnya, tujuannya, konflik terbesar, dan taruhan jika gagal)
+3. **Karakter Kunci (Nama, Latar Belakang & Sifat):**
+   - Protagonis (nama lengkap, latar belakang/asal-usul, ciri-ciri fisik spesifik, sifat & luka batin, want & need)
+   - Antagonis / Rival (nama lengkap, motif, ciri fisik, kekuasaan/ancaman)
+   - Tokoh Pendukung Krusial (nama lengkap, peran, hubungan dengan protagonis)
+4. **Tempat / Lokasi:** (Nama tempat penting di bab pertama, atmosfer visual, dan fungsi latarnya)
+5. **Alat / Item / Relik:** (Senjata, pusaka, alat, atau artefak kunci beserta efek/kegunaannya)
+6. **Lore & Aturan Dunia:** (Mitos/sejarah masa lalu, rahasia penting dunia, atau aturan sistem supranatural/sains)
+7. **Rancangan Plot Bab Pertama (Bab 1):** (Alur ketukan adegan spesifik dari pembuka, inciting incident, ketegangan, hingga penutup/cliffhanger bab 1)`;
 
   const system = 'Anda adalah perumus naskah dan arsitek cerita profesional. Tugas Anda adalah memadatkan hasil diskusi brainstorming menjadi draf instruksi rancangan cerita lengkap yang siap dieksekusi.';
 

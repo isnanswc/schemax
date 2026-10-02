@@ -470,7 +470,13 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
 
   const handleSelectOptionInChat = (opt: StoryOptionItem) => {
     handleSendMessage(
-      `Saya memilih ${opt.key}: "${opt.title}". Tolong fokuskan pada ide ini, elaborasi premis, latar dunia, detail karakter kunci, dan susun rancangan 5 bab awalnya agar siap dijadikan buku!`
+      `Saya memilih ${opt.key}: "${opt.title}". Tolong kembangkan ide ini secara mendalam dengan fokus pada BAB PERTAMA (jangan langsung buat 5 bab). Rincikan secara terstruktur:\n` +
+      `1. **Nama & Latar Belakang Karakter**: Siapa saja nama lengkap dan latar belakang (asal-usul) masing-masing karakter (protagonis, rival/antagonis, tokoh pendukung).\n` +
+      `2. **Ciri-Ciri & Sifat Karakter**: Ciri fisik spesifik, sifat, kepribadian, kebiasaan, luka batin (flaw), serta motivasi want & need.\n` +
+      `3. **Tempat / Lokasi**: Tempat-tempat penting di bab pertama beserta suasana/atmosfer visualnya.\n` +
+      `4. **Alat / Item / Relik**: Benda, senjata, pusaka, atau instrumen penting yang digunakan atau menjadi pusat misteri.\n` +
+      `5. **Lore & Aturan Dunia**: Sejarah, mitos, atau aturan supranatural/teknologi di baliknya.\n` +
+      `6. **Plot Bab Pertama (Bab 1)**: Alur ketukan adegan rinci dari adegan pembuka yang memikat, insiden pengganggu, eskalasi konflik, hingga penutup bab pertama agar siap dirancang menjadi buku!`
     );
   };
 
@@ -870,7 +876,7 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
               type="button"
               onClick={() =>
                 handleSendMessage(
-                  'Tolong rumuskan dan susun seluruh hasil diskusi kita sejauh ini menjadi Rancangan Blueprint Cerita lengkap (Judul Konsep & Genre, Logline/Premis, Latar Dunia, Karakter Kunci, dan Arc Bab 1 sampai 5) agar siap diwujudkan menjadi buku baru!'
+                  'Tolong rumuskan seluruh hasil diskusi kita sejauh ini menjadi Rancangan Blueprint Cerita lengkap dengan fokus mendalam pada BAB PERTAMA (jangan membuat 5 bab): rincikan nama & latar belakang karakter, ciri fisik & sifat, tempat, alat/relik, lore dunia, serta plot detail Bab 1 agar siap diwujudkan menjadi buku baru!'
                 )
               }
               disabled={isSending || isFetchingExternal}
