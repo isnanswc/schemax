@@ -4,7 +4,7 @@ import {
   Send,
   Plus,
   Trash2,
-  Edit2,
+  Edit3,
   BookOpen,
   Layers,
   ChevronDown,
@@ -301,7 +301,7 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
   };
 
   return (
-    <div className="relative flex flex-col h-[calc(100vh-68px)] max-w-5xl mx-auto px-2 sm:px-4 py-2 select-text">
+    <div className="relative flex flex-col h-[calc(100dvh-130px)] sm:h-[calc(100vh-140px)] max-w-5xl mx-auto px-2 sm:px-4 py-2 select-text">
       {/* 1. TOP HEADER BAR */}
       <header className="flex items-center justify-between px-3 py-2.5 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm z-20 flex-shrink-0 mb-2">
         <div className="flex items-center gap-2 min-w-0">
@@ -605,7 +605,7 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
                             className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                             title="Ganti Judul"
                           >
-                            <Edit2 className="w-3 h-3" />
+                            <Edit3 className="w-3 h-3" />
                           </button>
                           <button
                             type="button"

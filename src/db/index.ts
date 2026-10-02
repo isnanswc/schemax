@@ -313,6 +313,7 @@ export async function clearCharacterChat(bookId: string, entityId: string): Prom
 // ==========================================
 export async function getInspirationSessions(): Promise<InspirationChatSession[]> {
   try {
+    if (!db.inspirationChats) return [];
     return await db.inspirationChats.orderBy('updatedAt').reverse().toArray();
   } catch (err) {
     console.error('Failed to get inspiration sessions:', err);
@@ -322,6 +323,7 @@ export async function getInspirationSessions(): Promise<InspirationChatSession[]
 
 export async function getInspirationSession(id: string): Promise<InspirationChatSession | undefined> {
   try {
+    if (!db.inspirationChats) return undefined;
     return await db.inspirationChats.get(id);
   } catch (err) {
     console.error('Failed to get inspiration session:', err);
@@ -359,25 +361,48 @@ Ada ide awal, genre, atau buku yang ingin kita bahas bersama hari ini?`,
     updatedAt: Date.now(),
   };
 
-  await db.inspirationChats.put(session);
+  try {
+    if (db.inspirationChats) {
+      await db.inspirationChats.put(session);
+    }
+  } catch (err) {
+    console.error('Failed to persist new inspiration session:', err);
+  }
   return session;
 }
 
 export async function saveInspirationSession(session: InspirationChatSession): Promise<void> {
-  session.updatedAt = Date.now();
-  await db.inspirationChats.put(session);
+  try {
+    session.updatedAt = Date.now();
+    if (db.inspirationChats) {
+      await db.inspirationChats.put(session);
+    }
+  } catch (err) {
+    console.error('Failed to save inspiration session:', err);
+  }
 }
 
 export async function deleteInspirationSession(id: string): Promise<void> {
-  await db.inspirationChats.delete(id);
+  try {
+    if (db.inspirationChats) {
+      await db.inspirationChats.delete(id);
+    }
+  } catch (err) {
+    console.error('Failed to delete inspiration session:', err);
+  }
 }
 
 export async function updateInspirationSessionTitle(id: string, newTitle: string): Promise<void> {
-  const existing = await db.inspirationChats.get(id);
-  if (existing) {
-    existing.title = newTitle.trim() || 'Sesi Brainstorming';
-    existing.updatedAt = Date.now();
-    await db.inspirationChats.put(existing);
+  try {
+    if (!db.inspirationChats) return;
+    const existing = await db.inspirationChats.get(id);
+    if (existing) {
+      existing.title = newTitle.trim() || 'Sesi Brainstorming';
+      existing.updatedAt = Date.now();
+      await db.inspirationChats.put(existing);
+    }
+  } catch (err) {
+    console.error('Failed to update inspiration session title:', err);
   }
 }
 
