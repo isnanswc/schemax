@@ -175,6 +175,21 @@ export function App() {
     setReadingChapter(chapter);
   };
 
+  const handleReadBook = async (book: Book) => {
+    setCurrentBook(book);
+    try {
+      const chapters = await db.storyChapters.where('bookId').equals(book.id).sortBy('orderIndex');
+      if (chapters.length > 0) {
+        handleOpenReader(chapters[0]);
+      } else {
+        setActiveTab('chapters');
+      }
+    } catch (e) {
+      console.error('Failed to open reader for book:', e);
+      setActiveTab('chapters');
+    }
+  };
+
   const handleBackFromReader = () => {
     navStack.pop('reader');
     setReadingChapter(null);
@@ -337,6 +352,7 @@ export function App() {
                     books={books}
                     chapterCounts={chapterCounts}
                     onSelectBook={handleSelectBook}
+                    onReadBook={handleReadBook}
                     onOpenCreateModal={handleOpenCreateModal}
                     onOpenStoryArchitect={handleOpenArchitect}
                   />
@@ -367,6 +383,7 @@ export function App() {
                     }}
                     onNavigateToTab={setActiveTab}
                     onOpenGDriveSettings={handleOpenGDriveSettings}
+                    onOpenReader={handleOpenReader}
                   />
                 )}
 

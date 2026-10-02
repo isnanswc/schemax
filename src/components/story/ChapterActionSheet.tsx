@@ -97,7 +97,7 @@ export const ChapterActionSheet: React.FC<ChapterActionSheetProps> = ({
                 onClose();
                 onOpenReader(chapter);
               }}
-              className="w-full py-3 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-slate-100 font-bold text-xs sm:text-sm active:scale-95 transition flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-700"
+              className="w-full py-3 px-4 rounded-2xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-900 dark:text-amber-300 font-black text-xs sm:text-sm active:scale-95 transition flex items-center justify-center gap-2 border border-amber-500/40 shadow-xs"
             >
               <BookOpen className="w-4 h-4 text-amber-500" />
               <span>Buka Mode Baca 📖</span>

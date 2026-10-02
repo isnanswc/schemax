@@ -18,6 +18,7 @@ interface WorksViewProps {
   onSelectBook: (book: Book) => void;
   onOpenCreateModal: (defaultStatus?: BookStatus) => void;
   onOpenStoryArchitect?: () => void;
+  onReadBook?: (book: Book) => void;
 }
 
 export const WorksView: React.FC<WorksViewProps> = ({
@@ -26,6 +27,7 @@ export const WorksView: React.FC<WorksViewProps> = ({
   onSelectBook,
   onOpenCreateModal,
   onOpenStoryArchitect,
+  onReadBook,
 }) => {
   const [activeCategory, setActiveCategory] = useState<'all' | BookStatus>('released');
   const [searchQuery, setSearchQuery] = useState('');
@@ -210,6 +212,7 @@ export const WorksView: React.FC<WorksViewProps> = ({
               key={book.id}
               book={book}
               onSelect={onSelectBook}
+              onRead={onReadBook}
               chapterCount={chapterCounts[book.id] || 0}
             />
           ))}

@@ -1,5 +1,16 @@
 import { loadAISettings, GEMINI_NON_BLOCK_SAFETY_SETTINGS } from './aiService';
 import { hashString } from '../utils/tensionUtils';
+import { getCachedTTSAudio, saveTTSAudioBlob } from './ttsCacheService';
+
+export function base64ToBlob(base64: string, mimeType: string = 'audio/wav'): Blob {
+  const binaryString = window.atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return new Blob([bytes], { type: mimeType });
+}
 
 export type TTSEngineMode = 'auto' | 'gemini' | 'groq' | 'wasm';
 
@@ -325,7 +336,7 @@ export function formatTextWithEmotionTags(
  */
 export async function generateGeminiSpeechAudio(
   text: string,
-  modelName: string = 'gemini-2.0-flash',
+  modelName: string = 'gemini-3.8-flash-preview',
   voiceName: string = 'Aoede',
   emotionTag?: {
     emotion?: string;
@@ -333,11 +344,34 @@ export async function generateGeminiSpeechAudio(
     speaker?: string;
     isDialogue?: boolean;
     actingNotes?: string;
+  },
+  cacheOptions?: {
+    chapterId?: string;
+    paragraphIndex?: number;
+    forceRegenerate?: boolean;
   }
-): Promise<{ audioUrl: string; mimeType: string }> {
+): Promise<{ audioUrl: string; mimeType: string; fromCache?: boolean }> {
   const cleanText = text.trim();
   if (!cleanText) {
     throw new Error('Teks naskah kosong.');
+  }
+
+  // 1. Cek cache IndexedDB terlebih dahulu untuk menghemat token 100%!
+  if (cacheOptions?.chapterId !== undefined && cacheOptions?.paragraphIndex !== undefined && !cacheOptions.forceRegenerate) {
+    const cached = await getCachedTTSAudio(
+      cacheOptions.chapterId,
+      cacheOptions.paragraphIndex,
+      cleanText,
+      'gemini',
+      voiceName
+    );
+    if (cached && !cached.isStale) {
+      return {
+        audioUrl: cached.audioUrl,
+        mimeType: cached.item.mimeType,
+        fromCache: true,
+      };
+    }
   }
 
   const taggedText = formatTextWithEmotionTags(
@@ -349,10 +383,11 @@ export async function generateGeminiSpeechAudio(
   );
 
   const cacheKey = `gemini_${modelName}_${voiceName}_${hashString(taggedText)}`;
-  if (audioUrlCache.has(cacheKey)) {
+  if (audioUrlCache.has(cacheKey) && !cacheOptions?.forceRegenerate) {
     return {
       audioUrl: audioUrlCache.get(cacheKey)!,
       mimeType: 'audio/wav',
+      fromCache: true,
     };
   }
 
@@ -468,10 +503,26 @@ export async function generateGeminiSpeechAudio(
           const inlineObj = inlineDataPart.inlineData || inlineDataPart.inline_data;
           const mimeType = inlineObj.mimeType || inlineObj.mime_type || 'audio/wav';
           const base64Data = inlineObj.data;
-          const audioUrl = `data:${mimeType};base64,${base64Data}`;
+          const blob = base64ToBlob(base64Data, mimeType);
+
+          let audioUrl: string;
+          if (cacheOptions?.chapterId !== undefined && cacheOptions?.paragraphIndex !== undefined) {
+            audioUrl = await saveTTSAudioBlob(
+              cacheOptions.chapterId,
+              cacheOptions.paragraphIndex,
+              cleanText,
+              'gemini',
+              targetModel,
+              voiceName,
+              blob,
+              mimeType
+            );
+          } else {
+            audioUrl = URL.createObjectURL(blob);
+          }
 
           audioUrlCache.set(cacheKey, audioUrl);
-          return { audioUrl, mimeType };
+          return { audioUrl, mimeType, fromCache: false };
         }
 
         // 2. Jika model mengembalikan teks alih-alih audio (misal model chat non-audio atau salah model ID)
@@ -564,11 +615,34 @@ export async function generateGroqSpeechAudio(
     intensity?: number;
     speaker?: string;
     isDialogue?: boolean;
+  },
+  cacheOptions?: {
+    chapterId?: string;
+    paragraphIndex?: number;
+    forceRegenerate?: boolean;
   }
-): Promise<{ audioUrl: string; mimeType: string }> {
+): Promise<{ audioUrl: string; mimeType: string; fromCache?: boolean }> {
   const cleanText = text.trim();
   if (!cleanText) {
     throw new Error('Teks naskah kosong.');
+  }
+
+  // 1. Cek cache IndexedDB terlebih dahulu
+  if (cacheOptions?.chapterId !== undefined && cacheOptions?.paragraphIndex !== undefined && !cacheOptions.forceRegenerate) {
+    const cached = await getCachedTTSAudio(
+      cacheOptions.chapterId,
+      cacheOptions.paragraphIndex,
+      cleanText,
+      'groq',
+      voiceName
+    );
+    if (cached && !cached.isStale) {
+      return {
+        audioUrl: cached.audioUrl,
+        mimeType: cached.item.mimeType,
+        fromCache: true,
+      };
+    }
   }
 
   const taggedText = formatTextWithEmotionTags(
@@ -580,10 +654,11 @@ export async function generateGroqSpeechAudio(
   );
 
   const cacheKey = `groq_${modelName}_${voiceName}_${hashString(taggedText)}`;
-  if (audioUrlCache.has(cacheKey)) {
+  if (audioUrlCache.has(cacheKey) && !cacheOptions?.forceRegenerate) {
     return {
       audioUrl: audioUrlCache.get(cacheKey)!,
       mimeType: 'audio/wav',
+      fromCache: true,
     };
   }
 
@@ -620,10 +695,24 @@ export async function generateGroqSpeechAudio(
   }
 
   const blob = await response.blob();
-  const audioUrl = URL.createObjectURL(blob);
-  audioUrlCache.set(cacheKey, audioUrl);
+  let audioUrl: string;
+  if (cacheOptions?.chapterId !== undefined && cacheOptions?.paragraphIndex !== undefined) {
+    audioUrl = await saveTTSAudioBlob(
+      cacheOptions.chapterId,
+      cacheOptions.paragraphIndex,
+      cleanText,
+      'groq',
+      modelName,
+      voiceName,
+      blob,
+      'audio/wav'
+    );
+  } else {
+    audioUrl = URL.createObjectURL(blob);
+  }
 
-  return { audioUrl, mimeType: 'audio/wav' };
+  audioUrlCache.set(cacheKey, audioUrl);
+  return { audioUrl, mimeType: 'audio/wav', fromCache: false };
 }
 
 /**
@@ -641,23 +730,49 @@ export async function generateUnifiedSpeechAudio(
     speaker?: string;
     isDialogue?: boolean;
     actingNotes?: string;
+  },
+  cacheOptions?: {
+    chapterId?: string;
+    paragraphIndex?: number;
+    forceRegenerate?: boolean;
   }
-): Promise<{ audioUrl: string; audioUrls?: string[]; mimeType: string; usedEngine: TTSEngineMode }> {
+): Promise<{ audioUrl: string; audioUrls?: string[]; mimeType: string; usedEngine: TTSEngineMode; fromCache?: boolean }> {
+  const cleanText = text.trim();
+
+  // Check persistent IndexedDB cache first
+  if (cacheOptions?.chapterId !== undefined && cacheOptions?.paragraphIndex !== undefined && !cacheOptions.forceRegenerate) {
+    const cached = await getCachedTTSAudio(
+      cacheOptions.chapterId,
+      cacheOptions.paragraphIndex,
+      cleanText,
+      engine === 'auto' ? 'gemini' : engine,
+      voiceName || 'default'
+    );
+    if (cached && !cached.isStale) {
+      return {
+        audioUrl: cached.audioUrl,
+        mimeType: cached.item.mimeType,
+        usedEngine: (cached.item.engine as TTSEngineMode) || engine,
+        fromCache: true,
+      };
+    }
+  }
+
   // If user selected Gemini directly:
   if (engine === 'gemini') {
-    const res = await generateGeminiSpeechAudio(text, modelName, voiceName, emotionTag);
+    const res = await generateGeminiSpeechAudio(cleanText, modelName, voiceName, emotionTag, cacheOptions);
     return { ...res, usedEngine: 'gemini' };
   }
 
   // If user selected Groq directly:
   if (engine === 'groq') {
-    const res = await generateGroqSpeechAudio(text, modelName, voiceName, emotionTag);
+    const res = await generateGroqSpeechAudio(cleanText, modelName, voiceName, emotionTag, cacheOptions);
     return { ...res, usedEngine: 'groq' };
   }
 
   // If user selected WASM directly:
   if (engine === 'wasm') {
-    const res = await generateWasmSpeechAudio(text);
+    const res = await generateWasmSpeechAudio(cleanText);
     return { ...res, usedEngine: 'wasm' };
   }
 
@@ -675,10 +790,11 @@ export async function generateUnifiedSpeechAudio(
     try {
       const activeGeminiModel = modelName || extraConfig.selectedGeminiModel || 'gemini-3.8-flash-preview';
       const res = await generateGeminiSpeechAudio(
-        text,
+        cleanText,
         activeGeminiModel,
         voiceName || extraConfig.selectedVoice || 'Aoede',
-        emotionTag
+        emotionTag,
+        cacheOptions
       );
       return { ...res, usedEngine: 'gemini' };
     } catch (e: any) {
@@ -695,10 +811,11 @@ export async function generateUnifiedSpeechAudio(
       const activeGroqModel = modelName || extraConfig.selectedGroqModel;
       if (activeGroqModel) {
         const res = await generateGroqSpeechAudio(
-          text,
+          cleanText,
           activeGroqModel,
           voiceName || 'autumn',
-          emotionTag
+          emotionTag,
+          cacheOptions
         );
         return { ...res, usedEngine: 'groq' };
       }
@@ -708,7 +825,7 @@ export async function generateUnifiedSpeechAudio(
   }
 
   // 3. Fallback utama: WASM Mobile Free Natural Stream (100% Free, 0 Limits)
-  const res = await generateWasmSpeechAudio(text);
+  const res = await generateWasmSpeechAudio(cleanText);
   return { ...res, usedEngine: 'wasm' };
 }
 

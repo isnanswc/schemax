@@ -1,6 +1,20 @@
 import Dexie, { Table } from 'dexie';
 import { Book, StoryChapter, WorldEntity, MediaItem, CharacterChatSession, InspirationChatSession } from '../types';
 
+export interface TTSAudioCacheItem {
+  id: string; // `${chapterId || 'general'}_${paragraphIndex}_${engine}_${voice}`
+  chapterId?: string;
+  paragraphIndex: number;
+  textHash: string;
+  engine: string;
+  model: string;
+  voice: string;
+  audioBlob: Blob;
+  mimeType: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export class StoryStudioDB extends Dexie {
   books!: Table<Book>;
   chapters!: Table<StoryChapter>;
@@ -8,6 +22,7 @@ export class StoryStudioDB extends Dexie {
   media!: Table<MediaItem>;
   characterChats!: Table<CharacterChatSession>;
   inspirationChats!: Table<InspirationChatSession>;
+  ttsAudioCaches!: Table<TTSAudioCacheItem>;
 
   constructor() {
     super('SchemaxStoryStudioDB');
@@ -22,6 +37,9 @@ export class StoryStudioDB extends Dexie {
     });
     this.version(3).stores({
       inspirationChats: 'id, title, pinnedBookId, updatedAt, createdAt'
+    });
+    this.version(4).stores({
+      ttsAudioCaches: 'id, chapterId, paragraphIndex, textHash, engine, updatedAt'
     });
   }
 }

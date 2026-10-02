@@ -178,10 +178,10 @@ export const ChapterCard: React.FC<ChapterCardProps> = ({
                 e.stopPropagation();
                 onOpenReader(chapter);
               }}
-              className="py-1 px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-[11px] flex items-center gap-1 active:scale-95 transition"
+              className="py-1 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] sm:text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition"
               title="Baca Bab Ini (Mode Baca Bebas Distraksi)"
             >
-              <BookOpen className="w-3 h-3 text-amber-500" />
+              <BookOpen className="w-3.5 h-3.5 text-slate-950" />
               <span>Baca</span>
             </button>
           )}

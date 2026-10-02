@@ -18,7 +18,8 @@ import {
   Sliders,
   Repeat,
   Key,
-  ShieldCheck
+  ShieldCheck,
+  HardDrive
 } from 'lucide-react';
 import { ParagraphTensionItem, ParagraphEmotionTag } from '../../../types';
 import { getEmotionAcoustics } from '../../../services/dramaDirectorService';
@@ -51,6 +52,8 @@ import { TTSConfigModal } from './TTSConfigModal';
 export type FullTTSEngine = TTSEngineMode | 'browser';
 
 interface ReaderTTSPlayerProps {
+  chapterId?: string;
+  onAudioCached?: () => void;
   paragraphs: string[];
   tensionItems?: ParagraphTensionItem[];
   emotionTags?: ParagraphEmotionTag[];
@@ -62,6 +65,8 @@ interface ReaderTTSPlayerProps {
 }
 
 export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
+  chapterId,
+  onAudioCached,
   paragraphs,
   tensionItems = [],
   emotionTags = [],
@@ -281,6 +286,9 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
       }
     : tensionModulation;
 
+  const [isBatchCaching, setIsBatchCaching] = useState(false);
+  const [batchCacheProgress, setBatchCacheProgress] = useState<{ current: number; total: number } | null>(null);
+
   // Background prefetch function to buffer paragraph audio ahead of time
   const prefetchParagraph = async (index: number) => {
     if (index < 0 || index >= paragraphs.length || ttsEngine === 'browser') return;
@@ -297,7 +305,8 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
         ttsEngine as TTSEngineMode,
         selectedModel,
         selectedVoice,
-        tag
+        tag,
+        chapterId ? { chapterId, paragraphIndex: index } : undefined
       );
 
       const urls = res.audioUrls && res.audioUrls.length > 0 ? res.audioUrls : [res.audioUrl];
@@ -306,6 +315,9 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
         const audio = new Audio(urls[0]);
         audio.preload = 'auto';
         audio.load();
+      }
+      if (chapterId && onAudioCached) {
+        onAudioCached();
       }
     } catch (e) {
       console.warn(`[TTS Prefetch] Background prefetch paragraf ${index}:`, e);
@@ -568,13 +580,18 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
         ttsEngine as TTSEngineMode,
         selectedModel,
         selectedVoice,
-        tag
+        tag,
+        chapterId ? { chapterId, paragraphIndex: index } : undefined
       );
 
       // If user stopped or new speak started while fetch was underway, abort
       if (playbackSessionIdRef.current !== currentSession || !isPlayingRef.current) {
         setIsLoadingAudio(false);
         return;
+      }
+
+      if (chapterId && onAudioCached) {
+        onAudioCached();
       }
 
       const urls = res.audioUrls && res.audioUrls.length > 0 ? res.audioUrls : [res.audioUrl];
@@ -608,6 +625,41 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
       if (playbackSessionIdRef.current === currentSession) {
         setIsLoadingAudio(false);
       }
+    }
+  };
+
+  // Batch generate and cache all paragraphs of chapter for offline use / 0 token playback
+  const handleBatchSaveChapterAudio = async () => {
+    if (!chapterId || isBatchCaching || ttsEngine === 'browser') return;
+    setIsBatchCaching(true);
+    setEngineNotice(null);
+    let count = 0;
+    try {
+      for (let i = 0; i < paragraphs.length; i++) {
+        const text = paragraphs[i]?.trim();
+        if (!text) continue;
+        setBatchCacheProgress({ current: i + 1, total: paragraphs.length });
+        const tag = emotionTags.find((t) => t.paragraphIndex === i);
+        await generateUnifiedSpeechAudio(
+          text,
+          ttsEngine as TTSEngineMode,
+          selectedModel,
+          selectedVoice,
+          tag,
+          { chapterId, paragraphIndex: i }
+        );
+        count++;
+        if (onAudioCached) {
+          onAudioCached();
+        }
+      }
+      setEngineNotice(`Audio tersimpan (${count} paragraf). Pemutaran berikutnya 0 token / hemat kuota!`);
+    } catch (err: any) {
+      console.warn('Gagal batch simpan audio:', err);
+      setEngineNotice(`Gagal menyimpan beberapa audio: ${err.message || 'Error'}`);
+    } finally {
+      setIsBatchCaching(false);
+      setBatchCacheProgress(null);
     }
   };
 
@@ -810,6 +862,35 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
             </div>
 
             <div className="flex items-center gap-1.5 flex-shrink-0">
+              {/* Button to batch save entire chapter audio to IndexedDB */}
+              {chapterId && ttsEngine !== 'browser' && (
+                <button
+                  type="button"
+                  onClick={handleBatchSaveChapterAudio}
+                  disabled={isBatchCaching}
+                  className={`p-1.5 rounded-xl border text-[10px] font-bold flex items-center gap-1 transition active:scale-95 ${
+                    isBatchCaching
+                      ? 'bg-amber-500/20 text-amber-500 border-amber-500/40'
+                      : 'text-slate-400 hover:text-amber-500 border-transparent hover:border-amber-500/20 hover:bg-amber-500/10'
+                  }`}
+                  title="Simpan seluruh audio bab ini ke memori perangkat (Offline / Hemat Token)"
+                >
+                  {isBatchCaching ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />
+                      <span className="text-[9px]">
+                        {batchCacheProgress ? `${batchCacheProgress.current}/${batchCacheProgress.total}` : 'Menyimpan...'}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <HardDrive className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline text-[10px]">Simpan Bab</span>
+                    </>
+                  )}
+                </button>
+              )}
+
               {/* Button to open TTS Key Config */}
               <button
                 type="button"

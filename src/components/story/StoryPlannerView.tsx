@@ -263,14 +263,30 @@ export const StoryPlannerView: React.FC<StoryPlannerViewProps> = ({
           </button>
         </div>
 
-        {/* Add Planned Story Button */}
-        <button
-          onClick={handleOpenAddModal}
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 py-2 px-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-95 text-slate-950 font-bold rounded-xl text-xs shadow-md shadow-amber-500/15 transition flex-shrink-0"
-        >
-          <Plus className="w-4 h-4 stroke-[2.5]" />
-          <span>Tambah Rencana Bab</span>
-        </button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {chapters.length > 0 && onOpenReader && (
+            <button
+              onClick={() => {
+                const sorted = [...chapters].sort((a, b) => (a.order || 0) - (b.order || 0));
+                onOpenReader(sorted[0]);
+              }}
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 py-2 px-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 font-bold rounded-xl text-xs shadow-sm transition active:scale-95"
+              title="Buka Mode Baca bebas distraksi mulai dari Bab 1"
+            >
+              <BookOpen className="w-4 h-4 text-amber-500" />
+              <span>Mode Baca</span>
+            </button>
+          )}
+
+          {/* Add Planned Story Button */}
+          <button
+            onClick={handleOpenAddModal}
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 py-2 px-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-95 text-slate-950 font-bold rounded-xl text-xs shadow-md shadow-amber-500/15 transition flex-shrink-0"
+          >
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <span>Tambah Bab</span>
+          </button>
+        </div>
       </div>
 
       {/* Chapters List */}

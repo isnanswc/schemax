@@ -10,7 +10,10 @@ import {
   List,
   Check,
   Sparkles,
-  Bookmark
+  Bookmark,
+  RotateCcw,
+  HardDrive,
+  Play
 } from 'lucide-react';
 import { StoryChapter, Book, ChapterEmotionScript } from '../../../types';
 import { db } from '../../../db';
@@ -26,6 +29,11 @@ import {
   analyzeChapterDramaScriptWithAI,
   getEmotionAcoustics
 } from '../../../services/dramaDirectorService';
+import {
+  getChapterParagraphAudioStatuses,
+  deleteParagraphTTSCache,
+  TTSCacheStatus
+} from '../../../services/ttsCacheService';
 
 interface ChapterReaderViewProps {
   chapter: StoryChapter;
@@ -165,7 +173,41 @@ export const ChapterReaderView: React.FC<ChapterReaderViewProps> = ({
     lastScrollTopRef.current = currentScroll;
   };
 
-  // Scroll active TTS paragraph into view
+  // TTS Audio Cache Statuses per paragraph (IndexedDB persistent cache)
+  const [cacheStatuses, setCacheStatuses] = useState<Record<number, TTSCacheStatus>>({});
+  const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(null);
+
+  const refreshCacheStatuses = async () => {
+    if (!localChapter?.id || paragraphs.length === 0) return;
+    try {
+      const statuses = await getChapterParagraphAudioStatuses(localChapter.id, paragraphs);
+      setCacheStatuses(statuses);
+    } catch (err) {
+      console.warn('Gagal memuat status cache TTS:', err);
+    }
+  };
+
+  useEffect(() => {
+    refreshCacheStatuses();
+  }, [localChapter.id, localChapter.contentHtml]);
+
+  const handleRegenerateParagraphAudio = async (idx: number) => {
+    if (!localChapter?.id) return;
+    setRegeneratingIndex(idx);
+    try {
+      await deleteParagraphTTSCache(localChapter.id, idx);
+      await refreshCacheStatuses();
+      // Buka TTS player dan jalankan paragraf ini
+      setActiveTTSParagraph(idx);
+      setIsTTSActive(true);
+    } catch (err) {
+      console.warn('Gagal menghapus cache audio paragraf:', err);
+    } finally {
+      setRegeneratingIndex(null);
+    }
+  };
+
+  // Scroll active TTS paragraph into view (Smooth Karaoke Tracker)
   useEffect(() => {
     if (!isTTSActive) return;
     const el = document.getElementById(`reader-p-${activeTTSParagraph}`);
@@ -363,33 +405,113 @@ export const ChapterReaderView: React.FC<ChapterReaderViewProps> = ({
                   ? getEmotionAcoustics(emotionTag.emotion, emotionTag.intensity)
                   : null;
 
+                const cacheStatus = cacheStatuses[idx];
+                const isRegenerating = regeneratingIndex === idx;
+
                 return (
-                  <div key={idx} className="group/para space-y-1">
-                    {/* Optional Drama & Emotion Actor Cue Badge */}
-                    {settings.showEmotionCues && emotionTag && emotionAcoustics && (
-                      <div className="flex items-center gap-1.5 opacity-70 group-hover/para:opacity-100 transition-opacity">
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${emotionAcoustics.color}`}
-                          title={`[Petunjuk Akting]: ${emotionTag.actingNotes}`}
-                        >
-                          <span>{emotionAcoustics.icon}</span>
-                          <span>{emotionTag.speaker}</span>
-                          <span className="opacity-40">•</span>
-                          <span className="font-normal">{emotionTag.emotionLabel}</span>
-                        </span>
+                  <div
+                    key={idx}
+                    id={`reader-p-${idx}`}
+                    className={`group/para relative transition-all duration-300 rounded-2xl ${
+                      isTTSCurrent
+                        ? 'p-3.5 sm:p-4 bg-amber-500/10 dark:bg-amber-500/15 ring-2 ring-amber-500/50 shadow-lg shadow-amber-500/10'
+                        : 'p-1 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
+                    }`}
+                  >
+                    {/* Top Metadata Bar: Live Karaoke Tracker + Actor Cue + Cache Status */}
+                    <div className="flex items-center justify-between gap-2 mb-2 flex-wrap text-[11px]">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {/* Live Sound Wave Badge when this paragraph is currently spoken */}
+                        {isTTSCurrent && (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] shadow-sm animate-pulse">
+                            <span className="flex items-center gap-0.5 h-3">
+                              <span className="w-0.5 h-2.5 bg-slate-950 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                              <span className="w-0.5 h-3.5 bg-slate-950 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                              <span className="w-0.5 h-2 bg-slate-950 rounded-full animate-bounce" />
+                            </span>
+                            <span>Sedang Dibacakan</span>
+                          </div>
+                        )}
+
+                        {/* Optional Drama & Emotion Actor Cue Badge */}
+                        {settings.showEmotionCues && emotionTag && emotionAcoustics && (
+                          <span
+                            className={`font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 text-[10px] ${emotionAcoustics.color}`}
+                            title={`[Petunjuk Akting]: ${emotionTag.actingNotes}`}
+                          >
+                            <span>{emotionAcoustics.icon}</span>
+                            <span>{emotionTag.speaker}</span>
+                            <span className="opacity-40">•</span>
+                            <span className="font-normal">{emotionTag.emotionLabel}</span>
+                          </span>
+                        )}
+
+                        {/* Offline Persistent Audio Cache Badge */}
+                        {cacheStatus?.hasCache && !cacheStatus?.isStale && (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
+                            title={`Audio tersimpan di perangkat via engine ${cacheStatus.engine || 'AI'} (0 token / hemat kuota)`}
+                          >
+                            <HardDrive className="w-2.5 h-2.5" />
+                            <span>Audio Tersimpan (0 Token)</span>
+                          </span>
+                        )}
                       </div>
-                    )}
+
+                      {/* Stale Text Warning & Regenerate Button */}
+                      <div className="flex items-center gap-1.5">
+                        {cacheStatus?.isStale && (
+                          <div className="inline-flex items-center gap-1.5 bg-rose-500/10 dark:bg-rose-500/20 border border-rose-500/30 px-2 py-0.5 rounded-full">
+                            <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400">
+                              ⚠️ Teks berubah
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRegenerateParagraphAudio(idx);
+                              }}
+                              disabled={isRegenerating}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white font-black text-[9px] transition active:scale-95 shadow-xs disabled:opacity-50"
+                              title="Teks diubah sejak audio dibuat. Klik untuk men-generate ulang audio khusus paragraf ini."
+                            >
+                              <RotateCcw className={`w-2.5 h-2.5 ${isRegenerating ? 'animate-spin' : ''}`} />
+                              <span>Generate Ulang</span>
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Quick Play from this paragraph */}
+                        {!isTTSCurrent && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveTTSParagraph(idx);
+                              setIsTTSActive(true);
+                            }}
+                            className="opacity-0 group-hover/para:opacity-100 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500 hover:text-slate-950 transition active:scale-95"
+                            title="Dengarkan mulai dari paragraf ini"
+                          >
+                            <Play className="w-2.5 h-2.5 fill-current" />
+                            <span>Putar</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
 
                     <p
-                      id={`reader-p-${idx}`}
                       onClick={() => {
                         if (isTTSActive) {
                           setActiveTTSParagraph(idx);
+                        } else {
+                          setActiveTTSParagraph(idx);
+                          setIsTTSActive(true);
                         }
                       }}
                       className={`transition-all duration-200 cursor-pointer ${
                         isTTSCurrent
-                          ? 'p-3 rounded-2xl bg-amber-500/10 ring-2 ring-amber-500/40 shadow-sm font-medium'
+                          ? 'text-slate-950 dark:text-amber-50 font-medium leading-relaxed'
                           : 'hover:opacity-90'
                       }`}
                       style={{
@@ -474,6 +596,8 @@ export const ChapterReaderView: React.FC<ChapterReaderViewProps> = ({
       {/* 4. Text-To-Speech (TTS) Natural Emotive Player (When Active) */}
       {isTTSActive && paragraphs.length > 0 && (
         <ReaderTTSPlayer
+          chapterId={localChapter.id}
+          onAudioCached={refreshCacheStatuses}
           paragraphs={paragraphs}
           tensionItems={localChapter.tensionData?.items}
           emotionTags={localChapter.emotionScript?.tags}

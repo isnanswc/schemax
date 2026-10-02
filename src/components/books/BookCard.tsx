@@ -11,6 +11,7 @@ import { usePrivacy } from '../../contexts/PrivacyContext';
 interface BookCardProps {
   book: Book;
   onSelect: (book: Book) => void;
+  onRead?: (book: Book) => void;
   chapterCount?: number;
   onBookUpdated?: (updatedBook: Book) => void;
 }
@@ -18,6 +19,7 @@ interface BookCardProps {
 export const BookCard: React.FC<BookCardProps> = ({
   book,
   onSelect,
+  onRead,
   chapterCount = 0,
   onBookUpdated,
 }) => {
@@ -174,9 +176,26 @@ export const BookCard: React.FC<BookCardProps> = ({
               </span>
             </div>
 
-            <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-semibold group-hover:translate-x-0.5 transition-transform text-xs">
-              <span>Buka</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+            <div className="flex items-center gap-2">
+              {onRead && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRead(book);
+                  }}
+                  className="py-1 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1 shadow-sm active:scale-95 transition"
+                  title="Baca Buku Ini Sekarang"
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-slate-950" />
+                  <span>Baca</span>
+                </button>
+              )}
+
+              <div className="flex items-center gap-1 text-slate-600 dark:text-slate-300 font-semibold group-hover:translate-x-0.5 transition-transform text-xs">
+                <span>Buka</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </div>
             </div>
           </div>
         </div>
@@ -221,6 +240,27 @@ export const BookCard: React.FC<BookCardProps> = ({
 
             {/* Menu Options */}
             <div className="space-y-1">
+              {/* 0. Baca Buku (Mode Baca) */}
+              {onRead && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCloseMenu();
+                    onRead(book);
+                  }}
+                  className="w-full text-left px-3 py-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-900 dark:text-amber-300 flex items-center gap-3 transition text-xs font-bold active:scale-[0.98] border border-amber-500/30"
+                >
+                  <div className="p-1.5 rounded-lg bg-amber-500 text-slate-950 flex-shrink-0">
+                    <BookOpen className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="leading-tight font-black text-slate-900 dark:text-white">Baca Buku (Mode Baca)</p>
+                    <p className="text-[10px] text-amber-700 dark:text-amber-400 font-normal">Mulai membaca dari bab 1 atau bab terakhir</p>
+                  </div>
+                </button>
+              )}
+
               {/* 1. Edit Book Information */}
               <button
                 type="button"

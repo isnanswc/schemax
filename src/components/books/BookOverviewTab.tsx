@@ -34,6 +34,7 @@ interface BookOverviewTabProps {
   onBookUpdated: (updated: Book) => void;
   onNavigateToTab: (tab: any) => void;
   onOpenGDriveSettings?: () => void;
+  onOpenReader?: (chapter: StoryChapter) => void;
 }
 
 export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
@@ -44,6 +45,7 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
   onBookUpdated,
   onNavigateToTab,
   onOpenGDriveSettings,
+  onOpenReader,
 }) => {
   const { getBlurTitleClass, getBlurTextClass, getBlurImageClass } = usePrivacy();
   const [synopsis, setSynopsis] = useState(book.synopsis || '');
@@ -188,6 +190,17 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
                 </span>
 
                 <div className="flex items-center gap-2 flex-wrap">
+                  {chapters.length > 0 && onOpenReader && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenReader(chapters[0])}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-black bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-sm transition active:scale-95"
+                    >
+                      <BookOpen className="w-3.5 h-3.5" />
+                      <span>Baca Buku</span>
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     onClick={() => setIsEditModalOpen(true)}
