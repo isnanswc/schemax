@@ -262,7 +262,7 @@ export function App() {
     <div
       {...bindEmptyAreaLongPress()}
       className={`${
-        currentBook && activeTab === 'chat'
+        (currentBook && activeTab === 'chat') || (!currentBook && mainMenu === 'inspiration')
           ? 'fixed inset-0 h-[100dvh] max-h-[100dvh] overflow-hidden'
           : 'min-h-screen'
       } bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200`}
@@ -300,18 +300,20 @@ export function App() {
         />
       ) : (
         <>
-          {/* 3. Mobile-first Header */}
-          <MobileHeader
-            currentBook={currentBook}
-            onBack={currentBook ? handleBackToHome : undefined}
-            onOpenCornerMenu={handleOpenCornerMenu}
-          />
+          {/* 3. Mobile-first Header (Sembunyikan saat di tab AI Inspiration agar menempel tepat di status bar) */}
+          {(!currentBook && mainMenu === 'inspiration') ? null : (
+            <MobileHeader
+              currentBook={currentBook}
+              onBack={currentBook ? handleBackToHome : undefined}
+              onOpenCornerMenu={handleOpenCornerMenu}
+            />
+          )}
 
           {/* 3. Main Body Container - Compact & Edge-to-Edge on Mobile */}
           <main className={`flex-1 w-full max-w-4xl mx-auto ${(activeTab === 'chat' && currentBook) || (!currentBook && mainMenu === 'inspiration') ? 'p-0 overflow-hidden flex flex-col min-h-0 min-w-0' : 'px-1.5 sm:px-4 py-3 sm:py-6'}`}>
             {!currentBook ? (
               /* Home Screen: Toggle between Dashboard, Works, & Inspiration */
-              <div className={mainMenu === 'inspiration' ? 'flex-1 flex flex-col min-h-0 min-w-0' : 'space-y-4'}>
+              <div className={mainMenu === 'inspiration' ? 'flex-1 flex flex-col min-h-0 min-w-0 h-full' : 'space-y-4'}>
                 {mainMenu === 'dashboard' ? (
                   <DashboardView
                     books={books}

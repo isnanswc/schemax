@@ -32,6 +32,166 @@ import {
 } from '../../services/aiInspirationService';
 import { generateWithSmartFallback } from '../../services/aiService';
 
+interface MarkdownRendererProps {
+  content: string;
+  isUser?: boolean;
+}
+
+const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isUser }) => {
+  if (isUser) {
+    return <div className="whitespace-pre-wrap leading-relaxed select-text font-sans">{content}</div>;
+  }
+
+  const lines = content.split('\n');
+  const renderedElements: React.ReactNode[] = [];
+  let listItems: React.ReactNode[] = [];
+  let isNumberedList = false;
+
+  const flushList = () => {
+    if (listItems.length > 0) {
+      if (isNumberedList) {
+        renderedElements.push(
+          <ol key={`ol-${renderedElements.length}`} className="my-1.5 space-y-1 pl-0.5 list-none">
+            {listItems}
+          </ol>
+        );
+      } else {
+        renderedElements.push(
+          <ul key={`ul-${renderedElements.length}`} className="my-1.5 space-y-1 pl-0.5 list-none">
+            {listItems}
+          </ul>
+        );
+      }
+      listItems = [];
+      isNumberedList = false;
+    }
+  };
+
+  const parseInline = (text: string): React.ReactNode[] => {
+    const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g);
+    return parts.map((part, idx) => {
+      if (part.startsWith('`') && part.endsWith('`') && part.length >= 2) {
+        return (
+          <code
+            key={idx}
+            className="px-1.5 py-0.5 mx-0.5 rounded bg-slate-200/80 dark:bg-slate-800 text-[11px] font-mono text-amber-600 dark:text-amber-400 font-medium"
+          >
+            {part.slice(1, -1)}
+          </code>
+        );
+      }
+      if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
+        return (
+          <strong key={idx} className="font-extrabold text-slate-900 dark:text-amber-300">
+            {part.slice(2, -2)}
+          </strong>
+        );
+      }
+      if (part.startsWith('*') && part.endsWith('*') && part.length >= 2) {
+        return (
+          <em key={idx} className="italic text-slate-800 dark:text-slate-200">
+            {part.slice(1, -1)}
+          </em>
+        );
+      }
+      return part;
+    });
+  };
+
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+
+    if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
+      flushList();
+      renderedElements.push(<hr key={index} className="my-2 border-slate-200 dark:border-slate-800" />);
+      return;
+    }
+
+    if (trimmed.startsWith('### ')) {
+      flushList();
+      renderedElements.push(
+        <h4 key={index} className="text-xs sm:text-sm font-black text-amber-600 dark:text-amber-400 mt-2 mb-1 flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
+          <span>{parseInline(trimmed.replace(/^###\s+/, ''))}</span>
+        </h4>
+      );
+      return;
+    }
+    if (trimmed.startsWith('## ')) {
+      flushList();
+      renderedElements.push(
+        <h3 key={index} className="text-sm sm:text-base font-black text-amber-600 dark:text-amber-400 mt-2.5 mb-1 flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
+          <span>{parseInline(trimmed.replace(/^##\s+/, ''))}</span>
+        </h3>
+      );
+      return;
+    }
+    if (trimmed.startsWith('# ')) {
+      flushList();
+      renderedElements.push(
+        <h2 key={index} className="text-base sm:text-lg font-black text-amber-600 dark:text-amber-400 mt-3 mb-1.5">
+          {parseInline(trimmed.replace(/^#\s+/, ''))}
+        </h2>
+      );
+      return;
+    }
+
+    if (trimmed.startsWith('> ')) {
+      flushList();
+      renderedElements.push(
+        <div key={index} className="border-l-2 border-amber-500 pl-2.5 py-1 my-1.5 italic text-slate-700 dark:text-slate-300 bg-amber-500/5 rounded-r-lg text-xs sm:text-sm">
+          {parseInline(trimmed.replace(/^>\s+/, ''))}
+        </div>
+      );
+      return;
+    }
+
+    const bulletMatch = trimmed.match(/^([*\-•])\s+(.+)$/);
+    if (bulletMatch) {
+      if (isNumberedList) flushList();
+      isNumberedList = false;
+      listItems.push(
+        <li key={`li-${index}`} className="flex items-start gap-2 text-xs sm:text-sm my-0.5 leading-relaxed">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 dark:bg-amber-400 mt-1.5 flex-shrink-0" />
+          <span className="flex-1">{parseInline(bulletMatch[2])}</span>
+        </li>
+      );
+      return;
+    }
+
+    const numMatch = trimmed.match(/^(\d+)\.\s+(.+)$/);
+    if (numMatch) {
+      if (!isNumberedList && listItems.length > 0) flushList();
+      isNumberedList = true;
+      listItems.push(
+        <li key={`num-${index}`} className="flex items-start gap-2 text-xs sm:text-sm my-0.5 leading-relaxed">
+          <span className="text-[10px] font-mono font-bold px-1 py-0.2 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0">
+            {numMatch[1]}.
+          </span>
+          <span className="flex-1">{parseInline(numMatch[2])}</span>
+        </li>
+      );
+      return;
+    }
+
+    flushList();
+    if (trimmed === '') {
+      renderedElements.push(<div key={index} className="h-1" />);
+    } else {
+      renderedElements.push(
+        <p key={index} className="my-1 text-xs sm:text-sm leading-relaxed text-slate-800 dark:text-slate-200">
+          {parseInline(line)}
+        </p>
+      );
+    }
+  });
+
+  flushList();
+
+  return <div className="space-y-0.5 leading-relaxed select-text font-sans">{renderedElements}</div>;
+};
+
 interface InspirationChatViewProps {
   books: Book[];
   onOpenArchitectWithIdea: (rawIdea: string) => void;
@@ -301,45 +461,45 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
   };
 
   return (
-    <div className="relative flex flex-col h-[calc(100dvh-130px)] sm:h-[calc(100vh-140px)] max-w-5xl mx-auto px-2 sm:px-4 py-2 select-text">
-      {/* 1. TOP HEADER BAR */}
-      <header className="flex items-center justify-between px-3 py-2.5 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm z-20 flex-shrink-0 mb-2">
-        <div className="flex items-center gap-2 min-w-0">
+    <div className="relative flex flex-col h-full w-full min-h-0 overflow-hidden select-text bg-slate-50 dark:bg-slate-950">
+      {/* 1. TOP HEADER BAR (Directly under status bar with safe-top) */}
+      <header className="w-full bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-b border-slate-200/90 dark:border-slate-800/80 px-2.5 sm:px-4 py-2 safe-top flex-shrink-0 z-20 flex items-center justify-between gap-1.5 shadow-xs">
+        <div className="flex items-center gap-1.5 min-w-0">
           <button
             type="button"
             onClick={() => setIsDrawerOpen(true)}
-            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition active:scale-95"
+            className="p-1.5 sm:p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition active:scale-95 flex-shrink-0"
             title="Daftar Sesi Obrolan"
           >
             <Menu className="w-4 h-4" />
           </button>
 
           <div className="min-w-0">
-            <h2 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate flex items-center gap-1.5">
-              <span className="p-1 rounded-lg bg-amber-500/15 text-amber-500">
+            <h2 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate flex items-center gap-1">
+              <span className="p-0.5 rounded bg-amber-500/15 text-amber-500 flex-shrink-0">
                 <Sparkles className="w-3.5 h-3.5" />
               </span>
-              <span>{activeSession?.title || 'AI Inspiration Studio'}</span>
+              <span className="truncate">{activeSession?.title || 'AI Inspiration'}</span>
             </h2>
             <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
-              {activeSession ? `${activeSession.messages.length} pesan dalam memori` : 'Lab brainstorming ide'}
+              {activeSession ? `${activeSession.messages.length} pesan dalam memori` : 'Brainstorming Ide Cerita'}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           {/* Pinned Book Selector */}
-          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/80 rounded-xl px-2.5 py-1 text-xs border border-slate-200/80 dark:border-slate-700/80">
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl px-2 py-1 text-xs border border-slate-200/80 dark:border-slate-700/80">
             <BookOpen className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
             <select
               value={pinnedBookId}
               onChange={(e) => handleSelectPinnedBook(e.target.value)}
-              className="bg-transparent font-bold text-slate-800 dark:text-slate-200 focus:outline-none max-w-[130px] sm:max-w-[200px] truncate text-[11px]"
+              className="bg-transparent font-bold text-slate-800 dark:text-slate-200 focus:outline-none max-w-[90px] sm:max-w-[160px] truncate text-[11px]"
             >
-              <option value="">Ide Bebas (Semua Buku)</option>
+              <option value="">Ide Bebas</option>
               {books.map((b) => (
                 <option key={b.id} value={b.id}>
-                  Buku: {b.title}
+                  {b.title}
                 </option>
               ))}
             </select>
@@ -350,7 +510,7 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
             type="button"
             onClick={handleFormulate}
             disabled={isFormulating || !activeSession || activeSession.messages.length < 2}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs transition shadow-sm active:scale-95 disabled:opacity-50"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs transition shadow-sm active:scale-95 disabled:opacity-40"
             title="Formulasikan ide percakapan ini langsung ke AI Story Architect"
           >
             {isFormulating ? (
@@ -358,14 +518,14 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
             ) : (
               <Zap className="w-3.5 h-3.5 fill-current" />
             )}
-            <span className="hidden sm:inline">Formulasikan ke Architect</span>
-            <span className="sm:hidden">Architect</span>
+            <span className="hidden sm:inline">Ke Architect</span>
+            <span className="sm:hidden text-[11px]">Rancang</span>
           </button>
         </div>
       </header>
 
       {/* 2. CHAT MESSAGES SCROLL CONTAINER */}
-      <div className="flex-1 overflow-y-auto px-2 sm:px-4 py-3 space-y-4 rounded-2xl bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200/60 dark:border-slate-800/60">
+      <div className="flex-1 min-h-0 w-full overflow-y-auto px-2.5 sm:px-4 py-3 space-y-3 bg-slate-50/50 dark:bg-slate-950/40">
         {activeSession?.messages.map((msg) => {
           const isUser = msg.role === 'user';
           return (
@@ -384,20 +544,18 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
 
               {/* Message Bubble Card */}
               <div
-                className={`relative group p-3.5 sm:p-4 rounded-2xl text-xs sm:text-sm leading-relaxed transition-all shadow-xs ${
+                className={`relative group p-3 sm:p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed transition-all shadow-xs ${
                   isUser
                     ? 'bg-amber-500 text-slate-950 font-medium rounded-tr-xs'
                     : 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200/80 dark:border-slate-800 rounded-tl-xs'
                 }`}
               >
-                {/* Content with whitespace formatting */}
-                <div className="whitespace-pre-wrap leading-relaxed select-text font-sans">
-                  {msg.content}
-                </div>
+                {/* Formatted Content with Markdown Renderer */}
+                <MarkdownRenderer content={msg.content} isUser={isUser} />
 
                 {/* Assistant Bubble Actions (Copy & Formulate) */}
                 {!isUser && (
-                  <div className="mt-3 pt-2.5 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between gap-2 flex-wrap">
+                  <div className="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between gap-2 flex-wrap">
                     <button
                       type="button"
                       onClick={() => handleCopyMessage(msg.id, msg.content)}
@@ -411,7 +569,7 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
                       ) : (
                         <>
                           <Copy className="w-3.5 h-3.5" />
-                          <span>Salin Ide</span>
+                          <span>Salin</span>
                         </>
                       )}
                     </button>
@@ -436,7 +594,7 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
           <div className="flex items-center gap-2 p-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-xs animate-pulse">
             <Loader2 className="w-4 h-4 text-amber-500 animate-spin" />
             <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-              AI sedang merangkai ide &amp; menganalisis naskah...
+              AI sedang merangkai ide &amp; menganalisis cerita...
             </span>
           </div>
         )}
@@ -444,79 +602,81 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 3. QUICK EXTERNAL INSPIRATION CHIPS */}
-      <div className="py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-shrink-0">
+      {/* 3. QUICK EXTERNAL INSPIRATION CHIPS (Swipeable Compact Pills) */}
+      <div className="w-full max-w-full min-w-0 flex-shrink-0 px-2.5 py-1.5 bg-slate-100/70 dark:bg-slate-900/70 border-t border-slate-200/70 dark:border-slate-800/70 flex items-center gap-1.5 overflow-x-auto scrollbar-none snap-x z-10">
         <button
           type="button"
           onClick={() => handleTriggerExternal('tarot')}
           disabled={isSending || isFetchingExternal}
-          className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-700 dark:text-purple-300 border border-purple-500/30 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
+          className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/15 hover:bg-purple-500/25 text-purple-700 dark:text-purple-300 border border-purple-500/30 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
         >
           <span>🃏</span>
-          <span>Tarik Tarot (Plot Twist)</span>
+          <span>Tarot Twist</span>
         </button>
 
         <button
           type="button"
           onClick={() => handleTriggerExternal('open5e')}
           disabled={isSending || isFetchingExternal}
-          className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
+          className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
         >
           <span>🐉</span>
-          <span>Monster &amp; Artefak (Open5e)</span>
+          <span>D&amp;D Lore</span>
         </button>
 
         <button
           type="button"
           onClick={() => handleTriggerExternal('history')}
           disabled={isSending || isFetchingExternal}
-          className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 text-blue-700 dark:text-blue-300 border border-blue-500/30 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
+          className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-500/15 hover:bg-blue-500/25 text-blue-700 dark:text-blue-300 border border-blue-500/30 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
         >
           <span>⏳</span>
-          <span>Sejarah Hari Ini</span>
+          <span>Sejarah</span>
         </button>
 
         <button
           type="button"
           onClick={() => handleTriggerExternal('fact')}
           disabled={isSending || isFetchingExternal}
-          className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
+          className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
         >
           <span>💡</span>
-          <span>Fakta Unik Dunia</span>
+          <span>Fakta Unik</span>
         </button>
       </div>
 
-      {/* 4. INPUT AREA BAR */}
-      <div className="relative bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-md p-2 flex items-end gap-2 flex-shrink-0">
-        <textarea
-          ref={textareaRef}
-          value={inputMessage}
-          onChange={(e) => setInputMessage(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              handleSendMessage();
+      {/* 4. INPUT AREA BAR (Docks directly above HomeBottomNavigation) */}
+      <div className="w-full flex-shrink-0 px-2.5 pt-1.5 pb-[62px] sm:pb-3 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-t border-slate-200/80 dark:border-slate-800/80 shadow-lg z-10">
+        <div className="flex items-end gap-1.5 bg-slate-100/90 dark:bg-slate-900/90 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-1.5">
+          <textarea
+            ref={textareaRef}
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+            }}
+            placeholder={
+              pinnedBook
+                ? `Tanyakan ide kelanjutan untuk "${pinnedBook.title}"...`
+                : 'Tanyakan ide cerita, twist, motivasi tokoh, atau sistem sihir...'
             }
-          }}
-          placeholder={
-            pinnedBook
-              ? `Tanyakan ide kelanjutan untuk buku "${pinnedBook.title}"...`
-              : 'Tanyakan ide cerita, plot twist, motivasi tokoh, atau sistem sihir...'
-          }
-          rows={1}
-          className="flex-1 bg-transparent resize-none p-2 text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none max-h-32 leading-relaxed"
-        />
+            rows={1}
+            className="flex-1 bg-transparent resize-none px-2.5 py-1.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none max-h-28 leading-relaxed"
+          />
 
-        <button
-          type="button"
-          onClick={() => handleSendMessage()}
-          disabled={!inputMessage.trim() || isSending}
-          className="p-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-slate-950 font-bold transition active:scale-95 shadow-sm"
-          title="Kirim Pesan"
-        >
-          <Send className="w-4 h-4" />
-        </button>
+          <button
+            type="button"
+            onClick={() => handleSendMessage()}
+            disabled={!inputMessage.trim() || isSending}
+            className="p-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-slate-950 font-bold transition active:scale-95 shadow-sm flex-shrink-0"
+            title="Kirim Pesan"
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* 5. SIDEBAR / DRAWER LIST SESI PERCAKAPAN */}

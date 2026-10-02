@@ -2,7 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Book, StoryChapter } from '../../types';
 import { db } from '../../db';
-import { X, Printer, FileText, Check, Copy, BookOpen, Layers, Image as ImageIcon } from 'lucide-react';
+import {
+  X,
+  Printer,
+  FileText,
+  Check,
+  Copy,
+  BookOpen,
+  Layers,
+  Image as ImageIcon,
+  ZoomIn,
+  ZoomOut,
+  ChevronDown
+} from 'lucide-react';
 
 export type PaperSize = 'a4' | 'letter' | 'a5' | 'b5';
 
@@ -31,6 +43,7 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
   const [fontSize, setFontSize] = useState<'sm' | 'md' | 'lg'>('md');
   const [lineHeight, setLineHeight] = useState<'tight' | 'normal' | 'relaxed'>('normal');
   const [textAlign, setTextAlign] = useState<'justify' | 'left'>('justify');
+  const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [copied, setCopied] = useState(false);
 
   // Loaded Media Object URLs
@@ -171,6 +184,18 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
     setTimeout(() => setCopied(false), 2200);
   };
 
+  const handleZoomIn = () => setZoomLevel((prev) => Math.min(prev + 15, 150));
+  const handleZoomOut = () => setZoomLevel((prev) => Math.max(prev - 15, 60));
+  const handleZoomReset = () => setZoomLevel(100);
+
+  const handleJumpToSheet = (targetId: string) => {
+    if (!targetId) return;
+    const el = document.getElementById(targetId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   // Paper dimension styles for screen preview
   const paperDimensions: Record<PaperSize, string> = {
     a4: 'max-w-[210mm] min-h-[297mm]',
@@ -179,8 +204,18 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
     b5: 'max-w-[176mm] min-h-[250mm]',
   };
 
+  const fontSizeClass =
+    fontSize === 'sm'
+      ? 'text-xs sm:text-[13px]'
+      : fontSize === 'lg'
+      ? 'text-base sm:text-lg'
+      : 'text-sm sm:text-[15px]';
+
+  // Common styles for each physical sheet card in preview
+  const sheetCommonStyle = `schemax-preview-sheet w-full ${paperDimensions[paperSize]} bg-white text-slate-900 shadow-2xl rounded-2xl border border-slate-300/90 font-serif leading-relaxed p-8 sm:p-14 transition-all print:p-0 print:border-none print:shadow-none print:rounded-none print:max-w-none print:m-0 print:bg-transparent print:block flex flex-col justify-between ${fontSizeClass}`;
+
   const modalContent = (
-    <div className="schemax-modal-backdrop fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:m-0 print:bg-white print:overflow-visible print:static print:inset-auto print:h-auto print:w-full print:block">
+    <div className="schemax-modal-backdrop fixed inset-0 z-[9999] bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:m-0 print:bg-white print:overflow-visible print:static print:inset-auto print:h-auto print:w-full print:block">
       {/* Dynamic Print CSS for Page Layout, Margins, Page-Breaks, and Isolation */}
       <style>{`
         @media print {
@@ -223,7 +258,8 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
           /* Reset all modal containers so they don't clip */
           .schemax-modal-backdrop,
           .schemax-modal-card,
-          .schemax-preview-wrapper {
+          .schemax-preview-wrapper,
+          .schemax-preview-sheet-wrapper {
             position: static !important;
             inset: auto !important;
             width: 100% !important;
@@ -256,7 +292,21 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
             color: #0f172a !important;
             overflow: visible !important;
             height: auto !important;
+            transform: none !important;
             display: block !important;
+          }
+
+          /* Sheet container reset on print */
+          .schemax-preview-sheet {
+            margin: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            min-height: 0 !important;
           }
 
           /* 1. Halaman Sampul Buku (Cover): Halaman 1 mandiri */
@@ -300,7 +350,7 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
           }
 
           /* Jika bab adalah elemen pertama di dokumen (tanpa cover/toc atau mode per bab), mulai langsung di hal 1 */
-          .schemax-printable-doc > .schemax-chapter-article:first-child {
+          .schemax-printable-doc > .schemax-preview-sheet-wrapper:first-child .schemax-chapter-article {
             page-break-before: auto !important;
             break-before: auto !important;
             padding-top: 0 !important;
@@ -422,19 +472,19 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
       `}</style>
 
       {/* Modal Dialog Card */}
-      <div className="schemax-modal-card bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-5xl shadow-2xl flex flex-col max-h-[94vh] overflow-hidden my-auto print:max-h-none print:h-auto print:border-none print:shadow-none print:rounded-none print:overflow-visible print:w-full print:block print:m-0 print:p-0 animate-fade-in-up">
+      <div className="schemax-modal-card bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-6xl shadow-2xl flex flex-col max-h-[95vh] overflow-hidden my-auto print:max-h-none print:h-auto print:border-none print:shadow-none print:rounded-none print:overflow-visible print:w-full print:block print:m-0 print:p-0 animate-fade-in-up">
         {/* Header (Hidden on print) */}
-        <div className="schemax-no-print print:hidden flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40">
+        <div className="schemax-no-print print:hidden flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50">
           <div className="flex items-center gap-2.5">
             <span className="p-2 rounded-2xl bg-amber-500/15 text-amber-500">
               <Printer className="w-5 h-5" />
             </span>
             <div>
               <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-tight">
-                Cetak &amp; Ekspor PDF Standar Buku
+                Preview &amp; Cetak PDF Standar Buku
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Format naskah rapi sesuai aturan tipografi buku internasional (A4, Letter, A5, B5)
+                Tampilan lembar cetak presisi (A4, Letter, A5 Novel, B5 Akademik)
               </p>
             </div>
           </div>
@@ -449,7 +499,7 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
         </div>
 
         {/* Configuration Bar (Hidden on print) */}
-        <div className="schemax-no-print print:hidden p-3.5 bg-slate-100/70 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800/80 space-y-3 text-xs">
+        <div className="schemax-no-print print:hidden p-3.5 bg-slate-100/80 dark:bg-slate-950/70 border-b border-slate-200 dark:border-slate-800/80 space-y-3 text-xs">
           {/* Main Controls Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {/* 1. Paper Size Layout */}
@@ -462,10 +512,10 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
                 onChange={(e) => setPaperSize(e.target.value as PaperSize)}
                 className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-1.5 font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-amber-500 uppercase"
               >
-                <option value="a4">A4 (210 x 297 mm) - Standar Dokumen</option>
+                <option value="a4">A4 (210 x 297 mm) - Dokumen</option>
                 <option value="letter">Letter (8.5 x 11 in) - Standar AS</option>
                 <option value="a5">A5 (148 x 210 mm) - Standar Novel</option>
-                <option value="b5">B5 (176 x 250 mm) - Buku Akademik</option>
+                <option value="b5">B5 (176 x 250 mm) - Akademik</option>
               </select>
             </div>
 
@@ -557,7 +607,7 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
             </div>
           </div>
 
-          {/* Sub Row: Single Chapter selector or Checkbox options */}
+          {/* Sub Row: Checkbox Options & Jump / Zoom Controls */}
           <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-200/70 dark:border-slate-800/70 flex-wrap">
             {exportMode === 'single' ? (
               <div className="flex items-center gap-2 flex-1 min-w-[240px]">
@@ -583,7 +633,7 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
                     onChange={(e) => setIncludeCover(e.target.checked)}
                     className="rounded text-amber-500 focus:ring-amber-500 w-3.5 h-3.5"
                   />
-                  <span>Halaman Sampul Buku</span>
+                  <span>Sampul Buku</span>
                 </label>
                 <label className="inline-flex items-center gap-1.5 cursor-pointer font-bold text-slate-700 dark:text-slate-300 select-none">
                   <input
@@ -592,13 +642,13 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
                     onChange={(e) => setIncludeToc(e.target.checked)}
                     className="rounded text-amber-500 focus:ring-amber-500 w-3.5 h-3.5"
                   />
-                  <span>Daftar Isi &amp; Nomor Hal.</span>
+                  <span>Daftar Isi</span>
                 </label>
               </div>
             )}
 
-            {/* Image Checkboxes (Both for all and single mode) */}
-            <div className="flex items-center gap-4 flex-wrap">
+            {/* Image Checkboxes */}
+            <div className="flex items-center gap-3.5 flex-wrap">
               <label className="inline-flex items-center gap-1.5 cursor-pointer font-bold text-slate-700 dark:text-slate-300 select-none">
                 <input
                   type="checkbox"
@@ -615,89 +665,214 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
                   onChange={(e) => setIncludeInlineImages(e.target.checked)}
                   className="rounded text-amber-500 focus:ring-amber-500 w-3.5 h-3.5"
                 />
-                <span>Gambar Sisipan Naskah</span>
+                <span>Gambar Sisipan</span>
               </label>
             </div>
 
-            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-              Perkiraan: <strong>~{runningPage} Halaman Cetak</strong>
+            {/* Quick Preview Sheet Navigator & Zoom Controls */}
+            <div className="flex items-center gap-2 ml-auto">
+              {/* Jump to sheet */}
+              <div className="flex items-center gap-1">
+                <span className="font-bold text-slate-600 dark:text-slate-400 text-[11px] hidden sm:inline">
+                  Lompat:
+                </span>
+                <select
+                  onChange={(e) => handleJumpToSheet(e.target.value)}
+                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-[11px] font-medium text-slate-700 dark:text-slate-300 focus:outline-none"
+                  defaultValue=""
+                >
+                  <option value="" disabled>
+                    Pilih Lembar
+                  </option>
+                  {includeCover && exportMode === 'all' && (
+                    <option value="preview-sheet-cover">Hal. 1: Sampul Buku</option>
+                  )}
+                  {includeToc && exportMode === 'all' && (
+                    <option value="preview-sheet-toc">Hal. 2: Daftar Isi</option>
+                  )}
+                  {chaptersWithPageNumbers.map((ch) => (
+                    <option key={ch.id} value={`preview-sheet-ch-${ch.id}`}>
+                      Bab {ch.order}: {ch.title || 'Tanpa Judul'} (Hal. {ch.startPage})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Zoom Buttons */}
+              <div className="flex items-center gap-0.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-0.5">
+                <button
+                  type="button"
+                  onClick={handleZoomOut}
+                  disabled={zoomLevel <= 60}
+                  className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-40"
+                  title="Perkecil Preview"
+                >
+                  <ZoomOut className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleZoomReset}
+                  className="px-1 text-[10px] font-mono font-bold text-slate-700 dark:text-slate-300 hover:text-amber-600"
+                  title="Reset Zoom 100%"
+                >
+                  {zoomLevel}%
+                </button>
+                <button
+                  type="button"
+                  onClick={handleZoomIn}
+                  disabled={zoomLevel >= 150}
+                  className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-40"
+                  title="Perbesar Preview"
+                >
+                  <ZoomIn className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Live Printable Preview Canvas */}
-        <div className="schemax-preview-wrapper flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-200/70 dark:bg-slate-950/80 flex justify-center print:p-0 print:m-0 print:bg-white print:overflow-visible print:block print:w-full print:h-auto">
+        {/* Live Printable Preview Canvas (Drafting Desk Environment) */}
+        <div className="schemax-preview-wrapper flex-1 overflow-y-auto p-4 sm:p-10 bg-slate-300/80 dark:bg-slate-950/90 flex flex-col items-center print:p-0 print:m-0 print:bg-white print:overflow-visible print:block print:w-full print:h-auto">
           <div
             id="schemax-pdf-document"
-            className={`schemax-printable-doc w-full ${paperDimensions[paperSize]} bg-white text-slate-900 p-8 sm:p-14 rounded-2xl shadow-xl border border-slate-300/80 font-serif leading-relaxed print:p-0 print:border-none print:shadow-none print:max-w-none print:m-0 print:rounded-none transition-all ${
-              fontSize === 'sm'
-                ? 'text-xs sm:text-[13px]'
-                : fontSize === 'lg'
-                ? 'text-base sm:text-lg'
-                : 'text-sm sm:text-[15px]'
-            }`}
+            style={{
+              transform: zoomLevel !== 100 ? `scale(${zoomLevel / 100})` : undefined,
+              transformOrigin: 'top center',
+              transition: 'transform 0.15s ease-out',
+            }}
+            className="schemax-printable-doc w-full flex flex-col items-center space-y-10 print:space-y-0 print:transform-none"
           >
-            {/* Title / Cover Page (Dedicated Page) */}
+            {/* SHEET 1: Title / Cover Page (Dedicated Physical Sheet in Preview) */}
             {includeCover && exportMode === 'all' && (
-              <div className="schemax-book-cover-page text-center py-12 sm:py-20 mb-14 border-b-2 border-slate-900/40 print:border-none print:mb-0 print:py-0">
-                <div className="max-w-md mx-auto w-full flex flex-col items-center">
-                  {/* Book Cover Image if available */}
-                  {bookCoverUrl && (
-                    <div className="mb-6 sm:mb-8 w-full flex justify-center">
-                      <img
-                        src={bookCoverUrl}
-                        alt={`Sampul ${book.title}`}
-                        className="schemax-book-cover-img max-h-[380px] sm:max-h-[460px] w-auto max-w-[85%] object-contain rounded-xl shadow-2xl border border-slate-200 print:shadow-none print:border-none"
-                      />
-                    </div>
-                  )}
-
-                  <span className="text-xs uppercase tracking-widest font-sans font-bold text-amber-700 dark:text-amber-500 block mb-3">
-                    {book.genre || 'Novel'}
+              <div className="schemax-preview-sheet-wrapper w-full flex flex-col items-center">
+                {/* Screen-only Sheet Header Bar */}
+                <div className="schemax-no-print w-full max-w-[210mm] flex items-center justify-between text-[11px] font-sans font-bold text-slate-600 dark:text-slate-400 px-2 mb-1.5 select-none">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block shadow-xs" />
+                    Lembar 1 • Halaman Sampul Buku
                   </span>
-                  <h1 className="text-3xl sm:text-5xl font-black font-sans tracking-tight text-slate-950 mb-4 leading-tight">
-                    {book.title}
-                  </h1>
-                  {book.synopsis && (
-                    <p className="text-xs sm:text-sm italic text-slate-600 max-w-lg mx-auto mb-8 font-sans leading-relaxed">
-                      "{book.synopsis}"
-                    </p>
-                  )}
-                  <div className="pt-6 border-t border-slate-300 inline-block px-8 text-xs font-sans text-slate-500">
-                    Total {chapters.length} Bab • Dibuat dengan Schemax Story Studio
+                  <span className="uppercase text-[10px] bg-slate-200 dark:bg-slate-800 px-2 py-0.5 rounded-md font-mono">
+                    {paperSize.toUpperCase()}
+                  </span>
+                </div>
+
+                {/* The Physical Sheet */}
+                <div
+                  id="preview-sheet-cover"
+                  className={`schemax-book-cover-page ${sheetCommonStyle}`}
+                >
+                  <div className="max-w-md mx-auto w-full flex flex-col items-center justify-center my-auto text-center py-6">
+                    {/* Book Cover Image if available */}
+                    {bookCoverUrl ? (
+                      <div className="mb-6 sm:mb-8 w-full flex justify-center">
+                        <img
+                          src={bookCoverUrl}
+                          alt={`Sampul ${book.title}`}
+                          className="schemax-book-cover-img max-h-[380px] sm:max-h-[460px] w-auto max-w-[85%] object-contain rounded-xl shadow-2xl border border-slate-200 print:shadow-none print:border-none"
+                        />
+                      </div>
+                    ) : (
+                      <div className="mb-8 w-44 h-60 rounded-2xl bg-amber-50/80 border-2 border-dashed border-amber-300 flex flex-col items-center justify-center p-4 text-amber-700 shadow-inner schemax-no-print">
+                        <BookOpen className="w-12 h-12 mb-2 opacity-50" />
+                        <span className="text-xs font-sans font-bold text-center">
+                          (Belum Ada Gambar Sampul Buku)
+                        </span>
+                      </div>
+                    )}
+
+                    <span className="text-xs uppercase tracking-widest font-sans font-bold text-amber-800 block mb-3">
+                      {book.genre || 'Novel'}
+                    </span>
+                    <h1 className="text-3xl sm:text-5xl font-black font-sans tracking-tight text-slate-950 mb-4 leading-tight">
+                      {book.title}
+                    </h1>
+                    {book.synopsis && (
+                      <p className="text-xs sm:text-sm italic text-slate-600 max-w-lg mx-auto mb-8 font-sans leading-relaxed">
+                        "{book.synopsis}"
+                      </p>
+                    )}
+                    <div className="pt-6 border-t border-slate-300 inline-block px-8 text-xs font-sans text-slate-500">
+                      Total {chapters.length} Bab • Schemax Story Studio
+                    </div>
+                  </div>
+
+                  {/* Screen-only Sheet Bottom Page Counter */}
+                  <div className="schemax-no-print pt-6 border-t border-slate-100 flex items-center justify-between text-[11px] font-sans text-slate-400">
+                    <span>{book.title}</span>
+                    <span>Halaman 1 (Sampul)</span>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Table of Contents with Page Numbers (Dedicated Page) */}
+            {/* SHEET 2: Table of Contents (Dedicated Physical Sheet in Preview) */}
             {includeToc && exportMode === 'all' && (
-              <div className="schemax-toc-page mb-14 pb-8 border-b border-slate-200 print:border-none print:mb-0 print:pb-0">
-                <h2 className="text-xl sm:text-2xl font-sans font-black uppercase tracking-wider text-slate-900 mb-6 pb-2 border-b-2 border-slate-900 text-center">
-                  Daftar Isi
-                </h2>
-                <div className="space-y-3 font-sans text-xs sm:text-sm max-w-2xl mx-auto">
-                  {chaptersWithPageNumbers.map((ch) => (
-                    <div
-                      key={ch.id}
-                      className="flex items-baseline justify-between border-b border-dotted border-slate-300 pb-1.5"
-                    >
-                      <span className="font-semibold text-slate-800 pr-2">
-                        Bab {ch.order}: {ch.title || 'Tanpa Judul'}
-                      </span>
-                      <span className="text-slate-600 font-mono font-bold pl-2 flex-shrink-0">
-                        Hal. {ch.startPage}
-                      </span>
+              <div className="schemax-preview-sheet-wrapper w-full flex flex-col items-center">
+                {/* Screen-only Sheet Header Bar */}
+                <div className="schemax-no-print w-full max-w-[210mm] flex items-center justify-between text-[11px] font-sans font-bold text-slate-600 dark:text-slate-400 px-2 mb-1.5 select-none">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block shadow-xs" />
+                    Lembar 2 • Daftar Isi
+                  </span>
+                  <span className="uppercase text-[10px] bg-slate-200 dark:bg-slate-800 px-2 py-0.5 rounded-md font-mono">
+                    {paperSize.toUpperCase()}
+                  </span>
+                </div>
+
+                {/* The Physical Sheet */}
+                <div
+                  id="preview-sheet-toc"
+                  className={`schemax-toc-page ${sheetCommonStyle}`}
+                >
+                  <div className="w-full max-w-2xl mx-auto flex-1 flex flex-col">
+                    <h2 className="text-xl sm:text-2xl font-sans font-black uppercase tracking-wider text-slate-900 mb-8 pb-3 border-b-2 border-slate-900 text-center">
+                      Daftar Isi
+                    </h2>
+                    <div className="space-y-3 font-sans text-xs sm:text-sm flex-1">
+                      {chaptersWithPageNumbers.map((ch) => (
+                        <div
+                          key={ch.id}
+                          className="flex items-baseline justify-between border-b border-dotted border-slate-300 pb-1.5"
+                        >
+                          <span className="font-semibold text-slate-800 pr-2">
+                            Bab {ch.order}: {ch.title || 'Tanpa Judul'}
+                          </span>
+                          <span className="text-slate-600 font-mono font-bold pl-2 flex-shrink-0">
+                            Hal. {ch.startPage}
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
+
+                  {/* Screen-only Sheet Bottom Page Counter */}
+                  <div className="schemax-no-print pt-6 border-t border-slate-100 flex items-center justify-between text-[11px] font-sans text-slate-400 mt-8">
+                    <span>{book.title} • Daftar Isi</span>
+                    <span>Halaman 2</span>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* Chapters Content - Each Chapter on a New Page */}
-            <div className="space-y-16 print:space-y-0">
-              {chaptersWithPageNumbers.map((ch) => (
-                <article key={ch.id} className="schemax-chapter-article">
+            {/* SHEETS 3..N: Chapters (Each Chapter as a Physical Sheet in Preview) */}
+            {chaptersWithPageNumbers.map((ch) => (
+              <div key={ch.id} className="schemax-preview-sheet-wrapper w-full flex flex-col items-center">
+                {/* Screen-only Sheet Header Bar */}
+                <div className="schemax-no-print w-full max-w-[210mm] flex items-center justify-between text-[11px] font-sans font-bold text-slate-600 dark:text-slate-400 px-2 mb-1.5 select-none">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block shadow-xs" />
+                    Bab {ch.order} • {ch.title || 'Tanpa Judul'}
+                  </span>
+                  <span className="font-mono text-[10px] bg-slate-200 dark:bg-slate-800 px-2 py-0.5 rounded-md font-bold">
+                    Mulai Hal. {ch.startPage}
+                  </span>
+                </div>
+
+                {/* The Physical Sheet */}
+                <article
+                  id={`preview-sheet-ch-${ch.id}`}
+                  className={`schemax-chapter-article ${sheetCommonStyle}`}
+                >
                   <header className="schemax-chapter-header mb-8 pb-3 border-b border-slate-200 text-center">
                     <span className="text-xs font-sans font-bold text-amber-700 tracking-widest uppercase block mb-1">
                       Bab {ch.order}
@@ -706,7 +881,7 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
                       {ch.title || `Bab ${ch.order}`}
                     </h2>
                     <span className="text-[10px] font-sans text-slate-400 block print:hidden">
-                      Halaman {ch.startPage}
+                      Perkiraan Halaman {ch.startPage} • {ch.wordCount || 0} Kata
                     </span>
                   </header>
 
@@ -724,8 +899,9 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
                     </div>
                   )}
 
+                  {/* Chapter Manuscript Content */}
                   <div
-                    className={`prose-print max-w-none text-slate-900 leading-relaxed font-serif space-y-3 ${
+                    className={`prose-print max-w-none text-slate-900 leading-relaxed font-serif space-y-3 flex-1 ${
                       textAlign === 'justify' ? 'text-justify' : 'text-left'
                     }`}
                     style={{
@@ -734,16 +910,22 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
                     }}
                     dangerouslySetInnerHTML={{ __html: cleanHtml(ch.contentHtml) }}
                   />
+
+                  {/* Screen-only Sheet Bottom Page Counter */}
+                  <div className="schemax-no-print pt-6 border-t border-slate-100 flex items-center justify-between text-[11px] font-sans text-slate-400 mt-8">
+                    <span>{book.title} • Bab {ch.order}</span>
+                    <span>Halaman {ch.startPage}</span>
+                  </div>
                 </article>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
         </div>
 
         {/* Footer Actions (Hidden on print) */}
         <div className="schemax-no-print print:hidden px-5 py-3.5 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between gap-3">
           <div className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">
-            Tips: Pada dialog cetak, pilih <strong>"Save as PDF" / "Simpan sebagai PDF"</strong>.
+            Tips: Pada dialog cetak browser, pilih tujuan <strong>"Save as PDF" / "Simpan sebagai PDF"</strong>.
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
