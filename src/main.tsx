@@ -3,7 +3,11 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import { PrivacyProvider } from './contexts/PrivacyContext';
 import { SecurityProvider } from './contexts/SecurityContext';
+import { initAutoResizeTextareas } from './utils/autoResizeTextarea';
 import './index.css';
+
+// Initialize global auto-resizing for textareas
+initAutoResizeTextareas();
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },

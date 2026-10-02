@@ -531,12 +531,12 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
               Keterangan Kondisi Spesifik (Opsional)
             </label>
-            <input
-              type="text"
+            <textarea
+              rows={1}
               value={conditionDetails}
               onChange={(e) => setConditionDetails(e.target.value)}
               placeholder="Cth: Terluka di lengan kiri, Memimpin pasukan gerilya, Berkhianat sejak Bab 2"
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-500 text-xs shadow-sm"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-500 text-xs shadow-sm resize-none leading-relaxed"
             />
           </div>
 
@@ -545,12 +545,12 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
               Deskripsi Singkat / Peran
             </label>
-            <input
-              type="text"
+            <textarea
+              rows={1}
               value={shortDescription}
               onChange={(e) => setShortDescription(e.target.value)}
               placeholder="Contoh: Sang penempa besi legendaris dari klan timur"
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-amber-500 text-sm shadow-sm"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-amber-500 text-sm shadow-sm resize-none leading-relaxed"
             />
           </div>
 
@@ -560,12 +560,12 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
               <label className="block text-xs font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider mb-1">
                 🌱 Sifat &amp; Kepribadian Awal
               </label>
-              <input
-                type="text"
+              <textarea
+                rows={1}
                 value={initialTraits}
                 onChange={(e) => setInitialTraits(e.target.value)}
                 placeholder="Cth: Penyayang, baik hati, penurut, santun"
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500 text-xs shadow-sm"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500 text-xs shadow-sm resize-none leading-relaxed"
               />
             </div>
 
@@ -573,12 +573,12 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
               <label className="block text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-1">
                 ⚡ Sifat &amp; Kepribadian Terkini
               </label>
-              <input
-                type="text"
+              <textarea
+                rows={1}
                 value={currentTraits}
                 onChange={(e) => setCurrentTraits(e.target.value)}
                 placeholder="Cth: Kasar, manipulatif, dingin, penuh kebencian"
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-500 text-xs shadow-sm"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-500 text-xs shadow-sm resize-none leading-relaxed"
               />
             </div>
           </div>
@@ -588,12 +588,12 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
               Titik Balik / Peristiwa Perubahan Karakter (Opsional)
             </label>
-            <input
-              type="text"
+            <textarea
+              rows={1}
               value={evolutionSummary}
               onChange={(e) => setEvolutionSummary(e.target.value)}
               placeholder="Cth: Setelah dirasuki oleh jin dari pantai utara / Pengkhianatan di istana"
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-500 text-xs shadow-sm"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-500 text-xs shadow-sm resize-none leading-relaxed"
             />
           </div>
 
@@ -616,7 +616,7 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
                   }
                 }}
                 placeholder="Cth: Tinggi tegap 175cm, kulit sawo matang, rambut ikal hitam, mengenakan rompi tenun tradisional dan ikat kepala merah"
-                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-500 text-xs shadow-sm"
+                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-500 text-xs shadow-sm resize-none leading-relaxed"
               />
             </div>
 
@@ -637,12 +637,12 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
                   ⚡ Buat Ulang Prompt
                 </button>
               </div>
-              <input
-                type="text"
+              <textarea
+                rows={1}
                 value={visualPrompt}
                 onChange={(e) => setVisualPrompt(e.target.value)}
                 placeholder="Full body portrait standing upright, centered, Indonesian character..."
-                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-purple-500/30 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 font-mono text-[11px] shadow-sm"
+                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-purple-500/30 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 font-mono text-[11px] shadow-sm resize-none leading-relaxed"
               />
             </div>
           </div>
@@ -673,12 +673,12 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
                     onChange={(e) => handleAttributeChange(attr.id, 'label', e.target.value)}
                     className="w-1/3 px-2.5 py-1.5 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-white text-xs shadow-sm"
                   />
-                  <input
-                    type="text"
+                  <textarea
+                    rows={1}
                     placeholder="Nilai (cth: 24 Tahun, Kerajaan Surya)"
                     value={attr.value}
                     onChange={(e) => handleAttributeChange(attr.id, 'value', e.target.value)}
-                    className="flex-1 px-2.5 py-1.5 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-white text-xs shadow-sm"
+                    className="flex-1 px-2.5 py-1.5 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-white text-xs shadow-sm resize-none leading-relaxed"
                   />
                   <button
                     type="button"

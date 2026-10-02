@@ -275,12 +275,12 @@ export const ChapterSceneChronologyAccordion: React.FC<ChapterSceneChronologyAcc
                           <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
                             Keterangan Kejadian Khusus di Bab Ini
                           </label>
-                          <input
-                            type="text"
+                          <textarea
+                            rows={1}
                             value={editDetails}
                             onChange={(e) => setEditDetails(e.target.value)}
                             placeholder="Cth: Mengalami luka di bahu kanan saat kabur"
-                            className={`w-full p-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white ${getBlurTextClass()}`}
+                            className={`w-full p-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white resize-none leading-relaxed ${getBlurTextClass()}`}
                           />
                         </div>
                       </div>

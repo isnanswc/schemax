@@ -30,6 +30,11 @@
     -webkit-user-select: text !important;
   }
 
+  /* Auto-grow textareas to follow text content length */
+  textarea:not([data-no-auto-resize="true"]) {
+    field-sizing: content;
+  }
+
   html.dark body {
     background-color: #030712;
     color: #f8fafc;
