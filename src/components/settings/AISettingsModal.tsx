@@ -765,6 +765,9 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
             type="button"
             onClick={() => {
               saveAISettings(config);
+              // Re-read with loadAISettings sanitization to ensure state permanence
+              const ensured = loadAISettings();
+              saveAISettings(ensured);
               onSaved?.();
               onClose();
             }}

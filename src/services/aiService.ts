@@ -43,20 +43,38 @@ export const DEFAULT_OPENROUTER_MODELS: AIModelOption[] = [
 
 const STORAGE_KEY = 'schemax_ai_config_v3';
 
+export const DEFAULT_GEMINI_FALLBACKS: [string, string, string] = [
+  'gemini-2.5-flash',
+  'gemini-1.5-flash',
+  'gemini-2.0-flash',
+];
+
+export const DEFAULT_GROQ_FALLBACKS: [string, string, string] = [
+  'llama-3.3-70b-versatile',
+  'llama-3.1-8b-instant',
+  'mixtral-8x7b-32768',
+];
+
+export const DEFAULT_OPENROUTER_FALLBACKS: [string, string, string] = [
+  'meta-llama/llama-3.3-70b-instruct:free',
+  'mistralai/mistral-7b-instruct:free',
+  'openrouter/auto',
+];
+
 export function getDefaultAISettings(): AISettingsConfig {
   return {
     smartAdjustEnabled: true,
     providerPriority: ['gemini', 'groq', 'openrouter'],
     geminiConfig: {
-      fallbackModels: ['', '', ''],
+      fallbackModels: [...DEFAULT_GEMINI_FALLBACKS],
       cachedModels: DEFAULT_GEMINI_MODELS,
     },
     groqConfig: {
-      fallbackModels: ['', '', ''],
+      fallbackModels: [...DEFAULT_GROQ_FALLBACKS],
       cachedModels: DEFAULT_GROQ_MODELS,
     },
     openrouterConfig: {
-      fallbackModels: ['', '', ''],
+      fallbackModels: [...DEFAULT_OPENROUTER_FALLBACKS],
       cachedModels: DEFAULT_OPENROUTER_MODELS,
     },
     slots: [
@@ -137,64 +155,48 @@ export function loadAISettings(): AISettingsConfig {
       parsed.providerPriority.push('openrouter');
     }
 
-    // Ensure geminiConfig & groqConfig & openrouterConfig exist
-    if (!parsed.geminiConfig) {
-      parsed.geminiConfig = {
-        fallbackModels: ['', '', ''],
-        cachedModels: DEFAULT_GEMINI_MODELS,
+    // Helper to sanitize and guarantee fallback models are NEVER empty or lost
+    const sanitizeProviderConfig = (
+      existing: any,
+      defaults: [string, string, string],
+      defaultCached: AIModelOption[]
+    ): { fallbackModels: [string, string, string]; cachedModels: AIModelOption[]; lastFetchedAt?: number } => {
+      let cached = (existing?.cachedModels && Array.isArray(existing.cachedModels) && existing.cachedModels.length > 0)
+        ? existing.cachedModels
+        : defaultCached;
+
+      // Filter out non-existent 3.8 models from cache
+      if (cached.some((m: any) => m.id?.includes('3.8'))) {
+        cached = defaultCached;
+      }
+
+      let fb = Array.isArray(existing?.fallbackModels) ? [...existing.fallbackModels] : [];
+      // Clean non-existent 3.8 or 3.1
+      fb = fb.map((m: string) => (m && (m.includes('3.8') || m.includes('3.1')) ? defaults[0] : m));
+
+      // Guarantee fallback models are never empty
+      const m0 = fb[0] && fb[0].trim().length > 0 ? fb[0] : defaults[0];
+      const m1 = fb[1] && fb[1].trim().length > 0 ? fb[1] : defaults[1];
+      const m2 = fb[2] && fb[2].trim().length > 0 ? fb[2] : defaults[2];
+
+      return {
+        fallbackModels: [m0, m1, m2],
+        cachedModels: cached,
+        lastFetchedAt: existing?.lastFetchedAt,
       };
-    } else {
-      if (!Array.isArray(parsed.geminiConfig.fallbackModels)) {
-        parsed.geminiConfig.fallbackModels = ['', '', ''];
-      } else {
-        parsed.geminiConfig.fallbackModels = parsed.geminiConfig.fallbackModels.map((m: string) =>
-          m.includes('3.8') || m.includes('3.1') ? 'gemini-2.5-flash' : m
-        );
-      }
-      if (
-        !parsed.geminiConfig.cachedModels ||
-        parsed.geminiConfig.cachedModels.length === 0 ||
-        parsed.geminiConfig.cachedModels.some((m: any) => m.id?.includes('3.8'))
-      ) {
-        parsed.geminiConfig.cachedModels = DEFAULT_GEMINI_MODELS;
-      }
-    }
+    };
+
+    parsed.geminiConfig = sanitizeProviderConfig(parsed.geminiConfig, DEFAULT_GEMINI_FALLBACKS, DEFAULT_GEMINI_MODELS);
+    parsed.groqConfig = sanitizeProviderConfig(parsed.groqConfig, DEFAULT_GROQ_FALLBACKS, DEFAULT_GROQ_MODELS);
+    parsed.openrouterConfig = sanitizeProviderConfig(parsed.openrouterConfig, DEFAULT_OPENROUTER_FALLBACKS, DEFAULT_OPENROUTER_MODELS);
 
     if (Array.isArray(parsed.slots)) {
       parsed.slots = parsed.slots.map((s: any) => {
         if (s.provider === 'gemini' && Array.isArray(s.models)) {
-          s.models = s.models.map((m: string) => (m.includes('3.8') || m.includes('3.1') ? 'gemini-2.5-flash' : m));
+          s.models = s.models.map((m: string) => (m.includes('3.8') || m.includes('3.1') ? DEFAULT_GEMINI_FALLBACKS[0] : m));
         }
         return s;
       });
-    }
-
-    if (!parsed.groqConfig) {
-      parsed.groqConfig = {
-        fallbackModels: ['', '', ''],
-        cachedModels: DEFAULT_GROQ_MODELS,
-      };
-    } else {
-      if (!Array.isArray(parsed.groqConfig.fallbackModels)) {
-        parsed.groqConfig.fallbackModels = ['', '', ''];
-      }
-      if (!parsed.groqConfig.cachedModels || parsed.groqConfig.cachedModels.length === 0) {
-        parsed.groqConfig.cachedModels = DEFAULT_GROQ_MODELS;
-      }
-    }
-
-    if (!parsed.openrouterConfig) {
-      parsed.openrouterConfig = {
-        fallbackModels: ['', '', ''],
-        cachedModels: DEFAULT_OPENROUTER_MODELS,
-      };
-    } else {
-      if (!Array.isArray(parsed.openrouterConfig.fallbackModels)) {
-        parsed.openrouterConfig.fallbackModels = ['', '', ''];
-      }
-      if (!parsed.openrouterConfig.cachedModels || parsed.openrouterConfig.cachedModels.length === 0) {
-        parsed.openrouterConfig.cachedModels = DEFAULT_OPENROUTER_MODELS;
-      }
     }
 
     return parsed;
