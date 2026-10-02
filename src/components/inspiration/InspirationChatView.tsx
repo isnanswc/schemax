@@ -15,7 +15,8 @@ import {
   X,
   Loader2,
   Compass,
-  ArrowRight
+  ArrowRight,
+  RotateCcw
 } from 'lucide-react';
 import { Book, StoryChapter, WorldEntity, InspirationChatSession, InspirationChatMessage } from '../../types';
 import { db, getInspirationSessions, createInspirationSession, saveInspirationSession, deleteInspirationSession, updateInspirationSessionTitle } from '../../db';
@@ -580,8 +581,33 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
                   </div>
                 )}
 
+                {/* Error Bubble Interactive Actions */}
+                {msg.id.startsWith('msg_err_') && (
+                  <div className="mt-2.5 pt-2 border-t border-rose-200/80 dark:border-rose-900/60 flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={onOpenAISettings}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black transition active:scale-95 shadow-sm"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Buka Pengaturan AI</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const lastUser = [...(activeSession?.messages || [])].reverse().find((m) => m.role === 'user');
+                        if (lastUser) handleSendMessage(lastUser.content);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition active:scale-95"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Coba Kirim Ulang</span>
+                    </button>
+                  </div>
+                )}
+
                 {/* Assistant Copy Action */}
-                {!isUser && (
+                {!isUser && !msg.id.startsWith('msg_err_') && (
                   <div className={`flex items-center justify-end ${isBlueprint ? 'mt-1.5' : 'mt-2 pt-1.5 border-t border-slate-200/60 dark:border-slate-800/60'}`}>
                     <button
                       type="button"
@@ -798,22 +824,22 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
                           </p>
                         </div>
 
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                        <div className="flex items-center gap-1 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition flex-shrink-0">
                           <button
                             type="button"
                             onClick={(e) => handleStartEditTitle(sess, e)}
-                            className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-slate-700/60 transition active:scale-95"
                             title="Ganti Judul"
                           >
-                            <Edit3 className="w-3 h-3" />
+                            <Edit3 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             type="button"
                             onClick={(e) => handleDeleteSession(sess.id, e)}
-                            className="p-1 text-rose-400 hover:text-rose-600"
+                            className="p-1.5 rounded-lg text-rose-500 hover:text-rose-600 bg-rose-500/10 hover:bg-rose-500/20 dark:bg-rose-500/20 dark:hover:bg-rose-500/30 transition active:scale-95"
                             title="Hapus Sesi"
                           >
-                            <Trash2 className="w-3 h-3" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>

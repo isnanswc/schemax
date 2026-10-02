@@ -17,16 +17,13 @@ import {
   RelationshipType,
 } from '../types';
 
-// Modern baseline defaults (Gemini 3.8 / 3.1 / 3.0 series & Groq current lineup)
+// Modern baseline defaults (Stable official Gemini models & Groq lineup)
 export const DEFAULT_GEMINI_MODELS: AIModelOption[] = [
-  { id: 'gemini-3.8-flash-preview', name: 'Gemini 3.8 Flash Preview (Terbaru & Rekomendasi Utama)', description: 'Generasi 3.8: Generasi Paling Cerdas, Responsif, Audio & Teks Generasi Terbaru' },
-  { id: 'gemini-3.8-pro-preview', name: 'Gemini 3.8 Pro Preview', description: 'Generasi 3.8: Penalaran Mutakhir, Analisis Sastra Mendalam & Audio Ultra-Ekspresif' },
-  { id: 'gemini-3.1-flash', name: 'Gemini 3.1 Flash', description: 'Generasi 3.1: Super Cepat, Cerdas, Konteks Masif untuk Naskah Panjang' },
-  { id: 'gemini-3.1-pro', name: 'Gemini 3.1 Pro', description: 'Generasi 3.1: Penalaran Mendalam & Analisis Sastra Luas' },
-  { id: 'gemini-3.0-flash', name: 'Gemini 3.0 Flash', description: 'Generasi 3.0: Kecepatan Tinggi & Efisiensi Kuota' },
-  { id: 'gemini-3.0-pro', name: 'Gemini 3.0 Pro', description: 'Generasi 3.0: Analisis Struktur Plot Kompleks' },
-  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: 'Generasi 2.5: Cepat & Handal' },
-  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', description: 'Generasi 2.5: Analisis Luas' },
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (Rekomendasi Utama & Stabil)', description: 'Generasi 2.5: Cepat, Cerdas, Stabil & Kuota Hemat untuk Penulisan Novel' },
+  { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash (Paling Handal)', description: 'Generasi 1.5: Sangat Stabil, Kuota Besar, Bebas Error' },
+  { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', description: 'Generasi 2.0: Respons Sangat Cepat & Analisis Alur Cerita' },
+  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', description: 'Generasi 2.5: Penalaran Mendalam & Analisis Sastra Luas' },
+  { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', description: 'Generasi 1.5: Kapasitas Konteks Hingga 1 Juta Token' },
 ];
 
 export const DEFAULT_GROQ_MODELS: AIModelOption[] = [
@@ -149,10 +146,27 @@ export function loadAISettings(): AISettingsConfig {
     } else {
       if (!Array.isArray(parsed.geminiConfig.fallbackModels)) {
         parsed.geminiConfig.fallbackModels = ['', '', ''];
+      } else {
+        parsed.geminiConfig.fallbackModels = parsed.geminiConfig.fallbackModels.map((m: string) =>
+          m.includes('3.8') || m.includes('3.1') ? 'gemini-2.5-flash' : m
+        );
       }
-      if (!parsed.geminiConfig.cachedModels || parsed.geminiConfig.cachedModels.length === 0) {
+      if (
+        !parsed.geminiConfig.cachedModels ||
+        parsed.geminiConfig.cachedModels.length === 0 ||
+        parsed.geminiConfig.cachedModels.some((m: any) => m.id?.includes('3.8'))
+      ) {
         parsed.geminiConfig.cachedModels = DEFAULT_GEMINI_MODELS;
       }
+    }
+
+    if (Array.isArray(parsed.slots)) {
+      parsed.slots = parsed.slots.map((s: any) => {
+        if (s.provider === 'gemini' && Array.isArray(s.models)) {
+          s.models = s.models.map((m: string) => (m.includes('3.8') || m.includes('3.1') ? 'gemini-2.5-flash' : m));
+        }
+        return s;
+      });
     }
 
     if (!parsed.groqConfig) {
