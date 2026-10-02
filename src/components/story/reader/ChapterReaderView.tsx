@@ -34,6 +34,7 @@ import {
   deleteParagraphTTSCache,
   TTSCacheStatus
 } from '../../../services/ttsCacheService';
+import { usePrivacy } from '../../../contexts/PrivacyContext';
 
 interface ChapterReaderViewProps {
   chapter: StoryChapter;
@@ -56,6 +57,7 @@ export const ChapterReaderView: React.FC<ChapterReaderViewProps> = ({
 }) => {
   const [localChapter, setLocalChapter] = useState<StoryChapter>(chapter);
   const [isTaggingEmotion, setIsTaggingEmotion] = useState(false);
+  const { getBlurTitleClass, getBlurTextClass, bindEmptyAreaLongPress } = usePrivacy();
 
   useEffect(() => {
     setLocalChapter(chapter);
@@ -303,10 +305,10 @@ export const ChapterReaderView: React.FC<ChapterReaderViewProps> = ({
               title="Pilih Bab Lain"
             >
               <div className="min-w-0">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 block truncate">
+                <span className={`text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 block truncate ${getBlurTitleClass()}`}>
                   {bookTitle} • Bab {chapter.order || currentIndex + 1}
                 </span>
-                <h1 className="text-xs sm:text-sm font-black truncate max-w-[180px] sm:max-w-xs group-hover:underline">
+                <h1 className={`text-xs sm:text-sm font-black truncate max-w-[180px] sm:max-w-xs group-hover:underline ${getBlurTitleClass()}`}>
                   {chapter.title || 'Bab Tanpa Judul'}
                 </h1>
               </div>
@@ -358,6 +360,7 @@ export const ChapterReaderView: React.FC<ChapterReaderViewProps> = ({
       {/* 3. Main Reading Body Canvas */}
       <main
         ref={containerRef}
+        {...bindEmptyAreaLongPress()}
         onScroll={handleScroll}
         onClick={() => setIsHeaderVisible((prev) => !prev)}
         className="flex-1 overflow-y-auto px-4 sm:px-6 pt-20 pb-36"
@@ -375,7 +378,7 @@ export const ChapterReaderView: React.FC<ChapterReaderViewProps> = ({
             <span className="text-xs sm:text-sm font-bold tracking-widest uppercase text-amber-600 dark:text-amber-400">
               Bab {chapter.order || currentIndex + 1}
             </span>
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight">
+            <h1 className={`text-2xl sm:text-3xl md:text-4xl font-black tracking-tight ${getBlurTitleClass()}`}>
               {chapter.title || 'Bab Tanpa Judul'}
             </h1>
             <div className="flex items-center justify-center gap-3 text-xs opacity-60 pt-1">
@@ -513,7 +516,7 @@ export const ChapterReaderView: React.FC<ChapterReaderViewProps> = ({
                         isTTSCurrent
                           ? 'text-slate-950 dark:text-amber-50 font-medium leading-relaxed'
                           : 'hover:opacity-90'
-                      }`}
+                      } ${getBlurTextClass()}`}
                       style={{
                         borderLeft: tensionColor ? `4px solid ${tensionColor.hex}` : undefined,
                         paddingLeft: tensionColor ? '12px' : undefined,

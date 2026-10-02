@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   HardDrive
 } from 'lucide-react';
+import { usePrivacy } from '../../../contexts/PrivacyContext';
 import { ParagraphTensionItem, ParagraphEmotionTag } from '../../../types';
 import { getEmotionAcoustics } from '../../../services/dramaDirectorService';
 import {
@@ -76,6 +77,7 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
   onParagraphChange,
   onClose,
 }) => {
+  const { getBlurTextClass } = usePrivacy();
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [baseRate, setBaseRate] = useState<number>(1.0);
@@ -1400,7 +1402,7 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
         </div>
 
         {/* Current Paragraph Sneak Peek */}
-        <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 italic px-1">
+        <p className={`text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 italic px-1 ${getBlurTextClass()}`}>
           &ldquo;{paragraphs[activeParagraphIndex] || ''}&rdquo;
         </p>
       </div>

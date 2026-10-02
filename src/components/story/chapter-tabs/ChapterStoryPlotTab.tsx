@@ -37,6 +37,7 @@ import {
 import { StoryChapter, WorldEntity, Book } from '../../../types';
 import { db } from '../../../db';
 import { generateWithSmartFallback } from '../../../services/aiService';
+import { usePrivacy } from '../../../contexts/PrivacyContext';
 
 interface ChapterStoryPlotTabProps {
   chapter: StoryChapter;
@@ -133,6 +134,8 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
   onNavigateToManuscript,
   onNavigateToGlossary,
 }) => {
+  const { getBlurTextClass, getBlurTitleClass, bindEmptyAreaLongPress } = usePrivacy();
+
   // 📑 Three Sheets Toggle: 'internal' (AI Internal Studio) vs 'toolsaday' (AI Toolsaday Bridge) vs 'external' (AI External Context Pack)
   const [activeSheet, setActiveSheet] = useState<'internal' | 'toolsaday' | 'external'>('internal');
 
@@ -837,7 +840,7 @@ ${chapterPlotText.trim() || 'Kembangkan bab ini dengan pembuka yang memikat, kon
   ];
 
   return (
-    <div className="space-y-4 pb-28 max-w-4xl mx-auto animate-fade-in-up px-1 sm:px-2">
+    <div {...bindEmptyAreaLongPress()} className="space-y-4 pb-28 max-w-4xl mx-auto animate-fade-in-up px-1 sm:px-2">
       {/* ========================================================
           TOP NAVIGATION BAR: 2 SHEETS (AI INTERNAL vs AI EXTERNAL)
           ======================================================== */}
@@ -852,7 +855,7 @@ ${chapterPlotText.trim() || 'Kembangkan bab ini dengan pembuka yang memikat, kon
                 Plot Story &amp; AI Engine
               </h2>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Bab {chapter.order}: {chapter.title}
+                Bab {chapter.order}: <span className={getBlurTitleClass()}>{chapter.title}</span>
               </p>
             </div>
           </div>
@@ -1058,7 +1061,7 @@ ${chapterPlotText.trim() || 'Kembangkan bab ini dengan pembuka yang memikat, kon
               value={chapterPlotText}
               onChange={(e) => handleChapterPlotChange(e.target.value)}
               placeholder="Tuliskan poin-poin cerita bab ini...&#10;&#10;Contoh:&#10;- Dimulai saat tokoh utama terbangun di tepi sungai bersalju&#10;- Menemukan artefak kuno yang bersinar temaram&#10;- Muncul penjaga misterius yang menuntut jawaban..."
-              className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm leading-relaxed focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-sans shadow-inner resize-y min-h-[220px]"
+              className={`w-full p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm leading-relaxed focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-sans shadow-inner resize-y min-h-[220px] ${getBlurTextClass()}`}
             />
           </div>
 
@@ -1161,7 +1164,7 @@ ${chapterPlotText.trim() || 'Kembangkan bab ini dengan pembuka yang memikat, kon
                 value={additionalPrompt}
                 onChange={(e) => setAdditionalPrompt(e.target.value)}
                 placeholder="Contoh: Fokus pada adegan romansa yang intim tanpa sensor moralistik / Deskripsikan aksi laga pertarungan secara brutal / Nada cerita sarkas dan dingin..."
-                className="w-full p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-xs leading-relaxed focus:outline-none focus:border-amber-500 shadow-inner"
+                className={`w-full p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-xs leading-relaxed focus:outline-none focus:border-amber-500 shadow-inner ${getBlurTextClass()}`}
               />
               <div className="flex justify-end text-[10px] font-mono text-slate-400 dark:text-slate-500">
                 <span>{additionalPrompt.length.toLocaleString()} karakter</span>
@@ -1366,7 +1369,7 @@ ${chapterPlotText.trim() || 'Kembangkan bab ini dengan pembuka yang memikat, kon
               readOnly
               rows={6}
               value={getToolsadayFormattedPrompt()}
-              className="w-full p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 text-xs font-mono leading-relaxed focus:outline-none shadow-inner resize-y"
+              className={`w-full p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 text-xs font-mono leading-relaxed focus:outline-none shadow-inner resize-y ${getBlurTextClass()}`}
             />
           </div>
 
@@ -1398,7 +1401,7 @@ ${chapterPlotText.trim() || 'Kembangkan bab ini dengan pembuka yang memikat, kon
               value={toolsadayPastedText}
               onChange={(e) => setToolsadayPastedText(e.target.value)}
               placeholder="Tempelkan (Ctrl+V) naskah cerita hasil generate dari Toolsaday di sini..."
-              className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-slate-900 dark:text-slate-100 leading-relaxed focus:outline-none focus:border-blue-500 shadow-inner resize-y min-h-[160px]"
+              className={`w-full p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-slate-900 dark:text-slate-100 leading-relaxed focus:outline-none focus:border-blue-500 shadow-inner resize-y min-h-[160px] ${getBlurTextClass()}`}
             />
 
             {/* Word counter & Actions */}
@@ -1593,7 +1596,7 @@ ${chapterPlotText.trim() || 'Kembangkan bab ini dengan pembuka yang memikat, kon
                     rows={pt.id === 'characters' || pt.id === 'setting_item_lore' ? 6 : 4}
                     value={pt.text}
                     onChange={(e) => pt.setText(e.target.value)}
-                    className="w-full p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 text-xs font-mono leading-relaxed focus:outline-none focus:border-indigo-500 shadow-inner resize-y"
+                    className={`w-full p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 text-xs font-mono leading-relaxed focus:outline-none focus:border-indigo-500 shadow-inner resize-y ${getBlurTextClass()}`}
                   />
                   <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 dark:text-slate-500 px-1">
                     <span>{pt.text.length.toLocaleString()} karakter</span>

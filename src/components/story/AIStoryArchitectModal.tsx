@@ -30,6 +30,7 @@ import { generateStoryBlueprint, seedBlueprintToDatabase, BlueprintProgressInfo 
 import { AIGenerationEvent } from '../../types/ai';
 import { analyzeCharacterPhotoWithVision } from '../../services/aiService';
 import { parseStoryOptions } from '../../utils/storyOptionsParser';
+import { usePrivacy } from '../../contexts/PrivacyContext';
 
 interface AIStoryArchitectModalProps {
   isOpen: boolean;
@@ -48,6 +49,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
   initialRawIdea,
   autoStart,
 }) => {
+  const { getBlurTitleClass, getBlurTextClass, getBlurImageClass, bindEmptyAreaLongPress } = usePrivacy();
   const [step, setStep] = useState<'input' | 'review'>('input');
   const [rawIdea, setRawIdea] = useState(initialRawIdea || '');
 
@@ -652,7 +654,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                       }`}
                     >
                       {blueprint.title === opt && <Check className="w-3 h-3 flex-shrink-0" />}
-                      <span className="break-words">{opt}</span>
+                      <span className={`break-words ${getBlurTitleClass()}`}>{opt}</span>
                     </button>
                   ))}
                 </div>
@@ -664,7 +666,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                 value={blueprint.title}
                 onChange={(e) => updateBlueprint({ title: e.target.value })}
                 placeholder="Judul Buku..."
-                className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-bold text-slate-900 dark:text-white focus:outline-none focus:border-amber-500 shadow-sm"
+                className={`w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-bold text-slate-900 dark:text-white focus:outline-none focus:border-amber-500 shadow-sm ${getBlurTitleClass()}`}
               />
             </div>
 
@@ -741,7 +743,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                     rows={5}
                     value={blueprint.synopsis}
                     onChange={(e) => updateBlueprint({ synopsis: e.target.value })}
-                    className="w-full p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed focus:outline-none focus:border-amber-400 resize-y min-h-[110px]"
+                    className={`w-full p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed focus:outline-none focus:border-amber-400 resize-y min-h-[110px] ${getBlurTextClass()}`}
                   />
                 </div>
 
@@ -773,7 +775,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                                 <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] ${isSelected ? 'bg-amber-500 text-slate-950 font-black' : 'border border-slate-400'}`}>
                                   {isSelected && '✓'}
                                 </span>
-                                <span>{opt.title}</span>
+                                <span className={getBlurTitleClass()}>{opt.title}</span>
                               </span>
                               {isSelected && (
                                 <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/20 px-2 py-0.5 rounded-md">
@@ -781,7 +783,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                                 </span>
                               )}
                             </div>
-                            <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed pl-5">
+                            <p className={`text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed pl-5 ${getBlurTextClass()}`}>
                               {opt.description}
                             </p>
                           </div>
@@ -831,7 +833,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                             value={char.name}
                             onChange={(e) => handleUpdateCharacter(i, 'name', e.target.value)}
                             placeholder="Nama Karakter"
-                            className="w-full font-black text-sm sm:text-base text-slate-900 dark:text-white bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 px-1 py-1 focus:outline-none focus:border-pink-500"
+                            className={`w-full font-black text-sm sm:text-base text-slate-900 dark:text-white bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 px-1 py-1 focus:outline-none focus:border-pink-500 ${getBlurTitleClass()}`}
                           />
                         </div>
                       </div>
@@ -844,7 +846,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                             value={char.role || ''}
                             onChange={(e) => handleUpdateCharacter(i, 'role', e.target.value)}
                             placeholder="Peran (misal: Suami/Istri)"
-                            className="w-full sm:w-auto text-xs font-bold text-pink-600 dark:text-pink-400 bg-pink-500/10 px-2.5 py-1 rounded-lg border border-pink-500/20 focus:outline-none sm:max-w-[150px]"
+                            className={`w-full sm:w-auto text-xs font-bold text-pink-600 dark:text-pink-400 bg-pink-500/10 px-2.5 py-1 rounded-lg border border-pink-500/20 focus:outline-none sm:max-w-[150px] ${getBlurTextClass()}`}
                           />
                         </div>
                         {blueprint.characters.length > 1 && (
@@ -921,7 +923,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                           value={char.shortDescription || ''}
                           onChange={(e) => handleUpdateCharacter(i, 'shortDescription', e.target.value)}
                           placeholder="Contoh: Kepala keluarga yang mengalami musibah cincin..."
-                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-pink-400 resize-y min-h-[50px] leading-relaxed"
+                          className={`w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-pink-400 resize-y min-h-[50px] leading-relaxed ${getBlurTextClass()}`}
                         />
                       </div>
                     </div>
@@ -936,7 +938,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                         value={char.physicalTraits || ''}
                         onChange={(e) => handleUpdateCharacter(i, 'physicalTraits', e.target.value)}
                         placeholder="Contoh: Wanita 26 tahun keturunan Tionghoa-Sunda, kulit kuning langsat mulus, mata ekspresif lembut, tubuh sintal berpostur pas, mengenakan kemeja polo motif kotak kasual dan celana jeans rapi..."
-                        className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-amber-400 resize-y leading-relaxed min-h-[64px]"
+                        className={`w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-amber-400 resize-y leading-relaxed min-h-[64px] ${getBlurTextClass()}`}
                       />
                     </div>
 
@@ -950,7 +952,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                         value={char.traits || ''}
                         onChange={(e) => handleUpdateCharacter(i, 'traits', e.target.value)}
                         placeholder="Contoh: Penyayang, pekerja keras, mudah cemas, keras kepala saat mempertahankan kebenaran..."
-                        className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-400 resize-y leading-relaxed min-h-[64px]"
+                        className={`w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-400 resize-y leading-relaxed min-h-[64px] ${getBlurTextClass()}`}
                       />
                     </div>
 
@@ -1005,7 +1007,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                           value={itm.name}
                           onChange={(e) => handleUpdateItem(i, 'name', e.target.value)}
                           placeholder="Nama Item"
-                          className="font-bold text-xs text-slate-900 dark:text-white bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 px-1 py-0.5 focus:outline-none focus:border-amber-500 flex-1"
+                          className={`font-bold text-xs text-slate-900 dark:text-white bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 px-1 py-0.5 focus:outline-none focus:border-amber-500 flex-1 ${getBlurTitleClass()}`}
                         />
                         <button
                           type="button"
@@ -1020,7 +1022,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                         value={itm.shortDescription}
                         onChange={(e) => handleUpdateItem(i, 'shortDescription', e.target.value)}
                         placeholder="Efek, kutukan, atau dampak artefak terhadap cerita..."
-                        className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 resize-y min-h-[60px] focus:outline-none focus:border-amber-400 leading-relaxed"
+                        className={`w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 resize-y min-h-[60px] focus:outline-none focus:border-amber-400 leading-relaxed ${getBlurTextClass()}`}
                       />
                     </div>
                   ))}
@@ -1038,7 +1040,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                       onClick={handleAddLocation}
                       className="py-1 px-2.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-600 dark:text-cyan-300 font-bold text-[11px] transition flex items-center gap-1"
                     >
-                      <Plus className="w-3 h-3" />
+                      <Plus className="w-3.5 h-3.5" />
                       <span>Tambah Tempat</span>
                     </button>
                   </div>
@@ -1051,7 +1053,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                           value={loc.name}
                           onChange={(e) => handleUpdateLocation(i, 'name', e.target.value)}
                           placeholder="Nama Lokasi"
-                          className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 px-1 py-0.5 focus:outline-none focus:border-cyan-500 flex-1"
+                          className={`font-bold text-xs sm:text-sm text-slate-900 dark:text-white bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 px-1 py-0.5 focus:outline-none focus:border-cyan-500 flex-1 ${getBlurTitleClass()}`}
                         />
                         <button
                           type="button"
@@ -1066,7 +1068,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                         value={loc.shortDescription}
                         onChange={(e) => handleUpdateLocation(i, 'shortDescription', e.target.value)}
                         placeholder="Deskripsi suasana dan detail lokasi..."
-                        className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 resize-y min-h-[60px] focus:outline-none focus:border-cyan-400 leading-relaxed"
+                        className={`w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 resize-y min-h-[60px] focus:outline-none focus:border-cyan-400 leading-relaxed ${getBlurTextClass()}`}
                       />
                     </div>
                   ))}
@@ -1118,7 +1120,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                               }`}
                             >
                               {chap.title === opt && <Check className="w-3 h-3 flex-shrink-0" />}
-                              <span className="break-words">{opt}</span>
+                              <span className={`break-words ${getBlurTitleClass()}`}>{opt}</span>
                             </button>
                           ))}
                         </div>
@@ -1135,7 +1137,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                         value={chap.title}
                         onChange={(e) => handleUpdateChapter(0, 'title', e.target.value)}
                         placeholder="Judul Bab 1..."
-                        className="w-full font-bold text-xs sm:text-sm text-slate-900 dark:text-white bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-500 shadow-sm"
+                        className={`w-full font-bold text-xs sm:text-sm text-slate-900 dark:text-white bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-500 shadow-sm ${getBlurTitleClass()}`}
                       />
                     </div>
 
@@ -1152,7 +1154,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                         value={chap.premise}
                         onChange={(e) => handleUpdateChapter(0, 'premise', e.target.value)}
                         placeholder="1. Adegan pembuka...\n2. Titik balik dan kemunculan konflik...\n3. Ketegangan akhir bab..."
-                        className="w-full p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed resize-y min-h-[140px] focus:outline-none focus:border-indigo-400 shadow-inner"
+                        className={`w-full p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed resize-y min-h-[140px] focus:outline-none focus:border-indigo-400 shadow-inner ${getBlurTextClass()}`}
                       />
                     </div>
                   </div>

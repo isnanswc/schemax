@@ -20,6 +20,7 @@ import {
   Zap,
   ChevronRight
 } from 'lucide-react';
+import { usePrivacy } from '../../contexts/PrivacyContext';
 
 interface DashboardViewProps {
   books: Book[];
@@ -179,6 +180,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     .slice(0, 2);
 
   // Quick Resume calculations
+  const { getBlurTitleClass, getBlurTextClass, bindEmptyAreaLongPress } = usePrivacy();
+
   const progressPercent = recentChapter
     ? Math.min(
         100,
@@ -189,7 +192,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     : 0;
 
   return (
-    <div className="relative space-y-5 pb-28">
+    <div {...bindEmptyAreaLongPress()} className="relative space-y-5 pb-28">
       {/* ========================================================
           🌌 FULL CINEMATIC AMBIENT AURORA NEBULA
           Continuous edge-to-edge organic light without rigid blocks
@@ -295,7 +298,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </span>
                 <span className="text-xs text-slate-600 dark:text-slate-400 truncate font-semibold flex items-center gap-1">
                   <Feather className="w-3 h-3 text-amber-500/80 flex-shrink-0" />
-                  <span className="truncate">{recentBook.title}</span>
+                  <span className={`truncate ${getBlurTitleClass()}`}>{recentBook.title}</span>
                 </span>
               </div>
 
@@ -308,7 +311,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             {/* Title & Action Button Row */}
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0 flex-1">
-                <h3 className="text-base sm:text-xl font-black text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors truncate">
+                <h3 className={`text-base sm:text-xl font-black text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors truncate ${getBlurTitleClass()}`}>
                   Bab {recentChapter.order || 1}: {recentChapter.title || 'Bab Tanpa Judul'}
                 </h3>
                 <div className="flex items-center gap-3 text-xs text-slate-600 dark:text-slate-400 mt-1 font-medium">

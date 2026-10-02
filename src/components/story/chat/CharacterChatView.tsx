@@ -16,6 +16,7 @@ import {
   Users,
   ArrowLeft
 } from 'lucide-react';
+import { usePrivacy } from '../../../contexts/PrivacyContext';
 import { Book, WorldEntity, StoryChapter, MediaItem, CharacterChatMessage, CharacterChatSession } from '../../../types';
 import { useMediaUrl } from '../../../hooks/useMediaUrl';
 import {
@@ -42,6 +43,7 @@ const CharacterAvatarThumb: React.FC<{
   onClick: () => void;
 }> = ({ entity, isActive, onClick }) => {
   const { url } = useMediaUrl(entity.avatarMediaId);
+  const { getBlurImageClass, getBlurTitleClass, getBlurTextClass } = usePrivacy();
 
   return (
     <button
@@ -55,7 +57,7 @@ const CharacterAvatarThumb: React.FC<{
     >
       <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center border border-slate-200 dark:border-slate-700">
         {url ? (
-          <img src={url} alt={entity.name} className="w-full h-full object-cover" />
+          <img src={url} alt={entity.name} className={`w-full h-full object-cover ${getBlurImageClass()}`} />
         ) : (
           <User className="w-6 h-6 text-slate-400 group-hover:text-amber-500 transition-colors" />
         )}
@@ -64,10 +66,10 @@ const CharacterAvatarThumb: React.FC<{
         )}
       </div>
       <div className="w-full text-center">
-        <span className={`block text-xs font-bold truncate ${isActive ? 'text-amber-700 dark:text-amber-400' : 'text-slate-800 dark:text-slate-200'}`}>
+        <span className={`block text-xs font-bold truncate ${isActive ? 'text-amber-700 dark:text-amber-400' : 'text-slate-800 dark:text-slate-200'} ${getBlurTitleClass()}`}>
           {entity.name}
         </span>
-        <span className="block text-[10px] text-slate-400 dark:text-slate-500 truncate">
+        <span className={`block text-[10px] text-slate-400 dark:text-slate-500 truncate ${getBlurTextClass()}`}>
           {entity.shortDescription || 'Karakter'}
         </span>
       </div>
@@ -81,6 +83,7 @@ const CharacterGridCard: React.FC<{
   onClick: () => void;
 }> = ({ entity, onClick }) => {
   const { url } = useMediaUrl(entity.avatarMediaId);
+  const { getBlurImageClass, getBlurTitleClass, getBlurTextClass } = usePrivacy();
 
   return (
     <button
@@ -91,7 +94,7 @@ const CharacterGridCard: React.FC<{
       {/* Avatar */}
       <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 group-hover:border-amber-500 transition-colors shadow-sm flex items-center justify-center flex-shrink-0">
         {url ? (
-          <img src={url} alt={entity.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+          <img src={url} alt={entity.name} className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${getBlurImageClass()}`} />
         ) : (
           <User className="w-8 h-8 text-slate-400 group-hover:text-amber-500 transition-colors" />
         )}
@@ -100,15 +103,15 @@ const CharacterGridCard: React.FC<{
 
       {/* Info */}
       <div className="mt-3 w-full min-w-0 flex flex-col items-center">
-        <h4 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors truncate max-w-full">
+        <h4 className={`text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors truncate max-w-full ${getBlurTitleClass()}`}>
           {entity.name}
         </h4>
         <div className="mt-1 flex items-center gap-1">
-          <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 truncate max-w-[130px]">
+          <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 truncate max-w-[130px] ${getBlurTextClass()}`}>
             {entity.role || 'Karakter'}
           </span>
         </div>
-        <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+        <p className={`mt-1.5 text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed ${getBlurTextClass()}`}>
           {entity.shortDescription || entity.description || 'Karakter dalam naskah cerita.'}
         </p>
       </div>
@@ -168,6 +171,8 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const { getBlurImageClass, getBlurTitleClass, getBlurTextClass, bindEmptyAreaLongPress } = usePrivacy();
 
   // Active character object
   const activeChar = characters.find((c) => c.id === selectedEntityId) || null;
@@ -396,7 +401,7 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
         </div>
 
         {/* Characters Grid */}
-        <div className="flex-1 overflow-y-auto min-h-0 px-3 sm:px-6 py-4 scroll-smooth">
+        <div {...bindEmptyAreaLongPress()} className="flex-1 overflow-y-auto min-h-0 px-3 sm:px-6 py-4 scroll-smooth">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4 pb-6">
             {characters.map((char) => (
               <CharacterGridCard
@@ -433,19 +438,19 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 pr-1 flex-1">
             <div className="w-8 h-8 rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-800 flex items-center justify-center border border-amber-500/30 flex-shrink-0 shadow-xs">
               {activeCharAvatarUrl ? (
-                <img src={activeCharAvatarUrl} alt={activeChar.name} className="w-full h-full object-cover" />
+                <img src={activeCharAvatarUrl} alt={activeChar.name} className={`w-full h-full object-cover ${getBlurImageClass()}`} />
               ) : (
                 <User className="w-4 h-4 text-amber-500" />
               )}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-extrabold text-slate-900 dark:text-slate-100 truncate">
+                <span className={`text-xs font-extrabold text-slate-900 dark:text-slate-100 truncate ${getBlurTitleClass()}`}>
                   {activeChar.name}
                 </span>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
               </div>
-              <span className="text-[10px] text-slate-400 dark:text-slate-500 block truncate">
+              <span className={`text-[10px] text-slate-400 dark:text-slate-500 block truncate ${getBlurTextClass()}`}>
                 {activeChar.shortDescription || 'Karakter'}
               </span>
             </div>
@@ -545,22 +550,23 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
       {/* ========================================================================= */}
       <div
         ref={chatContainerRef}
+        {...bindEmptyAreaLongPress()}
         className="flex-1 overflow-y-auto min-h-0 px-2 sm:px-4 py-3 space-y-3.5 bg-slate-50/50 dark:bg-slate-950/50 scroll-smooth overscroll-contain"
       >
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center py-6 px-4">
             <div className="w-12 h-12 rounded-2xl overflow-hidden bg-slate-200 dark:bg-slate-800 flex items-center justify-center border border-amber-500/20 mb-2.5 shadow-md">
               {activeCharAvatarUrl ? (
-                <img src={activeCharAvatarUrl} alt={activeChar.name} className="w-full h-full object-cover" />
+                <img src={activeCharAvatarUrl} alt={activeChar.name} className={`w-full h-full object-cover ${getBlurImageClass()}`} />
               ) : (
                 <User className="w-6 h-6 text-amber-500" />
               )}
             </div>
             <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">
-              Mulai Percakapan dengan {activeChar.name}
+              Mulai Percakapan dengan <span className={getBlurTitleClass()}>{activeChar.name}</span>
             </h4>
             <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mb-4 leading-relaxed">
-              {activeChar.name} mengingat alur cerita naskah dan fakta-fakta yang Anda ceritakan kepadanya.
+              <span className={getBlurTitleClass()}>{activeChar.name}</span> mengingat alur cerita naskah dan fakta-fakta yang Anda ceritakan kepadanya.
             </p>
 
             {/* Quick starter chips */}
@@ -595,7 +601,7 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
                   ) : (
                     <div className="w-7 h-7 rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-800 flex items-center justify-center border border-amber-500/20 shadow-sm">
                       {activeCharAvatarUrl ? (
-                        <img src={activeCharAvatarUrl} alt={activeChar.name} className="w-full h-full object-cover" />
+                        <img src={activeCharAvatarUrl} alt={activeChar.name} className={`w-full h-full object-cover ${getBlurImageClass()}`} />
                       ) : (
                         <User className="w-4 h-4 text-amber-500" />
                       )}
@@ -612,11 +618,11 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
                   }`}
                 >
                   {!isUser && (
-                    <span className="block text-[10px] font-bold text-amber-600 dark:text-amber-400 mb-1">
+                    <span className={`block text-[10px] font-bold text-amber-600 dark:text-amber-400 mb-1 ${getBlurTitleClass()}`}>
                       {activeChar.name}
                     </span>
                   )}
-                  <p className="whitespace-pre-wrap select-text break-words [overflow-wrap:anywhere]">{msg.text}</p>
+                  <p className={`whitespace-pre-wrap select-text break-words [overflow-wrap:anywhere] ${getBlurTextClass()}`}>{msg.text}</p>
                   <span
                     className={`block text-[9px] mt-1 text-right ${
                       isUser ? 'text-amber-100/80' : 'text-slate-400'
@@ -766,7 +772,7 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
                     key={idx}
                     className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-xs text-slate-800 dark:text-slate-200"
                   >
-                    <span>🧠 {fact}</span>
+                    <span className={getBlurTextClass()}>🧠 {fact}</span>
                     <button
                       type="button"
                       onClick={() => handleDeleteFact(idx)}

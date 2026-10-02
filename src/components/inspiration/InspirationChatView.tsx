@@ -20,6 +20,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen
 } from 'lucide-react';
+import { usePrivacy } from '../../contexts/PrivacyContext';
 import { Book, StoryChapter, WorldEntity, InspirationChatSession, InspirationChatMessage } from '../../types';
 import { db, getInspirationSessions, createInspirationSession, saveInspirationSession, deleteInspirationSession, updateInspirationSessionTitle } from '../../db';
 import {
@@ -229,6 +230,8 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const { getBlurTitleClass, getBlurTextClass, getBlurImageClass, bindEmptyAreaLongPress } = usePrivacy();
 
   // Load initial sessions from IndexedDB
   useEffect(() => {
@@ -555,7 +558,7 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
                   ) : (
                     <div className="flex items-start justify-between gap-1.5">
                       <div className="min-w-0 flex-1">
-                        <p className={`text-xs font-bold truncate ${isActive ? 'text-amber-800 dark:text-amber-300' : 'text-slate-800 dark:text-slate-200'}`}>
+                        <p className={`text-xs font-bold truncate ${isActive ? 'text-amber-800 dark:text-amber-300' : 'text-slate-800 dark:text-slate-200'} ${getBlurTitleClass()}`}>
                           {sess.title}
                         </p>
                         <p className="text-[10px] text-slate-400 mt-0.5 truncate">
@@ -674,7 +677,7 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
         </header>
 
         {/* CHAT MESSAGES SCROLL CONTAINER */}
-        <div className="flex-1 min-h-0 w-full overflow-y-auto px-3 sm:px-6 py-4 space-y-3.5 bg-slate-50/50 dark:bg-slate-950/40">
+        <div {...bindEmptyAreaLongPress()} className="flex-1 min-h-0 w-full overflow-y-auto px-3 sm:px-6 py-4 space-y-3.5 bg-slate-50/50 dark:bg-slate-950/40">
           <div className="max-w-3xl lg:max-w-4xl mx-auto w-full space-y-3.5">
             {activeSession?.messages.map((msg) => {
               const isUser = msg.role === 'user';
@@ -711,7 +714,9 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
                     }`}
                   >
                     {/* Formatted Content with Markdown Renderer */}
-                    <MarkdownRenderer content={cleanContent} isUser={isUser} />
+                    <div className={getBlurTextClass()}>
+                      <MarkdownRenderer content={cleanContent} isUser={isUser} />
+                    </div>
 
                     {/* MULTI-OPTION SELECTION: Muncul bila AI memberikan 2 atau lebih opsi ide cerita */}
                     {hasMultipleOptions && detectedOptions && (
@@ -739,12 +744,12 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
                                   <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-800 dark:text-amber-300 font-black text-[11px]">
                                     {opt.key}
                                   </span>
-                                  <span className="text-xs font-bold text-slate-900 dark:text-white">
+                                  <span className={`text-xs font-bold text-slate-900 dark:text-white ${getBlurTitleClass()}`}>
                                     {opt.title !== opt.key ? opt.title : ''}
                                   </span>
                                 </div>
                                 {opt.preview && (
-                                  <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+                                  <p className={`text-[11px] text-slate-600 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed ${getBlurTextClass()}`}>
                                     {opt.preview}
                                   </p>
                                 )}
@@ -1045,7 +1050,7 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
                     ) : (
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                          <p className={`text-xs font-bold text-slate-800 dark:text-slate-200 truncate ${getBlurTitleClass()}`}>
                             {sess.title}
                           </p>
                           <p className="text-[10px] text-slate-400 mt-0.5">
