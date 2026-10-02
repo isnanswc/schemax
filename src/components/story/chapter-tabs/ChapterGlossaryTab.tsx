@@ -2534,33 +2534,13 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
       {/* 🔍 FULLSIZE IMAGE PREVIEW MODAL                                           */}
       {/* ========================================================================= */}
       {previewImageModal && (
-        <div
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 animate-fade-in"
-          onClick={() => setPreviewImageModal(null)}
-        >
-          <div
-            className="max-w-2xl w-full bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl space-y-3 p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between text-white pb-2 border-b border-slate-800">
-              <h4 className="text-sm font-bold truncate">{previewImageModal.caption || previewImageModal.name}</h4>
-              <button
-                type="button"
-                onClick={() => setPreviewImageModal(null)}
-                className="p-1 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="max-h-[70vh] flex items-center justify-center overflow-hidden rounded-2xl bg-black">
-              <img
-                src={previewImageModal.url}
-                alt={previewImageModal.name}
-                className="max-h-[70vh] w-auto object-contain mx-auto"
-              />
-            </div>
-          </div>
-        </div>
+        <ImageViewerModal
+          isOpen={!!previewImageModal}
+          imageUrl={previewImageModal.url}
+          title={previewImageModal.caption || previewImageModal.name}
+          subtitle="Ilustrasi Adegan Bab"
+          onClose={() => setPreviewImageModal(null)}
+        />
       )}
 
       {/* Add World Entity Modal */}

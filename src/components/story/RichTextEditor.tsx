@@ -148,10 +148,12 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   // Apply visual styling to paragraphs based on tensionData & plotholes
   const applyTensionStyling = (data = tensionData) => {
     if (!editorRef.current) return;
+    if (!data || !Array.isArray(data.items)) return;
     const children = Array.from(editorRef.current.children) as HTMLElement[];
     if (children.length === 0) return;
 
-    const { items, displayMode } = data;
+    const items = data.items;
+    const displayMode = data.displayMode || 'both';
     const isNone = displayMode === 'none';
     const isGutter = displayMode === 'gutter' || displayMode === 'both';
     const isUnderline = displayMode === 'underline' || displayMode === 'both';

@@ -434,9 +434,9 @@ export async function generateGeminiSpeechAudio(
           const msg = errJson.error?.message || `HTTP ${response.status} ${response.statusText}`;
           console.warn(`[Gemini TTS] Slot ${slot.label} model ${targetModel} HTTP ${response.status}:`, msg);
           if (response.status === 429) {
-            // Quota limit hit on this key, break to try next key slot immediately
+            // Quota limit hit on this key, continue to try next key slot immediately
             lastError = new Error(`Slot ${slot.label} kuota habis (429): ${msg}`);
-            break;
+            continue;
           }
           throw new Error(msg);
         }
