@@ -29,6 +29,7 @@ import { Book } from '../../types';
 import { generateStoryBlueprint, seedBlueprintToDatabase, BlueprintProgressInfo } from '../../services/blueprintService';
 import { AIGenerationEvent } from '../../types/ai';
 import { analyzeCharacterPhotoWithVision } from '../../services/aiService';
+import { parseStoryOptions } from '../../utils/storyOptionsParser';
 
 interface AIStoryArchitectModalProps {
   isOpen: boolean;
@@ -53,7 +54,9 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
   useEffect(() => {
     if (isOpen && initialRawIdea) {
       setRawIdea(initialRawIdea);
-      if (autoStart && !isLoading && !blueprint) {
+      const detectedOpts = parseStoryOptions(initialRawIdea);
+      // AutoStart hanya dijalankan jika ide berupa konsep tunggal, bukan multi-opsi
+      if (autoStart && !isLoading && !blueprint && (!detectedOpts || detectedOpts.length < 2)) {
         handleGenerate(initialRawIdea);
       }
     }
@@ -479,6 +482,51 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
               </div>
             ) : (
               <>
+                {/* Opsi Chooser Banner: Muncul jika teks draf memuat 2 atau lebih opsi ide cerita */}
+                {(() => {
+                  const detectedRawOptions = parseStoryOptions(rawIdea);
+                  if (!detectedRawOptions || detectedRawOptions.length < 2) return null;
+                  return (
+                    <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2.5 animate-in fade-in">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <Sparkles className="w-4 h-4 text-amber-500 fill-current" />
+                          <span className="text-xs font-black text-amber-800 dark:text-amber-300">
+                            Terdeteksi {detectedRawOptions.length} Opsi Ide Cerita. Pilih salah satu untuk difokuskan menjadi buku:
+                          </span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {detectedRawOptions.map((opt) => (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => setRawIdea(opt.content)}
+                            className="p-3 rounded-xl text-left bg-white dark:bg-slate-900 border border-amber-500/30 hover:border-amber-500 hover:shadow-md transition active:scale-95 flex flex-col gap-1.5 group"
+                          >
+                            <div className="flex items-center justify-between w-full">
+                              <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-800 dark:text-amber-300 font-black text-[10px]">
+                                {opt.key}
+                              </span>
+                              <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold group-hover:underline">
+                                Pilih Opsi Ini &rarr;
+                              </span>
+                            </div>
+                            <span className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1">
+                              {opt.title}
+                            </span>
+                            {opt.preview && (
+                              <span className="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                                {opt.preview}
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 <div className="space-y-2">
                   <label className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
                     <Feather className="w-4 h-4 text-amber-500" />

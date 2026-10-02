@@ -34,6 +34,7 @@ import {
   formulateIdeaForArchitect,
 } from '../../services/aiInspirationService';
 import { generateWithSmartFallback } from '../../services/aiService';
+import { parseStoryOptions, StoryOptionItem } from '../../utils/storyOptionsParser';
 
 interface MarkdownRendererProps {
   content: string;
@@ -459,6 +460,12 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
     setTimeout(() => setCopiedMsgId(null), 2000);
   };
 
+  const handleSelectOptionInChat = (opt: StoryOptionItem) => {
+    handleSendMessage(
+      `Saya memilih ${opt.key}: "${opt.title}". Tolong fokuskan pada ide ini, elaborasi premis, latar dunia, detail karakter kunci, dan susun rancangan 5 bab awalnya agar siap dijadikan buku!`
+    );
+  };
+
   return (
     <div className="relative flex h-full w-full min-h-0 overflow-hidden select-text bg-slate-50 dark:bg-slate-950">
       {/* 1. DESKTOP PERSISTENT SIDEBAR */}
@@ -651,8 +658,11 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
           <div className="max-w-3xl lg:max-w-4xl mx-auto w-full space-y-3.5">
             {activeSession?.messages.map((msg) => {
               const isUser = msg.role === 'user';
-              // Deteksi apakah pesan ini merupakan rancangan blueprint cerita
-              const isBlueprint = !isUser && (
+              const detectedOptions = !isUser ? parseStoryOptions(msg.content) : null;
+              const hasMultipleOptions = Boolean(detectedOptions && detectedOptions.length >= 2);
+
+              // Deteksi apakah pesan ini merupakan rancangan blueprint cerita TUNGGAL (bukan daftar opsi)
+              const isBlueprint = !isUser && !hasMultipleOptions && (
                 msg.content.includes('[STORY_BLUEPRINT_READY]') ||
                 (/judul/i.test(msg.content) && /premis|logline/i.test(msg.content) && (/karakter|tokoh/i.test(msg.content) || /bab\s*1|daftar\s*bab/i.test(msg.content)))
               );
@@ -683,7 +693,73 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
                     {/* Formatted Content with Markdown Renderer */}
                     <MarkdownRenderer content={cleanContent} isUser={isUser} />
 
-                    {/* HERO ACTION: Hanya tampil jika AI memang telah menyusun blueprint cerita */}
+                    {/* MULTI-OPTION SELECTION: Muncul bila AI memberikan 2 atau lebih opsi ide cerita */}
+                    {hasMultipleOptions && detectedOptions && (
+                      <div className="mt-3 pt-3 border-t border-amber-500/30 space-y-2 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent -mx-1.5 -mb-1 p-2.5 sm:p-3 rounded-xl">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <Sparkles className="w-4 h-4 text-amber-500 flex-shrink-0 fill-current" />
+                            <p className="text-xs font-black text-amber-800 dark:text-amber-300 truncate">
+                              Pilih Opsi yang Ingin Dirancang Menjadi Buku:
+                            </p>
+                          </div>
+                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 flex-shrink-0">
+                            {detectedOptions.length} Opsi
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-2 mt-1.5">
+                          {detectedOptions.map((opt) => (
+                            <div
+                              key={opt.id}
+                              className="p-2.5 sm:p-3 rounded-xl bg-white/95 dark:bg-slate-900/95 border border-amber-500/30 shadow-xs hover:border-amber-500 transition-all flex flex-col gap-2"
+                            >
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-800 dark:text-amber-300 font-black text-[11px]">
+                                    {opt.key}
+                                  </span>
+                                  <span className="text-xs font-bold text-slate-900 dark:text-white">
+                                    {opt.title !== opt.key ? opt.title : ''}
+                                  </span>
+                                </div>
+                                {opt.preview && (
+                                  <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+                                    {opt.preview}
+                                  </p>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100 dark:border-slate-800/80 flex-wrap">
+                                {/* Action 1: Langsung Rancang Opsi Ini */}
+                                <button
+                                  type="button"
+                                  onClick={() => onOpenArchitectWithIdea(opt.content, true)}
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 text-xs font-black shadow-sm transition active:scale-95"
+                                  title={`Buka AI Story Architect khusus untuk konsep ${opt.key}`}
+                                >
+                                  <Zap className="w-3.5 h-3.5 fill-current" />
+                                  <span>Rancang {opt.key} Jadi Buku</span>
+                                  <ArrowRight className="w-3 h-3" />
+                                </button>
+
+                                {/* Action 2: Pilih & Diskusikan di Chat */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleSelectOptionInChat(opt)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition active:scale-95 border border-slate-200 dark:border-slate-700"
+                                  title={`Minta AI fokus memperdalam ${opt.key}`}
+                                >
+                                  <span>💬 Pilih &amp; Kembangkan</span>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* HERO ACTION: Hanya tampil jika AI telah menyusun SATU blueprint cerita utuh */}
                     {isBlueprint && (
                       <div className="mt-3 pt-2.5 border-t border-amber-500/30 flex items-center justify-between gap-2 bg-amber-500/10 dark:bg-amber-500/15 -mx-1.5 -mb-1 px-2.5 py-2 rounded-xl">
                         <div className="min-w-0">
