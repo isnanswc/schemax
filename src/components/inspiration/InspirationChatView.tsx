@@ -16,7 +16,9 @@ import {
   Loader2,
   Compass,
   ArrowRight,
-  RotateCcw
+  RotateCcw,
+  PanelLeftClose,
+  PanelLeftOpen
 } from 'lucide-react';
 import { Book, StoryChapter, WorldEntity, InspirationChatSession, InspirationChatMessage } from '../../types';
 import { db, getInspirationSessions, createInspirationSession, saveInspirationSession, deleteInspirationSession, updateInspirationSessionTitle } from '../../db';
@@ -207,6 +209,7 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
   const [sessions, setSessions] = useState<InspirationChatSession[]>([]);
   const [activeSession, setActiveSession] = useState<InspirationChatSession | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(true);
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [editTitleValue, setEditTitleValue] = useState('');
 
@@ -457,297 +460,427 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
   };
 
   return (
-    <div className="relative flex flex-col h-full w-full min-h-0 overflow-hidden select-text bg-slate-50 dark:bg-slate-950">
-      {/* 1. TOP HEADER BAR (Directly under status bar with safe-top) */}
-      <header className="w-full bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-b border-slate-200/90 dark:border-slate-800/80 px-2.5 sm:px-4 py-2 safe-top flex-shrink-0 z-20 flex items-center justify-between gap-1.5 shadow-xs">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <button
-            type="button"
-            onClick={() => setIsDrawerOpen(true)}
-            className="p-1.5 sm:p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition active:scale-95 flex-shrink-0"
-            title="Daftar Sesi Obrolan"
-          >
-            <Menu className="w-4 h-4" />
-          </button>
-
-          <div className="min-w-0">
-            <h2 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate flex items-center gap-1">
-              <span className="p-0.5 rounded bg-amber-500/15 text-amber-500 flex-shrink-0">
-                <Sparkles className="w-3.5 h-3.5" />
-              </span>
-              <span className="truncate">{activeSession?.title || 'AI Inspiration'}</span>
-            </h2>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
-              {activeSession ? `${activeSession.messages.length} pesan dalam memori` : 'Brainstorming Ide Cerita'}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          {/* Pinned Book Selector */}
-          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl px-2 py-1 text-xs border border-slate-200/80 dark:border-slate-700/80">
-            <BookOpen className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-            <select
-              value={pinnedBookId}
-              onChange={(e) => handleSelectPinnedBook(e.target.value)}
-              className="bg-transparent font-bold text-slate-800 dark:text-slate-200 focus:outline-none max-w-[90px] sm:max-w-[160px] truncate text-[11px]"
+    <div className="relative flex h-full w-full min-h-0 overflow-hidden select-text bg-slate-50 dark:bg-slate-950">
+      {/* 1. DESKTOP PERSISTENT SIDEBAR */}
+      {isDesktopSidebarOpen && (
+        <aside className="hidden md:flex flex-col flex-shrink-0 w-64 lg:w-72 border-r border-slate-200/80 dark:border-slate-800/80 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md h-full select-none z-10 transition-all duration-200">
+          {/* Sidebar Top Header */}
+          <div className="flex items-center justify-between px-3.5 py-3 border-b border-slate-200/80 dark:border-slate-800/80">
+            <h3 className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-amber-500 flex-shrink-0" />
+              <span>Sesi Brainstorming</span>
+            </h3>
+            <button
+              type="button"
+              onClick={() => setIsDesktopSidebarOpen(false)}
+              className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition"
+              title="Sembunyikan Sidebar"
             >
-              <option value="">Ide Bebas</option>
-              {books.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.title}
-                </option>
-              ))}
-            </select>
+              <PanelLeftClose className="w-4 h-4" />
+            </button>
           </div>
 
-          {/* Formulate Button */}
-          <button
-            type="button"
-            onClick={handleFormulate}
-            disabled={isFormulating || !activeSession || activeSession.messages.length < 2}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs transition shadow-sm active:scale-95 disabled:opacity-40"
-            title="Formulasikan ide percakapan ini langsung ke AI Story Architect"
-          >
-            {isFormulating ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Zap className="w-3.5 h-3.5 fill-current" />
-            )}
-            <span className="hidden sm:inline">Ke Architect</span>
-            <span className="sm:hidden text-[11px]">Rancang</span>
-          </button>
-        </div>
-      </header>
-
-      {/* 2. CHAT MESSAGES SCROLL CONTAINER */}
-      <div className="flex-1 min-h-0 w-full overflow-y-auto px-2.5 sm:px-4 py-3 space-y-3 bg-slate-50/50 dark:bg-slate-950/40">
-        {activeSession?.messages.map((msg) => {
-          const isUser = msg.role === 'user';
-          // Deteksi apakah pesan ini merupakan rancangan blueprint cerita
-          const isBlueprint = !isUser && (
-            msg.content.includes('[STORY_BLUEPRINT_READY]') ||
-            (/judul/i.test(msg.content) && /premis|logline/i.test(msg.content) && (/karakter|tokoh/i.test(msg.content) || /bab\s*1|daftar\s*bab/i.test(msg.content)))
-          );
-          const cleanContent = msg.content.replace(/\[STORY_BLUEPRINT_READY\]/g, '').trim();
-
-          return (
-            <div
-              key={msg.id}
-              className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} max-w-[92%] sm:max-w-[85%] ${
-                isUser ? 'ml-auto' : 'mr-auto'
-              } animate-fade-in`}
+          {/* New Session Action */}
+          <div className="p-3 pb-2">
+            <button
+              type="button"
+              onClick={handleCreateNewSession}
+              className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 transition active:scale-95 shadow-sm"
             >
-              {/* Message Header Badge */}
-              <div className="flex items-center gap-1.5 mb-1 px-1 text-[10px] font-mono text-slate-400">
-                <span>{isUser ? 'Penulis' : 'AI Inspiration'}</span>
-                <span>•</span>
-                <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-              </div>
+              <Plus className="w-4 h-4" />
+              <span>Mulai Sesi Ide Baru</span>
+            </button>
+          </div>
 
-              {/* Message Bubble Card */}
-              <div
-                className={`relative group p-3 sm:p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed transition-all shadow-xs ${
-                  isUser
-                    ? 'bg-amber-500 text-slate-950 font-medium rounded-tr-xs'
-                    : 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200/80 dark:border-slate-800 rounded-tl-xs'
-                }`}
-              >
-                {/* Formatted Content with Markdown Renderer */}
-                <MarkdownRenderer content={cleanContent} isUser={isUser} />
+          {/* Session List */}
+          <div className="flex-1 overflow-y-auto px-3 py-1 space-y-1.5 scrollbar-thin">
+            {sessions.map((sess) => {
+              const isActive = activeSession?.id === sess.id;
+              const isEditing = editingTitleId === sess.id;
 
-                {/* HERO ACTION: Hanya tampil jika AI memang telah menyusun blueprint cerita */}
-                {isBlueprint && (
-                  <div className="mt-3 pt-2.5 border-t border-amber-500/30 flex items-center justify-between gap-2 bg-amber-500/10 dark:bg-amber-500/15 -mx-1.5 -mb-1 px-2.5 py-2 rounded-xl">
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-black text-amber-700 dark:text-amber-400 flex items-center gap-1">
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>Rancangan Blueprint Siap</span>
-                      </p>
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
-                        Pindahkan langsung ke AI Story Architect
-                      </p>
+              return (
+                <div
+                  key={sess.id}
+                  onClick={() => {
+                    setActiveSession(sess);
+                    setPinnedBookId(sess.pinnedBookId || '');
+                  }}
+                  className={`group p-2.5 rounded-xl border transition cursor-pointer ${
+                    isActive
+                      ? 'bg-amber-500/15 border-amber-500/50 shadow-xs ring-1 ring-amber-500/20'
+                      : 'bg-slate-50/70 dark:bg-slate-800/40 border-slate-200/60 dark:border-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  {isEditing ? (
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="text"
+                        value={editTitleValue}
+                        onChange={(e) => setEditTitleValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveTitle(sess.id);
+                        }}
+                        className="flex-1 bg-white dark:bg-slate-900 border border-amber-500 rounded-lg px-2 py-1 text-xs"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleSaveTitle(sess.id)}
+                        className="p-1 text-emerald-500 font-bold"
+                      >
+                        <Check className="w-4 h-4" />
+                      </button>
                     </div>
+                  ) : (
+                    <div className="flex items-start justify-between gap-1.5">
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-xs font-bold truncate ${isActive ? 'text-amber-800 dark:text-amber-300' : 'text-slate-800 dark:text-slate-200'}`}>
+                          {sess.title}
+                        </p>
+                        <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                          {sess.messages.length} pesan • {new Date(sess.updatedAt).toLocaleDateString()}
+                        </p>
+                      </div>
 
-                    <button
-                      type="button"
-                      onClick={() => onOpenArchitectWithIdea(cleanContent, true)}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black shadow-sm transition active:scale-95 flex-shrink-0"
-                    >
-                      <Zap className="w-3.5 h-3.5 fill-current" />
-                      <span>Rancang jadi Buku</span>
-                      <ArrowRight className="w-3 h-3" />
-                    </button>
-                  </div>
-                )}
-
-                {/* Error Bubble Interactive Actions */}
-                {msg.id.startsWith('msg_err_') && (
-                  <div className="mt-2.5 pt-2 border-t border-rose-200/80 dark:border-rose-900/60 flex items-center gap-2 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={onOpenAISettings}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black transition active:scale-95 shadow-sm"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Buka Pengaturan AI</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const lastUser = [...(activeSession?.messages || [])].reverse().find((m) => m.role === 'user');
-                        if (lastUser) handleSendMessage(lastUser.content);
-                      }}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition active:scale-95"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Coba Kirim Ulang</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* Assistant Copy Action */}
-                {!isUser && !msg.id.startsWith('msg_err_') && (
-                  <div className={`flex items-center justify-end ${isBlueprint ? 'mt-1.5' : 'mt-2 pt-1.5 border-t border-slate-200/60 dark:border-slate-800/60'}`}>
-                    <button
-                      type="button"
-                      onClick={() => handleCopyMessage(msg.id, cleanContent)}
-                      className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition text-[11px] flex items-center gap-1"
-                    >
-                      {copiedMsgId === msg.id ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-emerald-500" />
-                          <span className="text-emerald-600 dark:text-emerald-400 font-bold">Tersalin</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3.5 h-3.5" />
-                          <span>Salin</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-
-        {isSending && (
-          <div className="flex items-center gap-2 p-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-xs animate-pulse">
-            <Loader2 className="w-4 h-4 text-amber-500 animate-spin" />
-            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-              AI sedang merangkai ide &amp; menganalisis cerita...
-            </span>
+                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => handleStartEditTitle(sess, e)}
+                          className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-slate-700/60 transition"
+                          title="Ganti Judul"
+                        >
+                          <Edit3 className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteSession(sess.id, e)}
+                          className="p-1 rounded-lg text-rose-500 hover:text-rose-600 bg-rose-500/10 hover:bg-rose-500/20 dark:bg-rose-500/20 dark:hover:bg-rose-500/30 transition"
+                          title="Hapus Sesi"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        )}
+        </aside>
+      )}
 
-        <div ref={messagesEndRef} />
-      </div>
+      {/* 2. MAIN CHAT & BRAINSTORMING CANVAS */}
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+        {/* TOP HEADER BAR (Directly under status bar with safe-top) */}
+        <header className="w-full bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-b border-slate-200/90 dark:border-slate-800/80 px-2.5 sm:px-4 py-2 safe-top flex-shrink-0 z-20 flex items-center justify-between gap-1.5 shadow-xs">
+          <div className="flex items-center gap-1.5 min-w-0">
+            {/* Mobile hamburger menu */}
+            <button
+              type="button"
+              onClick={() => setIsDrawerOpen(true)}
+              className="md:hidden p-1.5 sm:p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition active:scale-95 flex-shrink-0"
+              title="Daftar Sesi Obrolan"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
 
-      {/* 3. QUICK INSPIRATION & BLUEPRINT CHIPS (Actionable Creative Writing Sparks) */}
-      <div className="w-full max-w-full min-w-0 flex-shrink-0 px-2.5 py-1.5 bg-slate-100/70 dark:bg-slate-900/70 border-t border-slate-200/70 dark:border-slate-800/70 flex items-center gap-1.5 overflow-x-auto scrollbar-none snap-x z-10">
-        <button
-          type="button"
-          onClick={() =>
-            handleSendMessage(
-              'Tolong rumuskan dan susun seluruh hasil diskusi kita sejauh ini menjadi Rancangan Blueprint Cerita lengkap (Judul Konsep & Genre, Logline/Premis, Latar Dunia, Karakter Kunci, dan Arc Bab 1 sampai 5) agar siap diwujudkan menjadi buku baru!'
-            )
-          }
-          disabled={isSending || isFetchingExternal}
-          className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-800 dark:text-amber-300 border border-amber-500/40 text-[11px] font-black transition active:scale-95 disabled:opacity-50 shadow-xs"
-        >
-          <Sparkles className="w-3 h-3 text-amber-500 fill-current" />
-          <span>📖 Rancang Blueprint Buku</span>
-        </button>
+            {/* Desktop reopen sidebar toggle button */}
+            {!isDesktopSidebarOpen && (
+              <button
+                type="button"
+                onClick={() => setIsDesktopSidebarOpen(true)}
+                className="hidden md:flex p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition active:scale-95 flex-shrink-0"
+                title="Buka Panel Sesi"
+              >
+                <PanelLeftOpen className="w-4 h-4" />
+              </button>
+            )}
 
-        <button
-          type="button"
-          onClick={() =>
-            handleSendMessage(
-              'Berikan 3 opsi plot twist mengejutkan yang logis dan meningkatkan ketegangan dramatis untuk cerita ini.'
-            )
-          }
-          disabled={isSending || isFetchingExternal}
-          className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/15 hover:bg-purple-500/25 text-purple-700 dark:text-purple-300 border border-purple-500/30 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
-        >
-          <Zap className="w-3 h-3 text-purple-500" />
-          <span>⚡ Ide Plot Twist</span>
-        </button>
+            <div className="min-w-0">
+              <h2 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate flex items-center gap-1">
+                <span className="p-0.5 rounded bg-amber-500/15 text-amber-500 flex-shrink-0">
+                  <Sparkles className="w-3.5 h-3.5" />
+                </span>
+                <span className="truncate">{activeSession?.title || 'AI Inspiration'}</span>
+              </h2>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                {activeSession ? `${activeSession.messages.length} pesan dalam memori` : 'Brainstorming Ide Cerita'}
+              </p>
+            </div>
+          </div>
 
-        <button
-          type="button"
-          onClick={() =>
-            handleSendMessage(
-              'Bantu saya mendalami motif batin, luka masa lalu, dan dinamika konflik antar karakter dalam cerita ini.'
-            )
-          }
-          disabled={isSending || isFetchingExternal}
-          className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-500/15 hover:bg-blue-500/25 text-blue-700 dark:text-blue-300 border border-blue-500/30 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
-        >
-          <span>👥 Karakter &amp; Konflik</span>
-        </button>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {/* Pinned Book Selector */}
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl px-2 py-1 text-xs border border-slate-200/80 dark:border-slate-700/80">
+              <BookOpen className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+              <select
+                value={pinnedBookId}
+                onChange={(e) => handleSelectPinnedBook(e.target.value)}
+                className="bg-transparent font-bold text-slate-800 dark:text-slate-200 focus:outline-none max-w-[90px] sm:max-w-[200px] truncate text-[11px]"
+              >
+                <option value="">Ide Bebas</option>
+                {books.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.title}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        <button
-          type="button"
-          onClick={() =>
-            handleSendMessage(
-              'Bantu deskripsikan detail latar suasana tempat (worldbuilding) yang kaya panca indra dan atmosferik untuk adegan ini.'
-            )
-          }
-          disabled={isSending || isFetchingExternal}
-          className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
-        >
-          <span>🏰 Dunia &amp; Suasana</span>
-        </button>
+            {/* Formulate Button */}
+            <button
+              type="button"
+              onClick={handleFormulate}
+              disabled={isFormulating || !activeSession || activeSession.messages.length < 2}
+              className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs transition shadow-sm active:scale-95 disabled:opacity-40"
+              title="Formulasikan ide percakapan ini langsung ke AI Story Architect"
+            >
+              {isFormulating ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Zap className="w-3.5 h-3.5 fill-current" />
+              )}
+              <span className="hidden sm:inline">Ke Architect</span>
+              <span className="sm:hidden text-[11px]">Rancang</span>
+            </button>
+          </div>
+        </header>
 
-        <button
-          type="button"
-          onClick={() => handleTriggerExternal('tarot')}
-          disabled={isSending || isFetchingExternal}
-          className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
-        >
-          <span>🃏 Simbol Misterius</span>
-        </button>
-      </div>
+        {/* CHAT MESSAGES SCROLL CONTAINER */}
+        <div className="flex-1 min-h-0 w-full overflow-y-auto px-3 sm:px-6 py-4 space-y-3.5 bg-slate-50/50 dark:bg-slate-950/40">
+          <div className="max-w-3xl lg:max-w-4xl mx-auto w-full space-y-3.5">
+            {activeSession?.messages.map((msg) => {
+              const isUser = msg.role === 'user';
+              // Deteksi apakah pesan ini merupakan rancangan blueprint cerita
+              const isBlueprint = !isUser && (
+                msg.content.includes('[STORY_BLUEPRINT_READY]') ||
+                (/judul/i.test(msg.content) && /premis|logline/i.test(msg.content) && (/karakter|tokoh/i.test(msg.content) || /bab\s*1|daftar\s*bab/i.test(msg.content)))
+              );
+              const cleanContent = msg.content.replace(/\[STORY_BLUEPRINT_READY\]/g, '').trim();
 
-      {/* 4. INPUT AREA BAR (Docks directly above HomeBottomNavigation) */}
-      <div className="w-full flex-shrink-0 px-2.5 pt-1.5 pb-[62px] sm:pb-3 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-t border-slate-200/80 dark:border-slate-800/80 shadow-lg z-10">
-        <div className="flex items-end gap-1.5 bg-slate-100/90 dark:bg-slate-900/90 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-1.5">
-          <textarea
-            ref={textareaRef}
-            value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSendMessage();
+              return (
+                <div
+                  key={msg.id}
+                  className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} max-w-[92%] sm:max-w-[85%] ${
+                    isUser ? 'ml-auto' : 'mr-auto'
+                  } animate-fade-in`}
+                >
+                  {/* Message Header Badge */}
+                  <div className="flex items-center gap-1.5 mb-1 px-1 text-[10px] font-mono text-slate-400">
+                    <span>{isUser ? 'Penulis' : 'AI Inspiration'}</span>
+                    <span>•</span>
+                    <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+
+                  {/* Message Bubble Card */}
+                  <div
+                    className={`relative group p-3 sm:p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed transition-all shadow-xs ${
+                      isUser
+                        ? 'bg-amber-500 text-slate-950 font-medium rounded-tr-xs'
+                        : 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200/80 dark:border-slate-800 rounded-tl-xs'
+                    }`}
+                  >
+                    {/* Formatted Content with Markdown Renderer */}
+                    <MarkdownRenderer content={cleanContent} isUser={isUser} />
+
+                    {/* HERO ACTION: Hanya tampil jika AI memang telah menyusun blueprint cerita */}
+                    {isBlueprint && (
+                      <div className="mt-3 pt-2.5 border-t border-amber-500/30 flex items-center justify-between gap-2 bg-amber-500/10 dark:bg-amber-500/15 -mx-1.5 -mb-1 px-2.5 py-2 rounded-xl">
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-black text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                            <Sparkles className="w-3.5 h-3.5" />
+                            <span>Rancangan Blueprint Siap</span>
+                          </p>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                            Pindahkan langsung ke AI Story Architect
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => onOpenArchitectWithIdea(cleanContent, true)}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black shadow-sm transition active:scale-95 flex-shrink-0"
+                        >
+                          <Zap className="w-3.5 h-3.5 fill-current" />
+                          <span>Rancang jadi Buku</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Error Bubble Interactive Actions */}
+                    {msg.id.startsWith('msg_err_') && (
+                      <div className="mt-2.5 pt-2 border-t border-rose-200/80 dark:border-rose-900/60 flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={onOpenAISettings}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black transition active:scale-95 shadow-sm"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Buka Pengaturan AI</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const lastUser = [...(activeSession?.messages || [])].reverse().find((m) => m.role === 'user');
+                            if (lastUser) handleSendMessage(lastUser.content);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition active:scale-95"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>Coba Kirim Ulang</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Assistant Copy Action */}
+                    {!isUser && !msg.id.startsWith('msg_err_') && (
+                      <div className={`flex items-center justify-end ${isBlueprint ? 'mt-1.5' : 'mt-2 pt-1.5 border-t border-slate-200/60 dark:border-slate-800/60'}`}>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyMessage(msg.id, cleanContent)}
+                          className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition text-[11px] flex items-center gap-1"
+                        >
+                          {copiedMsgId === msg.id ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-500" />
+                              <span className="text-emerald-600 dark:text-emerald-400 font-bold">Tersalin</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>Salin</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {isSending && (
+              <div className="flex items-center gap-2 p-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-xs animate-pulse">
+                <Loader2 className="w-4 h-4 text-amber-500 animate-spin" />
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                  AI sedang merangkai ide &amp; menganalisis cerita...
+                </span>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+        </div>
+
+        {/* 3. QUICK INSPIRATION & BLUEPRINT CHIPS */}
+        <div className="w-full max-w-full min-w-0 flex-shrink-0 px-2.5 sm:px-4 py-1.5 bg-slate-100/70 dark:bg-slate-900/70 border-t border-slate-200/70 dark:border-slate-800/70 flex items-center z-10">
+          <div className="max-w-3xl lg:max-w-4xl mx-auto w-full flex items-center gap-1.5 overflow-x-auto scrollbar-none snap-x">
+            <button
+              type="button"
+              onClick={() =>
+                handleSendMessage(
+                  'Tolong rumuskan dan susun seluruh hasil diskusi kita sejauh ini menjadi Rancangan Blueprint Cerita lengkap (Judul Konsep & Genre, Logline/Premis, Latar Dunia, Karakter Kunci, dan Arc Bab 1 sampai 5) agar siap diwujudkan menjadi buku baru!'
+                )
               }
-            }}
-            placeholder={
-              pinnedBook
-                ? `Tanyakan ide kelanjutan untuk "${pinnedBook.title}"...`
-                : 'Tanyakan ide cerita, twist, motivasi tokoh, atau sistem sihir...'
-            }
-            rows={1}
-            className="flex-1 bg-transparent resize-none px-2.5 py-1.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none max-h-28 leading-relaxed"
-          />
+              disabled={isSending || isFetchingExternal}
+              className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-800 dark:text-amber-300 border border-amber-500/40 text-[11px] font-black transition active:scale-95 disabled:opacity-50 shadow-xs"
+            >
+              <Sparkles className="w-3 h-3 text-amber-500 fill-current" />
+              <span>📖 Rancang Blueprint Buku</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => handleSendMessage()}
-            disabled={!inputMessage.trim() || isSending}
-            className="p-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-slate-950 font-bold transition active:scale-95 shadow-sm flex-shrink-0"
-            title="Kirim Pesan"
-          >
-            <Send className="w-4 h-4" />
-          </button>
+            <button
+              type="button"
+              onClick={() =>
+                handleSendMessage(
+                  'Berikan 3 opsi plot twist mengejutkan yang logis dan meningkatkan ketegangan dramatis untuk cerita ini.'
+                )
+              }
+              disabled={isSending || isFetchingExternal}
+              className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/15 hover:bg-purple-500/25 text-purple-700 dark:text-purple-300 border border-purple-500/30 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
+            >
+              <Zap className="w-3 h-3 text-purple-500" />
+              <span>⚡ Ide Plot Twist</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                handleSendMessage(
+                  'Bantu saya mendalami motif batin, luka masa lalu, dan dinamika konflik antar karakter dalam cerita ini.'
+                )
+              }
+              disabled={isSending || isFetchingExternal}
+              className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-500/15 hover:bg-blue-500/25 text-blue-700 dark:text-blue-300 border border-blue-500/30 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
+            >
+              <span>👥 Karakter &amp; Konflik</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                handleSendMessage(
+                  'Bantu deskripsikan detail latar suasana tempat (worldbuilding) yang kaya panca indra dan atmosferik untuk adegan ini.'
+                )
+              }
+              disabled={isSending || isFetchingExternal}
+              className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
+            >
+              <span>🏰 Dunia &amp; Suasana</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleTriggerExternal('tarot')}
+              disabled={isSending || isFetchingExternal}
+              className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
+            >
+              <span>🃏 Simbol Misterius</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 4. INPUT AREA BAR (Docks directly above HomeBottomNavigation) */}
+        <div className="w-full flex-shrink-0 px-2.5 sm:px-4 py-2 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-t border-slate-200/80 dark:border-slate-800/80 shadow-lg z-10">
+          <div className="max-w-3xl lg:max-w-4xl mx-auto w-full">
+            <div className="flex items-end gap-1.5 bg-slate-100/90 dark:bg-slate-900/90 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-1.5">
+              <textarea
+                ref={textareaRef}
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                placeholder={
+                  pinnedBook
+                    ? `Tanyakan ide kelanjutan untuk "${pinnedBook.title}"...`
+                    : 'Tanyakan ide cerita, twist, motivasi tokoh, atau sistem sihir...'
+                }
+                rows={1}
+                className="flex-1 bg-transparent resize-none px-2.5 py-1.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none max-h-28 leading-relaxed"
+              />
+
+              <button
+                type="button"
+                onClick={() => handleSendMessage()}
+                disabled={!inputMessage.trim() || isSending}
+                className="p-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-slate-950 font-bold transition active:scale-95 shadow-sm flex-shrink-0"
+                title="Kirim Pesan"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* 5. SIDEBAR / DRAWER LIST SESI PERCAKAPAN */}
+      {/* 5. MOBILE DRAWER LIST SESI PERCAKAPAN (shown on mobile when hamburger clicked) */}
       {isDrawerOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex justify-start animate-fade-in">
+        <div className="md:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex justify-start animate-fade-in">
           <div className="bg-white dark:bg-slate-900 w-full max-w-xs h-full p-4 border-r border-slate-200 dark:border-slate-800 flex flex-col shadow-2xl">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">

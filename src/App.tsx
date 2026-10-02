@@ -326,11 +326,11 @@ export function App() {
             />
           )}
 
-          {/* 3. Main Body Container - Compact & Edge-to-Edge on Mobile */}
-          <main className={`flex-1 w-full max-w-4xl mx-auto ${(activeTab === 'chat' && currentBook) || (!currentBook && mainMenu === 'inspiration') ? 'p-0 overflow-hidden flex flex-col min-h-0 min-w-0' : 'px-1.5 sm:px-4 py-3 sm:py-6'}`}>
+          {/* 3. Main Body Container - Compact & Edge-to-Edge on Mobile & Desktop Full Width for Chat & Inspiration */}
+          <main className={`flex-1 w-full ${(activeTab === 'chat' && currentBook) || (!currentBook && mainMenu === 'inspiration') ? 'max-w-none p-0 overflow-hidden flex flex-col min-h-0 min-w-0' : 'max-w-4xl mx-auto px-1.5 sm:px-4 py-3 sm:py-6'}`}>
             {!currentBook ? (
               /* Home Screen: Toggle between Dashboard, Works, & Inspiration */
-              <div className={mainMenu === 'inspiration' ? 'flex-1 flex flex-col min-h-0 min-w-0 h-full' : 'space-y-4'}>
+              <div className={mainMenu === 'inspiration' ? 'flex-1 flex flex-col min-h-0 min-w-0 h-full w-full' : 'space-y-4'}>
                 {mainMenu === 'dashboard' ? (
                   <DashboardView
                     books={books}

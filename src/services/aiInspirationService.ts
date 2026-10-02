@@ -81,7 +81,7 @@ TUGAS UTAMA ANDA:
      - **Latar Dunia & Setting:**
      - **Karakter Kunci:** (Protagonis, Antagonis, Pendukung beserta sifat & motivasi)
      - **Rancangan Arc Bab:** (Minimal Bab 1 sampai Bab 5 dengan konflik dan peristiwa tiap bab)
-   - Dan di bagian paling akhir respon tersebut, WAJIB sertakan penanda: `[STORY_BLUEPRINT_READY]` agar sistem otomatis mengenali dan memunculkan tombol "Rancang Jadi Buku" bagi penulis!
+   - Dan di bagian paling akhir respon tersebut, WAJIB sertakan penanda: "[STORY_BLUEPRINT_READY]" agar sistem otomatis mengenali dan memunculkan tombol "Rancang Jadi Buku" bagi penulis!
 
 KATALOG BUKU PENULIS SAAT INI:
 ${booksCatalogBrief}
