@@ -33,6 +33,7 @@ export function App() {
   const { bindEmptyAreaLongPress } = usePrivacy();
   const [mainMenu, setMainMenu] = useState<'dashboard' | 'works' | 'inspiration'>('dashboard');
   const [architectInitialIdea, setArchitectInitialIdea] = useState<string>('');
+  const [architectAutoStart, setArchitectAutoStart] = useState<boolean>(false);
   const [currentBook, setCurrentBook] = useState<Book | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('chapters');
   const [editingChapter, setEditingChapter] = useState<StoryChapter | null>(null);
@@ -342,8 +343,9 @@ export function App() {
                 ) : (
                   <InspirationChatView
                     books={books}
-                    onOpenArchitectWithIdea={(idea) => {
+                    onOpenArchitectWithIdea={(idea, autoStart) => {
                       setArchitectInitialIdea(idea);
+                      setArchitectAutoStart(!!autoStart);
                       setIsArchitectModalOpen(true);
                     }}
                     onOpenAISettings={handleOpenAISettings}
@@ -462,14 +464,17 @@ export function App() {
           <AIStoryArchitectModal
             isOpen={isArchitectModalOpen}
             initialRawIdea={architectInitialIdea}
+            autoStart={architectAutoStart}
             onClose={() => {
               handleCloseArchitect();
               setArchitectInitialIdea('');
+              setArchitectAutoStart(false);
             }}
             onProjectCreated={(newBook) => {
               triggerRefresh();
               handleSelectBook(newBook);
               setArchitectInitialIdea('');
+              setArchitectAutoStart(false);
             }}
             onOpenAISettings={handleOpenAISettings}
           />

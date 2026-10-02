@@ -36,6 +36,7 @@ interface AIStoryArchitectModalProps {
   onProjectCreated: (book: Book) => void;
   onOpenAISettings: () => void;
   initialRawIdea?: string;
+  autoStart?: boolean;
 }
 
 export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
@@ -44,6 +45,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
   onProjectCreated,
   onOpenAISettings,
   initialRawIdea,
+  autoStart,
 }) => {
   const [step, setStep] = useState<'input' | 'review'>('input');
   const [rawIdea, setRawIdea] = useState(initialRawIdea || '');
@@ -51,8 +53,11 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
   useEffect(() => {
     if (isOpen && initialRawIdea) {
       setRawIdea(initialRawIdea);
+      if (autoStart && !isLoading && !blueprint) {
+        handleGenerate(initialRawIdea);
+      }
     }
-  }, [isOpen, initialRawIdea]);
+  }, [isOpen, initialRawIdea, autoStart]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,8 +92,9 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
     'Di sebuah desa lereng gunung, seorang kakek pembuat wayang menemukan kayu keramat yang membuat karakter wayang buatannya hidup dan menuntut hak sebagai manusia.',
   ];
 
-  const handleGenerate = async () => {
-    if (!rawIdea.trim()) {
+  const handleGenerate = async (ideaOverride?: string) => {
+    const textToProcess = (typeof ideaOverride === 'string' ? ideaOverride : rawIdea).trim();
+    if (!textToProcess) {
       alert('Silakan tulis ide atau premis cerita Anda.');
       return;
     }
@@ -103,7 +109,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
     });
 
     try {
-      const generated = await generateStoryBlueprint(rawIdea, (info) => {
+      const generated = await generateStoryBlueprint(textToProcess, (info) => {
         setCurrentProgress(info);
         if (info.attempt) {
           setAttemptHistory((prev) => {

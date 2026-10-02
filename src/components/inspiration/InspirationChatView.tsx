@@ -194,7 +194,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isUser }) 
 
 interface InspirationChatViewProps {
   books: Book[];
-  onOpenArchitectWithIdea: (rawIdea: string) => void;
+  onOpenArchitectWithIdea: (rawIdea: string, autoStart?: boolean) => void;
   onOpenAISettings: () => void;
 }
 
@@ -404,31 +404,26 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
     }
   };
 
-  // External API Injection Handler
+  // External API Injection Handler (Now with literary contextual bridging)
   const handleTriggerExternal = async (type: 'tarot' | 'open5e' | 'history' | 'fact') => {
     if (!activeSession || isSending || isFetchingExternal) return;
     setIsFetchingExternal(true);
 
     try {
-      let promptTitle = '';
       let promptBody = '';
 
       if (type === 'tarot') {
         const card = await fetchTarotPrompt();
-        promptTitle = `🃏 ${card.name}`;
-        promptBody = card.narrativePrompt;
+        promptBody = `Saya menarik simbol kartu "${card.name}" (Makna filosofis: ${card.meaning}). Bagaimana simbol atau pertanda ini bisa diadaptasi secara kreatif menjadi misteri, firasat, atau rahasia penting dalam alur cerita kita?`;
       } else if (type === 'open5e') {
         const item = await fetchOpen5eInspiration();
-        promptTitle = `🐉 Inspirasi ${item.name} (${item.category})`;
         promptBody = `Bantu saya mengadaptasi konsep ini ke dalam cerita:\nNama: ${item.name} (${item.category})\nDeskripsi: ${item.description}\n${item.extraInfo || ''}`;
       } else if (type === 'history') {
         const hist = await fetchHistoricalPrompt();
-        promptTitle = `⏳ Peristiwa Sejarah Tahun ${hist.year}`;
-        promptBody = hist.storyPrompt;
+        promptBody = `Berikut catatan peristiwa sejarah tahun ${hist.year}: "${hist.eventText}". Bagaimana kita bisa mengambil inspirasi konflik dramatis ini untuk diadaptasi ke dalam fiksi cerita kita?`;
       } else {
         const fact = await fetchUselessFact();
-        promptTitle = `💡 Fakta Unik Dunia`;
-        promptBody = fact.thoughtPrompt;
+        promptBody = `Berikut fakta unik: "${fact.fact}". Coba jadikan fakta unik ini sebagai detail menarik atau obrolan cerdas antar tokoh dalam cerita kita.`;
       }
 
       await handleSendMessage(promptBody);
@@ -439,14 +434,14 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
     }
   };
 
-  // Formulate to Story Architect
+  // Formulate to Story Architect (Direct autoStart generation)
   const handleFormulate = async () => {
     if (!activeSession || isFormulating) return;
     setIsFormulating(true);
 
     try {
       const formulatedIdea = await formulateIdeaForArchitect(activeSession, pinnedBook);
-      onOpenArchitectWithIdea(formulatedIdea);
+      onOpenArchitectWithIdea(formulatedIdea, true);
     } catch (err: any) {
       alert(`Gagal memformulasikan ide: ${err.message || 'Error AI'}`);
     } finally {
@@ -528,6 +523,13 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
       <div className="flex-1 min-h-0 w-full overflow-y-auto px-2.5 sm:px-4 py-3 space-y-3 bg-slate-50/50 dark:bg-slate-950/40">
         {activeSession?.messages.map((msg) => {
           const isUser = msg.role === 'user';
+          // Deteksi apakah pesan ini merupakan rancangan blueprint cerita
+          const isBlueprint = !isUser && (
+            msg.content.includes('[STORY_BLUEPRINT_READY]') ||
+            (/judul/i.test(msg.content) && /premis|logline/i.test(msg.content) && (/karakter|tokoh/i.test(msg.content) || /bab\s*1|daftar\s*bab/i.test(msg.content)))
+          );
+          const cleanContent = msg.content.replace(/\[STORY_BLUEPRINT_READY\]/g, '').trim();
+
           return (
             <div
               key={msg.id}
@@ -551,14 +553,39 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
                 }`}
               >
                 {/* Formatted Content with Markdown Renderer */}
-                <MarkdownRenderer content={msg.content} isUser={isUser} />
+                <MarkdownRenderer content={cleanContent} isUser={isUser} />
 
-                {/* Assistant Bubble Actions (Copy & Formulate) */}
-                {!isUser && (
-                  <div className="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between gap-2 flex-wrap">
+                {/* HERO ACTION: Hanya tampil jika AI memang telah menyusun blueprint cerita */}
+                {isBlueprint && (
+                  <div className="mt-3 pt-2.5 border-t border-amber-500/30 flex items-center justify-between gap-2 bg-amber-500/10 dark:bg-amber-500/15 -mx-1.5 -mb-1 px-2.5 py-2 rounded-xl">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-black text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Rancangan Blueprint Siap</span>
+                      </p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                        Pindahkan langsung ke AI Story Architect
+                      </p>
+                    </div>
+
                     <button
                       type="button"
-                      onClick={() => handleCopyMessage(msg.id, msg.content)}
+                      onClick={() => onOpenArchitectWithIdea(cleanContent, true)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black shadow-sm transition active:scale-95 flex-shrink-0"
+                    >
+                      <Zap className="w-3.5 h-3.5 fill-current" />
+                      <span>Rancang jadi Buku</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Assistant Copy Action */}
+                {!isUser && (
+                  <div className={`flex items-center justify-end ${isBlueprint ? 'mt-1.5' : 'mt-2 pt-1.5 border-t border-slate-200/60 dark:border-slate-800/60'}`}>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyMessage(msg.id, cleanContent)}
                       className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition text-[11px] flex items-center gap-1"
                     >
                       {copiedMsgId === msg.id ? (
@@ -572,16 +599,6 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
                           <span>Salin</span>
                         </>
                       )}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleFormulate}
-                      disabled={isFormulating}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-[11px] font-bold border border-amber-500/30 transition active:scale-95"
-                    >
-                      <Sparkles className="w-3 h-3" />
-                      <span>Rancang jadi Buku</span>
                     </button>
                   </div>
                 )}
@@ -602,46 +619,69 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 3. QUICK EXTERNAL INSPIRATION CHIPS (Swipeable Compact Pills) */}
+      {/* 3. QUICK INSPIRATION & BLUEPRINT CHIPS (Actionable Creative Writing Sparks) */}
       <div className="w-full max-w-full min-w-0 flex-shrink-0 px-2.5 py-1.5 bg-slate-100/70 dark:bg-slate-900/70 border-t border-slate-200/70 dark:border-slate-800/70 flex items-center gap-1.5 overflow-x-auto scrollbar-none snap-x z-10">
+        <button
+          type="button"
+          onClick={() =>
+            handleSendMessage(
+              'Tolong rumuskan dan susun seluruh hasil diskusi kita sejauh ini menjadi Rancangan Blueprint Cerita lengkap (Judul Konsep & Genre, Logline/Premis, Latar Dunia, Karakter Kunci, dan Arc Bab 1 sampai 5) agar siap diwujudkan menjadi buku baru!'
+            )
+          }
+          disabled={isSending || isFetchingExternal}
+          className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-800 dark:text-amber-300 border border-amber-500/40 text-[11px] font-black transition active:scale-95 disabled:opacity-50 shadow-xs"
+        >
+          <Sparkles className="w-3 h-3 text-amber-500 fill-current" />
+          <span>📖 Rancang Blueprint Buku</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            handleSendMessage(
+              'Berikan 3 opsi plot twist mengejutkan yang logis dan meningkatkan ketegangan dramatis untuk cerita ini.'
+            )
+          }
+          disabled={isSending || isFetchingExternal}
+          className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/15 hover:bg-purple-500/25 text-purple-700 dark:text-purple-300 border border-purple-500/30 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
+        >
+          <Zap className="w-3 h-3 text-purple-500" />
+          <span>⚡ Ide Plot Twist</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            handleSendMessage(
+              'Bantu saya mendalami motif batin, luka masa lalu, dan dinamika konflik antar karakter dalam cerita ini.'
+            )
+          }
+          disabled={isSending || isFetchingExternal}
+          className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-500/15 hover:bg-blue-500/25 text-blue-700 dark:text-blue-300 border border-blue-500/30 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
+        >
+          <span>👥 Karakter &amp; Konflik</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            handleSendMessage(
+              'Bantu deskripsikan detail latar suasana tempat (worldbuilding) yang kaya panca indra dan atmosferik untuk adegan ini.'
+            )
+          }
+          disabled={isSending || isFetchingExternal}
+          className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
+        >
+          <span>🏰 Dunia &amp; Suasana</span>
+        </button>
+
         <button
           type="button"
           onClick={() => handleTriggerExternal('tarot')}
           disabled={isSending || isFetchingExternal}
-          className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/15 hover:bg-purple-500/25 text-purple-700 dark:text-purple-300 border border-purple-500/30 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
+          className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
         >
-          <span>🃏</span>
-          <span>Tarot Twist</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleTriggerExternal('open5e')}
-          disabled={isSending || isFetchingExternal}
-          className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
-        >
-          <span>🐉</span>
-          <span>D&amp;D Lore</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleTriggerExternal('history')}
-          disabled={isSending || isFetchingExternal}
-          className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-500/15 hover:bg-blue-500/25 text-blue-700 dark:text-blue-300 border border-blue-500/30 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
-        >
-          <span>⏳</span>
-          <span>Sejarah</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleTriggerExternal('fact')}
-          disabled={isSending || isFetchingExternal}
-          className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
-        >
-          <span>💡</span>
-          <span>Fakta Unik</span>
+          <span>🃏 Simbol Misterius</span>
         </button>
       </div>
 
