@@ -13,7 +13,8 @@ import {
   Plus,
   Compass,
   Film,
-  Users
+  Users,
+  ArrowLeft
 } from 'lucide-react';
 import { Book, WorldEntity, StoryChapter, MediaItem, CharacterChatMessage, CharacterChatSession } from '../../../types';
 import { useMediaUrl } from '../../../hooks/useMediaUrl';
@@ -74,6 +75,53 @@ const CharacterAvatarThumb: React.FC<{
   );
 };
 
+// Grid card subcomponent for character selection screen
+const CharacterGridCard: React.FC<{
+  entity: WorldEntity;
+  onClick: () => void;
+}> = ({ entity, onClick }) => {
+  const { url } = useMediaUrl(entity.avatarMediaId);
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group relative flex flex-col items-center p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 hover:border-amber-500/50 hover:shadow-lg dark:hover:shadow-amber-500/5 hover:-translate-y-0.5 transition-all duration-200 text-center active:scale-[0.98] w-full"
+    >
+      {/* Avatar */}
+      <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 group-hover:border-amber-500 transition-colors shadow-sm flex items-center justify-center flex-shrink-0">
+        {url ? (
+          <img src={url} alt={entity.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+        ) : (
+          <User className="w-8 h-8 text-slate-400 group-hover:text-amber-500 transition-colors" />
+        )}
+        <span className="absolute bottom-1 right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900" />
+      </div>
+
+      {/* Info */}
+      <div className="mt-3 w-full min-w-0 flex flex-col items-center">
+        <h4 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors truncate max-w-full">
+          {entity.name}
+        </h4>
+        <div className="mt-1 flex items-center gap-1">
+          <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 truncate max-w-[130px]">
+            {entity.role || 'Karakter'}
+          </span>
+        </div>
+        <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+          {entity.shortDescription || entity.description || 'Karakter dalam naskah cerita.'}
+        </p>
+      </div>
+
+      {/* Start Chat Button Pill */}
+      <div className="mt-3.5 w-full py-1.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 group-hover:bg-amber-500 text-slate-600 dark:text-slate-300 group-hover:text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs">
+        <MessageSquare className="w-3.5 h-3.5" />
+        <span>Mulai Chat</span>
+      </div>
+    </button>
+  );
+};
+
 export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
   book,
   entities,
@@ -85,13 +133,19 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
   // Filter characters only
   const characters = entities.filter((e) => e.category === 'character');
 
-  // Selected character
+  // Selected character (defaults to initialEntityId if provided, or empty string to display character selection grid)
   const [selectedEntityId, setSelectedEntityId] = useState<string>(() => {
     if (initialEntityId && characters.some((c) => c.id === initialEntityId)) {
       return initialEntityId;
     }
-    return characters[0]?.id || '';
+    return '';
   });
+
+  useEffect(() => {
+    if (initialEntityId && characters.some((c) => c.id === initialEntityId)) {
+      setSelectedEntityId(initialEntityId);
+    }
+  }, [initialEntityId, characters]);
 
   // Character selection drawer toggle (defaults to false for minimal, spacious view)
   const [showCharacterDrawer, setShowCharacterDrawer] = useState(false);
@@ -116,7 +170,7 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Active character object
-  const activeChar = characters.find((c) => c.id === selectedEntityId) || characters[0];
+  const activeChar = characters.find((c) => c.id === selectedEntityId) || null;
   const { url: activeCharAvatarUrl } = useMediaUrl(activeChar?.avatarMediaId);
 
   // Load chat session when active character changes
@@ -304,6 +358,59 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
     );
   }
 
+  // If no character is currently selected, display the Character Selection Grid
+  if (!activeChar) {
+    return (
+      <div className="flex-1 flex flex-col min-h-0 min-w-0 w-full max-w-4xl mx-auto overflow-hidden">
+        {/* Header */}
+        <div className="flex-shrink-0 px-3.5 sm:px-6 py-3 sm:py-4 bg-slate-50/95 dark:bg-slate-950/95 border-b border-slate-200/80 dark:border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 flex-shrink-0">
+              <Users className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100">
+                  Pilih Karakter untuk Diajak Bicara
+                </h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/25">
+                  {characters.length} Tokoh
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Pilih tokoh naskah untuk memulai percakapan imersif atau wawancara karakter.
+              </p>
+            </div>
+          </div>
+
+          {onOpenWorldbuilding && (
+            <button
+              type="button"
+              onClick={onOpenWorldbuilding}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold transition self-start sm:self-auto"
+            >
+              <Plus className="w-3.5 h-3.5 text-amber-500" />
+              <span>Kelola Karakter</span>
+            </button>
+          )}
+        </div>
+
+        {/* Characters Grid */}
+        <div className="flex-1 overflow-y-auto min-h-0 px-3 sm:px-6 py-4 scroll-smooth">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4 pb-6">
+            {characters.map((char) => (
+              <CharacterGridCard
+                key={char.id}
+                entity={char}
+                onClick={() => setSelectedEntityId(char.id)}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 flex flex-col min-h-0 min-w-0 w-full max-w-4xl mx-auto overflow-hidden relative">
       {/* ========================================================================= */}
@@ -311,6 +418,17 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
       {/* ========================================================================= */}
       <div className="flex-shrink-0 z-20 w-full px-2 py-1.5 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 min-w-0 relative">
         <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 backdrop-blur-md shadow-xs min-w-0">
+          {/* Back to Character Selection */}
+          <button
+            type="button"
+            onClick={() => setSelectedEntityId('')}
+            className="flex items-center gap-1 px-2 py-1.5 mr-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition flex-shrink-0 active:scale-95"
+            title="Kembali ke Daftar Karakter"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Ganti</span>
+          </button>
+
           {/* Left: Active Character Identity */}
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 pr-1 flex-1">
             <div className="w-8 h-8 rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-800 flex items-center justify-center border border-amber-500/30 flex-shrink-0 shadow-xs">

@@ -211,6 +211,7 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
   const [activeSession, setActiveSession] = useState<InspirationChatSession | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(true);
+  const [sessionToDelete, setSessionToDelete] = useState<InspirationChatSession | null>(null);
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [editTitleValue, setEditTitleValue] = useState('');
 
@@ -286,20 +287,27 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
   };
 
   // Handle deleting session
-  const handleDeleteSession = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!confirm('Hapus sesi obrolan brainstorming ini?')) return;
-    await deleteInspirationSession(id);
-    const updated = sessions.filter((s) => s.id !== id);
-    setSessions(updated);
-    if (activeSession?.id === id) {
-      if (updated.length > 0) {
-        setActiveSession(updated[0]);
-      } else {
-        const fresh = await createInspirationSession();
-        setSessions([fresh]);
-        setActiveSession(fresh);
+  const handleConfirmDelete = async () => {
+    if (!sessionToDelete) return;
+    const id = sessionToDelete.id;
+    setSessionToDelete(null);
+    try {
+      await deleteInspirationSession(id);
+      const updated = sessions.filter((s) => s.id !== id);
+      setSessions(updated);
+      if (activeSession?.id === id) {
+        if (updated.length > 0) {
+          setActiveSession(updated[0]);
+          setPinnedBookId(updated[0].pinnedBookId || '');
+        } else {
+          const fresh = await createInspirationSession();
+          setSessions([fresh]);
+          setActiveSession(fresh);
+          setPinnedBookId('');
+        }
       }
+    } catch (err) {
+      console.error('Failed to delete inspiration session:', err);
     }
   };
 
@@ -549,7 +557,7 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition flex-shrink-0">
+                      <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition flex-shrink-0">
                         <button
                           type="button"
                           onClick={(e) => handleStartEditTitle(sess, e)}
@@ -560,8 +568,14 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
                         </button>
                         <button
                           type="button"
-                          onClick={(e) => handleDeleteSession(sess.id, e)}
-                          className="p-1 rounded-lg text-rose-500 hover:text-rose-600 bg-rose-500/10 hover:bg-rose-500/20 dark:bg-rose-500/20 dark:hover:bg-rose-500/30 transition"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            setSessionToDelete(sess);
+                          }}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          className="p-1 rounded-lg text-rose-500 hover:text-rose-600 bg-rose-500/10 hover:bg-rose-500/20 dark:bg-rose-500/20 dark:hover:bg-rose-500/30 transition active:scale-95"
                           title="Hapus Sesi"
                         >
                           <Trash2 className="w-3 h-3" />
@@ -1044,7 +1058,13 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
                           </button>
                           <button
                             type="button"
-                            onClick={(e) => handleDeleteSession(sess.id, e)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              setSessionToDelete(sess);
+                            }}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
                             className="p-1.5 rounded-lg text-rose-500 hover:text-rose-600 bg-rose-500/10 hover:bg-rose-500/20 dark:bg-rose-500/20 dark:hover:bg-rose-500/30 transition active:scale-95"
                             title="Hapus Sesi"
                           >
@@ -1056,6 +1076,55 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
                   </div>
                 );
               })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6. IN-APP CONFIRMATION MODAL FOR DELETING SESSION */}
+      {sessionToDelete && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
+          onClick={() => setSessionToDelete(null)}
+        >
+          <div
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-sm p-4 sm:p-5 shadow-2xl space-y-3 animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2.5 text-rose-500">
+              <div className="p-2 rounded-xl bg-rose-500/15">
+                <Trash2 className="w-5 h-5 text-rose-500" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">
+                  Hapus Sesi Inspirasi?
+                </h4>
+                <p className="text-[11px] text-slate-400">
+                  Tindakan ini tidak dapat dibatalkan.
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-950/60 p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800">
+              Sesi "<span className="font-bold text-slate-900 dark:text-white">{sessionToDelete.title}</span>" beserta {sessionToDelete.messages.length} pesan di dalamnya akan dihapus permanen.
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setSessionToDelete(null)}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition active:scale-95"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="px-4 py-1.5 rounded-xl text-xs font-black text-white bg-rose-600 hover:bg-rose-700 shadow-md shadow-rose-600/20 transition active:scale-95 flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Hapus Sekarang</span>
+              </button>
             </div>
           </div>
         </div>
