@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Book, StoryChapter } from '../../types';
-import { X, Printer, FileText, Check, Copy, Eye, BookOpen, Layers } from 'lucide-react';
+import { db } from '../../db';
+import { X, Printer, FileText, Check, Copy, BookOpen, Layers, Image as ImageIcon } from 'lucide-react';
 
 export type PaperSize = 'a4' | 'letter' | 'a5' | 'b5';
 
@@ -23,11 +25,86 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
   );
   const [paperSize, setPaperSize] = useState<PaperSize>('a4');
   const [includeCover, setIncludeCover] = useState(true);
+  const [includeChapterCover, setIncludeChapterCover] = useState(true);
+  const [includeInlineImages, setIncludeInlineImages] = useState(true);
   const [includeToc, setIncludeToc] = useState(true);
   const [fontSize, setFontSize] = useState<'sm' | 'md' | 'lg'>('md');
   const [lineHeight, setLineHeight] = useState<'tight' | 'normal' | 'relaxed'>('normal');
   const [textAlign, setTextAlign] = useState<'justify' | 'left'>('justify');
   const [copied, setCopied] = useState(false);
+
+  // Loaded Media Object URLs
+  const [bookCoverUrl, setBookCoverUrl] = useState<string | null>(book.coverImageUrl || null);
+  const [chapterCovers, setChapterCovers] = useState<Record<string, string>>({});
+
+  // Escape key handler
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  // Load Book Cover and Chapter Covers from IndexedDB blob store
+  useEffect(() => {
+    if (!isOpen) return;
+    let isMounted = true;
+    const createdUrls: string[] = [];
+
+    const loadCovers = async () => {
+      // 1. Book Cover
+      if (book.coverMediaId) {
+        try {
+          const item = await db.media.get(book.coverMediaId);
+          if (item && item.blob && isMounted) {
+            const url = URL.createObjectURL(item.blob);
+            createdUrls.push(url);
+            setBookCoverUrl(url);
+          }
+        } catch (err) {
+          console.error('Failed to load book cover from db.media:', err);
+        }
+      } else if (book.coverImageUrl) {
+        setBookCoverUrl(book.coverImageUrl);
+      } else {
+        setBookCoverUrl(null);
+      }
+
+      // 2. Chapter Covers
+      const chCoverMap: Record<string, string> = {};
+      for (const ch of chapters) {
+        if (ch.coverImageUrl) {
+          chCoverMap[ch.id] = ch.coverImageUrl;
+        }
+        if (ch.coverMediaId) {
+          try {
+            const item = await db.media.get(ch.coverMediaId);
+            if (item && item.blob && isMounted) {
+              const url = URL.createObjectURL(item.blob);
+              createdUrls.push(url);
+              chCoverMap[ch.id] = url;
+            }
+          } catch (err) {
+            console.error(`Failed to load cover for chapter ${ch.id}:`, err);
+          }
+        }
+      }
+      if (isMounted) {
+        setChapterCovers(chCoverMap);
+      }
+    };
+
+    loadCovers();
+
+    return () => {
+      isMounted = false;
+      createdUrls.forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, [isOpen, book.id, book.coverMediaId, book.coverImageUrl, chapters]);
 
   if (!isOpen) return null;
 
@@ -39,12 +116,18 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
 
   // Clean html to printable text / elements
   const cleanHtml = (html?: string) => {
-    if (!html) return '<p class="empty-text"><em>(Naskah bab ini belum ditulis)</em></p>';
+    if (!html) return '<p class="empty-text italic text-slate-400"><em>(Naskah bab ini belum ditulis)</em></p>';
+    if (!includeInlineImages) {
+      // Strip story-image-block figures and inline images if user opted out
+      return html
+        .replace(/<figure[^>]*class="[^"]*story-image-block[^"]*"[^>]*>[\s\S]*?<\/figure>/gi, '')
+        .replace(/<figure[^>]*>[\s\S]*?<\/figure>/gi, '')
+        .replace(/<img[^>]*>/gi, '');
+    }
     return html;
   };
 
   // Calculate realistic starting page numbers for TOC based on word counts
-  // Standard Paperback / A4 density: ~250 - 300 words per page
   const wordsPerPage = paperSize === 'a5' ? 220 : paperSize === 'b5' ? 250 : 300;
   let runningPage = 1;
   if (includeCover && exportMode === 'all') runningPage += 1;
@@ -55,8 +138,9 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
 
   const chaptersWithPageNumbers = exportChapters.map((ch) => {
     const startPage = runningPage;
-    const chWords = ch.wordCount || (ch.contentHtml ? ch.contentHtml.replace(/<[^>]*>/g, '').split(/\s+/).length : 0);
-    const pagesForThisChapter = Math.max(1, Math.ceil(chWords / wordsPerPage));
+    const chWords = ch.wordCount || (ch.contentHtml ? ch.contentHtml.replace(/<[^>]*>/g, '').split(/\s+/).filter(Boolean).length : 0);
+    const coverExtra = (includeChapterCover && chapterCovers[ch.id]) ? 0.75 : 0;
+    const pagesForThisChapter = Math.max(1, Math.ceil((chWords / wordsPerPage) + coverExtra));
     runningPage += pagesForThisChapter;
     return {
       ...ch,
@@ -95,39 +179,241 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
     b5: 'max-w-[176mm] min-h-[250mm]',
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-      {/* Dynamic Print CSS for Page Layout, Margins, and Footers */}
+  const modalContent = (
+    <div className="schemax-modal-backdrop fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:m-0 print:bg-white print:overflow-visible print:static print:inset-auto print:h-auto print:w-full print:block">
+      {/* Dynamic Print CSS for Page Layout, Margins, Page-Breaks, and Isolation */}
       <style>{`
         @media print {
           @page {
             size: ${paperSize === 'letter' ? 'letter' : paperSize.toUpperCase()};
-            margin: 20mm 15mm 20mm 15mm;
+            margin: 18mm 15mm 20mm 15mm;
             @bottom-center {
               content: counter(page);
-              font-family: serif;
-              font-size: 10pt;
+              font-family: 'Times New Roman', Times, serif;
+              font-size: 9pt;
               color: #475569;
             }
           }
-          body {
+
+          /* Hide entire React root outside of this portal */
+          #root {
+            display: none !important;
+          }
+
+          /* Ensure html & body flow infinitely without clipping viewports */
+          html, body {
+            background: #ffffff !important;
             background-color: #ffffff !important;
             color: #0f172a !important;
-            counter-reset: page 1;
+            margin: 0 !important;
+            padding: 0 !important;
+            height: auto !important;
+            min-height: 100% !important;
+            overflow: visible !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
-          .print-page-break {
+
+          /* Hide non-print UI bars */
+          .schemax-no-print,
+          .print\\:hidden {
+            display: none !important;
+          }
+
+          /* Reset all modal containers so they don't clip */
+          .schemax-modal-backdrop,
+          .schemax-modal-card,
+          .schemax-preview-wrapper {
+            position: static !important;
+            inset: auto !important;
+            width: 100% !important;
+            max-width: none !important;
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+            box-shadow: none !important;
+            background: transparent !important;
+            border-radius: 0 !important;
+            transform: none !important;
+            backdrop-filter: none !important;
+            display: block !important;
+          }
+
+          /* The printable book document container */
+          #schemax-pdf-document {
+            position: static !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-shadow: none !important;
+            border: none !important;
+            border-radius: 0 !important;
+            background: #ffffff !important;
+            color: #0f172a !important;
+            overflow: visible !important;
+            height: auto !important;
+            display: block !important;
+          }
+
+          /* 1. Halaman Sampul Buku (Cover): Halaman 1 mandiri */
+          .schemax-book-cover-page {
+            page-break-before: auto !important;
+            break-before: auto !important;
             page-break-after: always !important;
             break-after: page !important;
+            min-height: 88vh !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+            align-items: center !important;
+            text-align: center !important;
+            box-sizing: border-box !important;
+            padding: 15mm 10mm !important;
           }
+
+          /* 2. Halaman Daftar Isi (TOC): Mulai di halaman baru & akhiri halaman */
+          .schemax-toc-page {
+            page-break-before: always !important;
+            break-before: page !important;
+            page-break-after: always !important;
+            break-after: page !important;
+            min-height: auto !important;
+            display: block !important;
+            box-sizing: border-box !important;
+            padding-top: 10mm !important;
+          }
+
+          /* 3. Setiap Bab: PASTI dimulai di lembar baru */
+          .schemax-chapter-article {
+            page-break-before: always !important;
+            break-before: page !important;
+            break-inside: auto !important;
+            display: block !important;
+            width: 100% !important;
+            clear: both !important;
+            box-sizing: border-box !important;
+            padding-top: 10mm !important;
+          }
+
+          /* Jika bab adalah elemen pertama di dokumen (tanpa cover/toc atau mode per bab), mulai langsung di hal 1 */
+          .schemax-printable-doc > .schemax-chapter-article:first-child {
+            page-break-before: auto !important;
+            break-before: auto !important;
+            padding-top: 0 !important;
+          }
+
+          .schemax-chapter-header {
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+            margin-bottom: 18pt !important;
+          }
+
+          /* 4. Gambar: Sampul Buku, Sampul Bab, dan Gambar Sisipan */
+          img {
+            max-width: 100% !important;
+            height: auto !important;
+            object-fit: contain !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
+          .schemax-book-cover-img {
+            max-width: 80% !important;
+            max-height: 52vh !important;
+            width: auto !important;
+            height: auto !important;
+            object-fit: contain !important;
+            margin: 0 auto 18pt auto !important;
+            border-radius: 6pt !important;
+            display: block !important;
+          }
+
+          .schemax-chapter-cover-box {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+            margin: 0 auto 16pt auto !important;
+            text-align: center !important;
+            width: 100% !important;
+          }
+
+          .schemax-chapter-cover-img {
+            max-width: 100% !important;
+            max-height: 280pt !important;
+            width: auto !important;
+            height: auto !important;
+            object-fit: contain !important;
+            margin: 0 auto !important;
+            border-radius: 6pt !important;
+            display: block !important;
+          }
+
+          /* Gambar sisipan di dalam naskah cerita */
+          .story-image-block,
+          figure {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            margin: 16pt auto !important;
+            padding: 0 !important;
+            background: transparent !important;
+            border: none !important;
+            text-align: center !important;
+            width: 100% !important;
+            display: block !important;
+          }
+
+          .story-image-block img,
+          figure img {
+            max-width: 100% !important;
+            max-height: 380pt !important;
+            width: auto !important;
+            height: auto !important;
+            margin: 0 auto !important;
+            border-radius: 4pt !important;
+            object-fit: contain !important;
+            display: block !important;
+          }
+
+          figcaption {
+            font-size: 9pt !important;
+            color: #475569 !important;
+            font-style: italic !important;
+            margin-top: 6pt !important;
+            text-align: center !important;
+            page-break-before: avoid !important;
+            break-before: avoid !important;
+          }
+
+          .entity-tag-pill {
+            font-size: 8pt !important;
+            padding: 1pt 5pt !important;
+            border: 0.5pt solid #cbd5e1 !important;
+            color: #475569 !important;
+            background: #f8fafc !important;
+            border-radius: 9999px !important;
+            display: inline-block !important;
+          }
+
+          /* Tipografi & Paragraf */
           .prose-print {
             text-align: ${textAlign} !important;
             text-justify: inter-word !important;
             hyphens: auto !important;
+            font-size: ${fontSize === 'sm' ? '10pt' : fontSize === 'lg' ? '13pt' : '11.5pt'} !important;
           }
           .prose-print p {
             text-indent: 1.5em !important;
-            margin-bottom: 0.5em !important;
+            margin-bottom: 0.6em !important;
             line-height: ${lineHeight === 'relaxed' ? '1.8' : lineHeight === 'tight' ? '1.4' : '1.6'} !important;
+            orphans: 3 !important;
+            widows: 3 !important;
           }
           .prose-print p:first-of-type {
             text-indent: 0 !important;
@@ -135,10 +421,10 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
         }
       `}</style>
 
-      {/* Container */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-5xl shadow-2xl flex flex-col max-h-[94vh] overflow-hidden my-auto animate-fade-in-up">
+      {/* Modal Dialog Card */}
+      <div className="schemax-modal-card bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-5xl shadow-2xl flex flex-col max-h-[94vh] overflow-hidden my-auto print:max-h-none print:h-auto print:border-none print:shadow-none print:rounded-none print:overflow-visible print:w-full print:block print:m-0 print:p-0 animate-fade-in-up">
         {/* Header (Hidden on print) */}
-        <div className="print:hidden flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40">
+        <div className="schemax-no-print print:hidden flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40">
           <div className="flex items-center gap-2.5">
             <span className="p-2 rounded-2xl bg-amber-500/15 text-amber-500">
               <Printer className="w-5 h-5" />
@@ -163,115 +449,118 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
         </div>
 
         {/* Configuration Bar (Hidden on print) */}
-        <div className="print:hidden p-3.5 bg-slate-100/70 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800/80 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-          {/* 1. Paper Size Layout */}
-          <div>
-            <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-              📐 Ukuran Kertas:
-            </label>
-            <select
-              value={paperSize}
-              onChange={(e) => setPaperSize(e.target.value as PaperSize)}
-              className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-1.5 font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-amber-500 uppercase"
-            >
-              <option value="a4">A4 (210 x 297 mm) - Standar Dokumen</option>
-              <option value="letter">Letter (8.5 x 11 in) - Standar AS</option>
-              <option value="a5">A5 (148 x 210 mm) - Standar Novel</option>
-              <option value="b5">B5 (176 x 250 mm) - Buku Akademik</option>
-            </select>
-          </div>
-
-          {/* 2. Export Mode */}
-          <div>
-            <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-              📑 Cakupan Bab:
-            </label>
-            <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700">
-              <button
-                type="button"
-                onClick={() => setExportMode('all')}
-                className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition text-[11px] ${
-                  exportMode === 'all'
-                    ? 'bg-amber-500 text-slate-950 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
+        <div className="schemax-no-print print:hidden p-3.5 bg-slate-100/70 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800/80 space-y-3 text-xs">
+          {/* Main Controls Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {/* 1. Paper Size Layout */}
+            <div>
+              <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                📐 Ukuran Kertas:
+              </label>
+              <select
+                value={paperSize}
+                onChange={(e) => setPaperSize(e.target.value as PaperSize)}
+                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-1.5 font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-amber-500 uppercase"
               >
-                Semua ({chapters.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setExportMode('single')}
-                className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition text-[11px] ${
-                  exportMode === 'single'
-                    ? 'bg-amber-500 text-slate-950 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                Per Bab
-              </button>
+                <option value="a4">A4 (210 x 297 mm) - Standar Dokumen</option>
+                <option value="letter">Letter (8.5 x 11 in) - Standar AS</option>
+                <option value="a5">A5 (148 x 210 mm) - Standar Novel</option>
+                <option value="b5">B5 (176 x 250 mm) - Buku Akademik</option>
+              </select>
             </div>
-          </div>
 
-          {/* 3. Typography & Justify */}
-          <div>
-            <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-              🖋️ Tipografi &amp; Rata Teks:
-            </label>
-            <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700">
-              <button
-                type="button"
-                onClick={() => setTextAlign('justify')}
-                className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition text-[11px] ${
-                  textAlign === 'justify'
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400'
-                }`}
-                title="Rata Kanan-Kiri Presisi (Standar Buku Internasional)"
-              >
-                Justify (Rapi)
-              </button>
-              <button
-                type="button"
-                onClick={() => setTextAlign('left')}
-                className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition text-[11px] ${
-                  textAlign === 'left'
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400'
-                }`}
-                title="Rata Kiri Standar"
-              >
-                Rata Kiri
-              </button>
-            </div>
-          </div>
-
-          {/* 4. Options & Font size */}
-          <div>
-            <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-              🔤 Ukuran Huruf:
-            </label>
-            <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700">
-              {(['sm', 'md', 'lg'] as const).map((sz) => (
+            {/* 2. Export Mode */}
+            <div>
+              <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                📑 Cakupan Bab:
+              </label>
+              <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700">
                 <button
-                  key={sz}
                   type="button"
-                  onClick={() => setFontSize(sz)}
-                  className={`flex-1 py-1.5 rounded-lg font-bold uppercase text-[11px] ${
-                    fontSize === sz
-                      ? 'bg-slate-900 dark:bg-slate-700 text-white'
-                      : 'text-slate-400'
+                  onClick={() => setExportMode('all')}
+                  className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition text-[11px] ${
+                    exportMode === 'all'
+                      ? 'bg-amber-500 text-slate-950 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
-                  {sz === 'sm' ? '10pt' : sz === 'md' ? '11.5pt' : '13pt'}
+                  Semua ({chapters.length})
                 </button>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => setExportMode('single')}
+                  className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition text-[11px] ${
+                    exportMode === 'single'
+                      ? 'bg-amber-500 text-slate-950 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  Per Bab
+                </button>
+              </div>
+            </div>
+
+            {/* 3. Typography & Justify */}
+            <div>
+              <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                🖋️ Tipografi &amp; Rata Teks:
+              </label>
+              <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => setTextAlign('justify')}
+                  className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition text-[11px] ${
+                    textAlign === 'justify'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400'
+                  }`}
+                  title="Rata Kanan-Kiri Presisi (Standar Buku Internasional)"
+                >
+                  Justify (Rapi)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTextAlign('left')}
+                  className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition text-[11px] ${
+                    textAlign === 'left'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400'
+                  }`}
+                  title="Rata Kiri Standar"
+                >
+                  Rata Kiri
+                </button>
+              </div>
+            </div>
+
+            {/* 4. Font size */}
+            <div>
+              <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                🔤 Ukuran Huruf:
+              </label>
+              <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                {(['sm', 'md', 'lg'] as const).map((sz) => (
+                  <button
+                    key={sz}
+                    type="button"
+                    onClick={() => setFontSize(sz)}
+                    className={`flex-1 py-1.5 rounded-lg font-bold uppercase text-[11px] ${
+                      fontSize === sz
+                        ? 'bg-slate-900 dark:bg-slate-700 text-white'
+                        : 'text-slate-400'
+                    }`}
+                  >
+                    {sz === 'sm' ? '10pt' : sz === 'md' ? '11.5pt' : '13pt'}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* Additional Row: Chapter select or Checkboxes */}
-          <div className="col-span-2 sm:col-span-4 flex items-center justify-between gap-4 pt-1 border-t border-slate-200/60 dark:border-slate-800/60 flex-wrap">
+          {/* Sub Row: Single Chapter selector or Checkbox options */}
+          <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-200/70 dark:border-slate-800/70 flex-wrap">
             {exportMode === 'single' ? (
-              <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+              <div className="flex items-center gap-2 flex-1 min-w-[240px]">
                 <span className="font-bold text-slate-700 dark:text-slate-300">Pilih Bab:</span>
                 <select
                   value={selectedChapterId}
@@ -286,39 +575,61 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
                 </select>
               </div>
             ) : (
-              <div className="flex items-center gap-4">
-                <label className="inline-flex items-center gap-1.5 cursor-pointer font-bold text-slate-700 dark:text-slate-300">
+              <div className="flex items-center gap-4 flex-wrap">
+                <label className="inline-flex items-center gap-1.5 cursor-pointer font-bold text-slate-700 dark:text-slate-300 select-none">
                   <input
                     type="checkbox"
                     checked={includeCover}
                     onChange={(e) => setIncludeCover(e.target.checked)}
                     className="rounded text-amber-500 focus:ring-amber-500 w-3.5 h-3.5"
                   />
-                  <span>Halaman Judul</span>
+                  <span>Halaman Sampul Buku</span>
                 </label>
-                <label className="inline-flex items-center gap-1.5 cursor-pointer font-bold text-slate-700 dark:text-slate-300">
+                <label className="inline-flex items-center gap-1.5 cursor-pointer font-bold text-slate-700 dark:text-slate-300 select-none">
                   <input
                     type="checkbox"
                     checked={includeToc}
                     onChange={(e) => setIncludeToc(e.target.checked)}
                     className="rounded text-amber-500 focus:ring-amber-500 w-3.5 h-3.5"
                   />
-                  <span>Daftar Isi dengan Nomor Halaman</span>
+                  <span>Daftar Isi &amp; Nomor Hal.</span>
                 </label>
               </div>
             )}
 
-            <div className="text-[11px] text-slate-500 dark:text-slate-400">
-              Perkiraan Tebal: <strong>~{runningPage} Halaman Cetak</strong>
+            {/* Image Checkboxes (Both for all and single mode) */}
+            <div className="flex items-center gap-4 flex-wrap">
+              <label className="inline-flex items-center gap-1.5 cursor-pointer font-bold text-slate-700 dark:text-slate-300 select-none">
+                <input
+                  type="checkbox"
+                  checked={includeChapterCover}
+                  onChange={(e) => setIncludeChapterCover(e.target.checked)}
+                  className="rounded text-amber-500 focus:ring-amber-500 w-3.5 h-3.5"
+                />
+                <span>Sampul Bab</span>
+              </label>
+              <label className="inline-flex items-center gap-1.5 cursor-pointer font-bold text-slate-700 dark:text-slate-300 select-none">
+                <input
+                  type="checkbox"
+                  checked={includeInlineImages}
+                  onChange={(e) => setIncludeInlineImages(e.target.checked)}
+                  className="rounded text-amber-500 focus:ring-amber-500 w-3.5 h-3.5"
+                />
+                <span>Gambar Sisipan Naskah</span>
+              </label>
+            </div>
+
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+              Perkiraan: <strong>~{runningPage} Halaman Cetak</strong>
             </div>
           </div>
         </div>
 
         {/* Live Printable Preview Canvas */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-200/70 dark:bg-slate-950/80 flex justify-center">
+        <div className="schemax-preview-wrapper flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-200/70 dark:bg-slate-950/80 flex justify-center print:p-0 print:m-0 print:bg-white print:overflow-visible print:block print:w-full print:h-auto">
           <div
             id="schemax-pdf-document"
-            className={`w-full ${paperDimensions[paperSize]} bg-white text-slate-900 p-8 sm:p-14 rounded-2xl shadow-xl border border-slate-300/80 font-serif leading-relaxed print:p-0 print:border-none print:shadow-none print:max-w-none print:m-0 transition-all ${
+            className={`schemax-printable-doc w-full ${paperDimensions[paperSize]} bg-white text-slate-900 p-8 sm:p-14 rounded-2xl shadow-xl border border-slate-300/80 font-serif leading-relaxed print:p-0 print:border-none print:shadow-none print:max-w-none print:m-0 print:rounded-none transition-all ${
               fontSize === 'sm'
                 ? 'text-xs sm:text-[13px]'
                 : fontSize === 'lg'
@@ -326,33 +637,46 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
                 : 'text-sm sm:text-[15px]'
             }`}
           >
-            {/* Title / Cover Page */}
+            {/* Title / Cover Page (Dedicated Page) */}
             {includeCover && exportMode === 'all' && (
-              <div className="text-center py-16 sm:py-24 border-b-2 border-slate-900 mb-14 print-page-break">
-                <span className="text-xs uppercase tracking-widest font-sans font-bold text-slate-500 block mb-4">
-                  {book.genre || 'Novel'}
-                </span>
-                <h1 className="text-3xl sm:text-5xl font-black font-sans tracking-tight text-slate-950 mb-5">
-                  {book.title}
-                </h1>
-                {book.synopsis && (
-                  <p className="text-sm italic text-slate-600 max-w-lg mx-auto mb-10 font-sans leading-relaxed">
-                    "{book.synopsis}"
-                  </p>
-                )}
-                <div className="pt-10 border-t border-slate-200 inline-block px-10 text-xs font-sans text-slate-400">
-                  Total {chapters.length} Bab • Dibuat dengan Schemax Story Studio
+              <div className="schemax-book-cover-page text-center py-12 sm:py-20 mb-14 border-b-2 border-slate-900/40 print:border-none print:mb-0 print:py-0">
+                <div className="max-w-md mx-auto w-full flex flex-col items-center">
+                  {/* Book Cover Image if available */}
+                  {bookCoverUrl && (
+                    <div className="mb-6 sm:mb-8 w-full flex justify-center">
+                      <img
+                        src={bookCoverUrl}
+                        alt={`Sampul ${book.title}`}
+                        className="schemax-book-cover-img max-h-[380px] sm:max-h-[460px] w-auto max-w-[85%] object-contain rounded-xl shadow-2xl border border-slate-200 print:shadow-none print:border-none"
+                      />
+                    </div>
+                  )}
+
+                  <span className="text-xs uppercase tracking-widest font-sans font-bold text-amber-700 dark:text-amber-500 block mb-3">
+                    {book.genre || 'Novel'}
+                  </span>
+                  <h1 className="text-3xl sm:text-5xl font-black font-sans tracking-tight text-slate-950 mb-4 leading-tight">
+                    {book.title}
+                  </h1>
+                  {book.synopsis && (
+                    <p className="text-xs sm:text-sm italic text-slate-600 max-w-lg mx-auto mb-8 font-sans leading-relaxed">
+                      "{book.synopsis}"
+                    </p>
+                  )}
+                  <div className="pt-6 border-t border-slate-300 inline-block px-8 text-xs font-sans text-slate-500">
+                    Total {chapters.length} Bab • Dibuat dengan Schemax Story Studio
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* Table of Contents with Page Numbers */}
+            {/* Table of Contents with Page Numbers (Dedicated Page) */}
             {includeToc && exportMode === 'all' && (
-              <div className="mb-14 pb-8 border-b border-slate-200 print-page-break">
-                <h2 className="text-xl font-sans font-black uppercase tracking-wider text-slate-900 mb-6 pb-2 border-b-2 border-slate-900 text-center">
+              <div className="schemax-toc-page mb-14 pb-8 border-b border-slate-200 print:border-none print:mb-0 print:pb-0">
+                <h2 className="text-xl sm:text-2xl font-sans font-black uppercase tracking-wider text-slate-900 mb-6 pb-2 border-b-2 border-slate-900 text-center">
                   Daftar Isi
                 </h2>
-                <div className="space-y-3 font-sans text-xs sm:text-sm">
+                <div className="space-y-3 font-sans text-xs sm:text-sm max-w-2xl mx-auto">
                   {chaptersWithPageNumbers.map((ch) => (
                     <div
                       key={ch.id}
@@ -370,21 +694,35 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
               </div>
             )}
 
-            {/* Chapters Content */}
-            <div className="space-y-16">
+            {/* Chapters Content - Each Chapter on a New Page */}
+            <div className="space-y-16 print:space-y-0">
               {chaptersWithPageNumbers.map((ch) => (
-                <article key={ch.id} className="print-page-break">
-                  <header className="mb-8 pb-3 border-b border-slate-200 text-center">
+                <article key={ch.id} className="schemax-chapter-article">
+                  <header className="schemax-chapter-header mb-8 pb-3 border-b border-slate-200 text-center">
                     <span className="text-xs font-sans font-bold text-amber-700 tracking-widest uppercase block mb-1">
                       Bab {ch.order}
                     </span>
-                    <h2 className="text-2xl sm:text-3xl font-sans font-black text-slate-900">
+                    <h2 className="text-2xl sm:text-3xl font-sans font-black text-slate-900 mb-1">
                       {ch.title || `Bab ${ch.order}`}
                     </h2>
-                    <span className="text-[10px] font-sans text-slate-400 mt-1 block">
+                    <span className="text-[10px] font-sans text-slate-400 block print:hidden">
                       Halaman {ch.startPage}
                     </span>
                   </header>
+
+                  {/* Chapter Cover Image if available & enabled */}
+                  {includeChapterCover && chapterCovers[ch.id] && (
+                    <div className="schemax-chapter-cover-box my-6">
+                      <img
+                        src={chapterCovers[ch.id]}
+                        alt={`Sampul Bab ${ch.order}: ${ch.title}`}
+                        className="schemax-chapter-cover-img max-h-[300px] w-auto max-w-full object-contain mx-auto rounded-xl shadow-md border border-slate-200 print:shadow-none print:border-none"
+                      />
+                      <p className="text-[10px] italic text-slate-500 mt-2 font-sans text-center print:hidden">
+                        Ilustrasi Sampul Bab {ch.order}
+                      </p>
+                    </div>
+                  )}
 
                   <div
                     className={`prose-print max-w-none text-slate-900 leading-relaxed font-serif space-y-3 ${
@@ -403,7 +741,7 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
         </div>
 
         {/* Footer Actions (Hidden on print) */}
-        <div className="print:hidden px-5 py-3.5 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between gap-3">
+        <div className="schemax-no-print print:hidden px-5 py-3.5 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between gap-3">
           <div className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">
             Tips: Pada dialog cetak, pilih <strong>"Save as PDF" / "Simpan sebagai PDF"</strong>.
           </div>
@@ -431,4 +769,6 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };
