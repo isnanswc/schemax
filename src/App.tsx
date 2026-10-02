@@ -20,6 +20,7 @@ import { SyncStatusModal } from './components/sync/SyncStatusModal';
 import { AISettingsModal } from './components/settings/AISettingsModal';
 import { GDriveSettingsModal } from './components/settings/GDriveSettingsModal';
 import { AIStoryArchitectModal } from './components/story/AIStoryArchitectModal';
+import { InspirationChatView } from './components/inspiration/InspirationChatView';
 import { navStack } from './services/backNavigationService';
 import { LayoutDashboard, BookOpen } from 'lucide-react';
 import { usePrivacy } from './contexts/PrivacyContext';
@@ -30,7 +31,8 @@ import { getStoredThemeMode, applyTheme, initThemeListener } from './services/th
 
 export function App() {
   const { bindEmptyAreaLongPress } = usePrivacy();
-  const [mainMenu, setMainMenu] = useState<'dashboard' | 'works'>('dashboard');
+  const [mainMenu, setMainMenu] = useState<'dashboard' | 'works' | 'inspiration'>('dashboard');
+  const [architectInitialIdea, setArchitectInitialIdea] = useState<string>('');
   const [currentBook, setCurrentBook] = useState<Book | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('chapters');
   const [editingChapter, setEditingChapter] = useState<StoryChapter | null>(null);
@@ -306,10 +308,10 @@ export function App() {
           />
 
           {/* 3. Main Body Container - Compact & Edge-to-Edge on Mobile */}
-          <main className={`flex-1 w-full max-w-4xl mx-auto ${activeTab === 'chat' && currentBook ? 'p-0 overflow-hidden flex flex-col min-h-0 min-w-0' : 'px-1.5 sm:px-4 py-3 sm:py-6'}`}>
+          <main className={`flex-1 w-full max-w-4xl mx-auto ${(activeTab === 'chat' && currentBook) || (!currentBook && mainMenu === 'inspiration') ? 'p-0 overflow-hidden flex flex-col min-h-0 min-w-0' : 'px-1.5 sm:px-4 py-3 sm:py-6'}`}>
             {!currentBook ? (
-              /* Home Screen: Toggle between Dashboard & Works */
-              <div className="space-y-4">
+              /* Home Screen: Toggle between Dashboard, Works, & Inspiration */
+              <div className={mainMenu === 'inspiration' ? 'flex-1 flex flex-col min-h-0 min-w-0' : 'space-y-4'}>
                 {mainMenu === 'dashboard' ? (
                   <DashboardView
                     books={books}
@@ -327,13 +329,22 @@ export function App() {
                     onOpenAISettings={handleOpenAISettings}
                     onNavigateToWorks={() => setMainMenu('works')}
                   />
-                ) : (
+                ) : mainMenu === 'works' ? (
                   <WorksView
                     books={books}
                     chapterCounts={chapterCounts}
                     onSelectBook={handleSelectBook}
                     onOpenCreateModal={handleOpenCreateModal}
                     onOpenStoryArchitect={handleOpenArchitect}
+                  />
+                ) : (
+                  <InspirationChatView
+                    books={books}
+                    onOpenArchitectWithIdea={(idea) => {
+                      setArchitectInitialIdea(idea);
+                      setIsArchitectModalOpen(true);
+                    }}
+                    onOpenAISettings={handleOpenAISettings}
                   />
                 )}
               </div>
@@ -448,10 +459,15 @@ export function App() {
           {/* 8. AI Story Architect Modal (Idea to Full Project) */}
           <AIStoryArchitectModal
             isOpen={isArchitectModalOpen}
-            onClose={handleCloseArchitect}
+            initialRawIdea={architectInitialIdea}
+            onClose={() => {
+              handleCloseArchitect();
+              setArchitectInitialIdea('');
+            }}
             onProjectCreated={(newBook) => {
               triggerRefresh();
               handleSelectBook(newBook);
+              setArchitectInitialIdea('');
             }}
             onOpenAISettings={handleOpenAISettings}
           />

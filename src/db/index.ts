@@ -1,5 +1,5 @@
 import Dexie, { Table } from 'dexie';
-import { Book, StoryChapter, WorldEntity, MediaItem, CharacterChatSession } from '../types';
+import { Book, StoryChapter, WorldEntity, MediaItem, CharacterChatSession, InspirationChatSession } from '../types';
 
 export class StoryStudioDB extends Dexie {
   books!: Table<Book>;
@@ -7,6 +7,7 @@ export class StoryStudioDB extends Dexie {
   worldEntities!: Table<WorldEntity>;
   media!: Table<MediaItem>;
   characterChats!: Table<CharacterChatSession>;
+  inspirationChats!: Table<InspirationChatSession>;
 
   constructor() {
     super('SchemaxStoryStudioDB');
@@ -18,6 +19,9 @@ export class StoryStudioDB extends Dexie {
     });
     this.version(2).stores({
       characterChats: 'id, bookId, entityId, updatedAt'
+    });
+    this.version(3).stores({
+      inspirationChats: 'id, title, pinnedBookId, updatedAt, createdAt'
     });
   }
 }
@@ -303,4 +307,78 @@ export async function clearCharacterChat(bookId: string, entityId: string): Prom
     await db.characterChats.put(existing);
   }
 }
+
+// ==========================================
+// AI Inspiration Chat Sessions & Messages
+// ==========================================
+export async function getInspirationSessions(): Promise<InspirationChatSession[]> {
+  try {
+    return await db.inspirationChats.orderBy('updatedAt').reverse().toArray();
+  } catch (err) {
+    console.error('Failed to get inspiration sessions:', err);
+    return [];
+  }
+}
+
+export async function getInspirationSession(id: string): Promise<InspirationChatSession | undefined> {
+  try {
+    return await db.inspirationChats.get(id);
+  } catch (err) {
+    console.error('Failed to get inspiration session:', err);
+    return undefined;
+  }
+}
+
+export async function createInspirationSession(
+  title = 'Sesi Brainstorming Baru',
+  pinnedBookId?: string
+): Promise<InspirationChatSession> {
+  const id = 'insp_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7);
+  const session: InspirationChatSession = {
+    id,
+    title,
+    pinnedBookId,
+    messages: [
+      {
+        id: 'msg_welcome_' + Date.now(),
+        role: 'assistant',
+        content: `Halo! Saya rekan brainstorming kreatif dan arsitek ide Anda. 💡
+
+Di sini kita bisa mengeksplorasi ide cerita apa pun:
+• **Menciptakan premis & plot baru** dari nol
+• **Menganalisis dan mengembangkan naskah buku** yang sudah Anda tulis di Schemax
+• **Menggali sistem sihir, monster (Open5e), atau artefak kuno**
+• **Mencari *plot twist* tak terduga** menggunakan kartu takdir atau peristiwa sejarah
+• **Memformulasikan ide ke AI Story Architect** agar otomatis jadi buku baru!
+
+Ada ide awal, genre, atau buku yang ingin kita bahas bersama hari ini?`,
+        timestamp: Date.now(),
+      },
+    ],
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  await db.inspirationChats.put(session);
+  return session;
+}
+
+export async function saveInspirationSession(session: InspirationChatSession): Promise<void> {
+  session.updatedAt = Date.now();
+  await db.inspirationChats.put(session);
+}
+
+export async function deleteInspirationSession(id: string): Promise<void> {
+  await db.inspirationChats.delete(id);
+}
+
+export async function updateInspirationSessionTitle(id: string, newTitle: string): Promise<void> {
+  const existing = await db.inspirationChats.get(id);
+  if (existing) {
+    existing.title = newTitle.trim() || 'Sesi Brainstorming';
+    existing.updatedAt = Date.now();
+    await db.inspirationChats.put(existing);
+  }
+}
+
 

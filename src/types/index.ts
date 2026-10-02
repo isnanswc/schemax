@@ -327,3 +327,28 @@ export interface GDriveItem {
   thumbnailUrl?: string;
   directUrl?: string;
 }
+
+export interface InspirationChatMessageAttachment {
+  type: 'open5e' | 'tarot' | 'history' | 'fact' | 'book_ref' | 'formulation';
+  title?: string;
+  data?: any;
+}
+
+export interface InspirationChatMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: number;
+  attachments?: InspirationChatMessageAttachment[];
+}
+
+export interface InspirationChatSession {
+  id: string; // insp_<timestamp>_<random>
+  title: string;
+  summary?: string; // Rolling memory summary for long 100+ messages context
+  pinnedBookId?: string; // Optional book ID being analyzed
+  messages: InspirationChatMessage[];
+  createdAt: number;
+  updatedAt: number;
+}
+

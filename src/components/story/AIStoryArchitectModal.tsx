@@ -35,6 +35,7 @@ interface AIStoryArchitectModalProps {
   onClose: () => void;
   onProjectCreated: (book: Book) => void;
   onOpenAISettings: () => void;
+  initialRawIdea?: string;
 }
 
 export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
@@ -42,9 +43,16 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
   onClose,
   onProjectCreated,
   onOpenAISettings,
+  initialRawIdea,
 }) => {
   const [step, setStep] = useState<'input' | 'review'>('input');
-  const [rawIdea, setRawIdea] = useState('');
+  const [rawIdea, setRawIdea] = useState(initialRawIdea || '');
+
+  useEffect(() => {
+    if (isOpen && initialRawIdea) {
+      setRawIdea(initialRawIdea);
+    }
+  }, [isOpen, initialRawIdea]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [error, setError] = useState<string | null>(null);
