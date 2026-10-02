@@ -52,6 +52,7 @@ interface RichTextEditorProps {
   chapter: StoryChapter;
   bookTitle: string;
   entities?: WorldEntity[];
+  initialTab?: ChapterActiveTab;
   onBack: () => void;
   onChapterUpdated: (updated: StoryChapter) => void;
   onSwitchChapter?: (chapter: StoryChapter) => void;
@@ -61,6 +62,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   chapter,
   bookTitle,
   entities = [],
+  initialTab = 'info',
   onBack,
   onChapterUpdated,
   onSwitchChapter,
@@ -69,8 +71,8 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const editorRef = useRef<HTMLDivElement>(null);
   const [currentChapter, setCurrentChapter] = useState<StoryChapter>(chapter);
 
-  // 1. Default to 'manuscript' (Writing Studio / Editor) on open
-  const [activeTab, setActiveTab] = useState<ChapterActiveTab>('manuscript');
+  // 1. Default to Chapter Studio ('info') on open, unless explicitly requested
+  const [activeTab, setActiveTab] = useState<ChapterActiveTab>(initialTab || 'info');
 
   const [title, setTitle] = useState(chapter.title);
   const [status, setStatus] = useState<ChapterStatus>(chapter.status);
@@ -402,24 +404,30 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   }, [chapter.id]);
 
   useEffect(() => {
+    setActiveTab(initialTab || 'info');
+  }, [chapter.id, initialTab]);
+
+  useEffect(() => {
     if (activeTab === 'manuscript') {
       applyTensionStyling(tensionData);
-      if (!navStack.has('editor-manuscript')) {
-        navStack.push('editor-manuscript', () => {
+    }
+    if (activeTab !== 'info') {
+      if (!navStack.has('editor-subtab')) {
+        navStack.push('editor-subtab', () => {
           handleTabChange('info');
         });
       }
     } else {
-      if (navStack.has('editor-manuscript')) {
-        navStack.pop('editor-manuscript');
+      if (navStack.has('editor-subtab')) {
+        navStack.pop('editor-subtab');
       }
     }
   }, [activeTab]);
 
   useEffect(() => {
     return () => {
-      if (navStack.has('editor-manuscript')) {
-        navStack.pop('editor-manuscript');
+      if (navStack.has('editor-subtab')) {
+        navStack.pop('editor-subtab');
       }
     };
   }, []);
@@ -439,9 +447,16 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     setActiveTab(tab);
   };
 
-  // Back Navigation Handler
+  // Back Navigation Handler: Return to Chapter Studio ('info') if in subtab, or back to chapter list if in 'info'
   const handleHeaderBack = () => {
-    handleBack();
+    if (activeTab !== 'info') {
+      if (navStack.has('editor-subtab')) {
+        navStack.pop('editor-subtab');
+      }
+      handleTabChange('info');
+    } else {
+      handleBack();
+    }
   };
 
   const handleOpenAIAssistant = () => {
@@ -798,7 +813,7 @@ ${afterHtml}
             type="button"
             onClick={handleHeaderBack}
             className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition active:scale-95 flex-shrink-0"
-            title={activeTab === 'manuscript' ? 'Kembali ke Info Bab' : 'Kembali ke Daftar Bab'}
+            title={activeTab !== 'info' ? 'Kembali ke Studio Bab' : 'Kembali ke Daftar Bab'}
           >
             <ArrowLeft className="w-4 h-4" />
           </button>

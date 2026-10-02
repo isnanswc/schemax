@@ -10,6 +10,7 @@ import { WorksView } from './components/works/WorksView';
 import { BookOverviewTab } from './components/books/BookOverviewTab';
 import { StoryPlannerView } from './components/story/StoryPlannerView';
 import { RichTextEditor } from './components/story/RichTextEditor';
+import { ChapterActiveTab } from './components/story/chapter-tabs/ChapterBottomNav';
 import { ChapterReaderView } from './components/story/reader/ChapterReaderView';
 import { WorldBuildingView } from './components/world/WorldBuildingView';
 import { MediaGalleryView } from './components/media/MediaGalleryView';
@@ -34,6 +35,7 @@ export function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('chapters');
   const [editingChapter, setEditingChapter] = useState<StoryChapter | null>(null);
   const [studioChapter, setStudioChapter] = useState<StoryChapter | null>(null);
+  const [editorInitialTab, setEditorInitialTab] = useState<ChapterActiveTab>('info');
   const [readingChapter, setReadingChapter] = useState<StoryChapter | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createModalInitialStatus, setCreateModalInitialStatus] = useState<BookStatus>('draft');
@@ -140,14 +142,15 @@ export function App() {
   };
 
   const handleOpenChapterStudio = (chapter: StoryChapter) => {
-    handleOpenEditor(chapter);
+    handleOpenEditor(chapter, 'info');
   };
 
   const handleBackFromChapterStudio = () => {
     handleBackFromEditor();
   };
 
-  const handleOpenEditor = (chapter: StoryChapter) => {
+  const handleOpenEditor = (chapter: StoryChapter, initialTab: ChapterActiveTab = 'info') => {
+    setEditorInitialTab(initialTab);
     navStack.push('editor', () => {
       setEditingChapter(null);
       setStudioChapter(null);
@@ -271,7 +274,7 @@ export function App() {
           onBack={handleBackFromReader}
           onOpenEditor={(ch) => {
             handleBackFromReader();
-            handleOpenEditor(ch);
+            handleOpenEditor(ch, 'manuscript');
           }}
           onSwitchChapter={handleSwitchReadingChapter}
         />
@@ -280,6 +283,7 @@ export function App() {
           chapter={editingChapter || studioChapter!}
           bookTitle={currentBook.title}
           entities={bookEntities}
+          initialTab={editorInitialTab}
           onBack={handleBackFromEditor}
           onChapterUpdated={(updated) => {
             setEditingChapter(updated);
@@ -316,7 +320,7 @@ export function App() {
                     onSelectBook={handleSelectBook}
                     onResumeChapter={(book, chapter) => {
                       handleSelectBook(book);
-                      handleOpenEditor(chapter);
+                      handleOpenEditor(chapter, 'manuscript');
                     }}
                     onOpenCreateModal={() => handleOpenCreateModal('draft')}
                     onOpenStoryArchitect={handleOpenArchitect}
