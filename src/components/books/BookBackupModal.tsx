@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   X,
   HardDrive,
@@ -16,7 +16,13 @@ import {
   Copy,
   ArrowRight,
   Database,
-  ExternalLink
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  Calendar,
+  Clock,
+  BookOpen,
+  Search,
 } from 'lucide-react';
 import { Book } from '../../types';
 import { db } from '../../db';
@@ -37,6 +43,107 @@ import {
   fetchBackupContentFromGDrive,
   GDriveBackupItem,
 } from '../../services/gdriveService';
+
+function formatBytes(bytes?: number): string {
+  if (!bytes || bytes <= 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
+
+export interface ParsedBackupFileItem extends GDriveBackupItem {
+  bookTitle: string;
+  backupDate: Date;
+  displayDateStr: string;
+  relativeTimeStr: string;
+}
+
+function parseBackupFileInfo(fileName: string, updatedAt?: string): {
+  bookTitle: string;
+  backupDate: Date;
+  displayDateStr: string;
+  relativeTimeStr: string;
+} {
+  const clean = fileName.replace(/\.(schemax\.json|json|schemax)$/i, '');
+  let title = '';
+  let date: Date | null = null;
+
+  if (clean.includes('_backup_')) {
+    const [left, ...rest] = clean.split('_backup_');
+    const right = rest.join('_backup_');
+
+    if (left.toLowerCase() === 'schemax' || left === '') {
+      // e.g. schemax_backup_Sangkuriang_2026-10-03_14-30
+      const dateMatch = right.match(/^(.*?)_(\d{4}-\d{2}-\d{2})[-_](\d{2})[-_](\d{2})/);
+      if (dateMatch) {
+        title = dateMatch[1].replace(/_/g, ' ').trim();
+        date = new Date(`${dateMatch[2]}T${dateMatch[3]}:${dateMatch[4]}:00`);
+      } else {
+        title = right.replace(/_/g, ' ').trim();
+      }
+    } else {
+      // standard format: Sangkuriang_backup_2026-10-03_14-30
+      title = left.replace(/_/g, ' ').trim();
+      const dateMatch = right.match(/(\d{4}-\d{2}-\d{2})[-_](\d{2})[-_](\d{2})/);
+      if (dateMatch) {
+        date = new Date(`${dateMatch[1]}T${dateMatch[2]}:${dateMatch[3]}:00`);
+      }
+    }
+  }
+
+  // Fallback date from updatedAt
+  if ((!date || isNaN(date.getTime())) && updatedAt) {
+    const d = new Date(updatedAt);
+    if (!isNaN(d.getTime())) date = d;
+  }
+  if (!date || isNaN(date.getTime())) {
+    date = new Date();
+  }
+
+  if (!title) {
+    title = clean.replace(/_/g, ' ').trim() || 'Berkas Cadangan';
+  }
+
+  let displayDateStr = '';
+  try {
+    displayDateStr = date.toLocaleDateString('id-ID', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    displayDateStr = date.toISOString().slice(0, 16).replace('T', ' ');
+  }
+
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMinutes / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  let relativeTimeStr = '';
+  if (diffMinutes < 5) {
+    relativeTimeStr = 'Baru saja';
+  } else if (diffMinutes < 60) {
+    relativeTimeStr = `${diffMinutes} mnt lalu`;
+  } else if (diffHours < 24) {
+    relativeTimeStr = `${diffHours} jam lalu`;
+  } else if (diffDays < 7) {
+    relativeTimeStr = `${diffDays} hari lalu`;
+  } else {
+    relativeTimeStr = displayDateStr;
+  }
+
+  return {
+    bookTitle: title,
+    backupDate: date,
+    displayDateStr,
+    relativeTimeStr,
+  };
+}
 
 interface BookBackupModalProps {
   isOpen: boolean;
@@ -95,6 +202,76 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
   const [gdriveBackups, setGdriveBackups] = useState<GDriveBackupItem[]>([]);
   const [isLoadingGDriveFiles, setIsLoadingGDriveFiles] = useState(false);
   const [gdriveError, setGdriveError] = useState<string | null>(null);
+  const [isGDrivePickerOpen, setIsGDrivePickerOpen] = useState(false);
+  const [expandedBooks, setExpandedBooks] = useState<Record<string, boolean>>({});
+  const [searchBackupQuery, setSearchBackupQuery] = useState('');
+
+  // 📚 Kelompokkan file cadangan Google Drive per Judul Buku & Urutkan Tanggal (Terbaru dahulu)
+  const groupedBackups = useMemo(() => {
+    const map = new Map<string, ParsedBackupFileItem[]>();
+
+    for (const item of gdriveBackups) {
+      const info = parseBackupFileInfo(item.name, item.updatedAt);
+      const parsedItem: ParsedBackupFileItem = {
+        ...item,
+        bookTitle: info.bookTitle,
+        backupDate: info.backupDate,
+        displayDateStr: info.displayDateStr,
+        relativeTimeStr: info.relativeTimeStr,
+      };
+
+      const currentList = map.get(info.bookTitle) || [];
+      currentList.push(parsedItem);
+      map.set(info.bookTitle, currentList);
+    }
+
+    // Urutkan item di setiap buku: PALING BARU DI ATAS (descending)
+    map.forEach((items) => {
+      items.sort((a, b) => b.backupDate.getTime() - a.backupDate.getTime());
+    });
+
+    const result: Array<{ bookTitle: string; items: ParsedBackupFileItem[] }> = [];
+    map.forEach((items, bookTitle) => {
+      result.push({ bookTitle, items });
+    });
+
+    // Urutkan buku: buku dengan cadangan terbaru muncul paling atas
+    result.sort((a, b) => {
+      const aTime = a.items[0]?.backupDate.getTime() || 0;
+      const bTime = b.items[0]?.backupDate.getTime() || 0;
+      return bTime - aTime;
+    });
+
+    return result;
+  }, [gdriveBackups]);
+
+  // Otomatis buka accordion buku pertama jika baru pertama kali dimuat
+  useEffect(() => {
+    if (groupedBackups.length > 0) {
+      setExpandedBooks((prev) => {
+        if (Object.keys(prev).length === 0) {
+          return { [groupedBackups[0].bookTitle]: true };
+        }
+        return prev;
+      });
+    }
+  }, [groupedBackups]);
+
+  const filteredGroupedBackups = useMemo(() => {
+    if (!searchBackupQuery.trim()) return groupedBackups;
+    const q = searchBackupQuery.toLowerCase();
+    return groupedBackups
+      .map((group) => {
+        const titleMatches = group.bookTitle.toLowerCase().includes(q);
+        const filteredItems = group.items.filter(
+          (it) => it.name.toLowerCase().includes(q) || it.displayDateStr.toLowerCase().includes(q)
+        );
+        if (titleMatches) return group;
+        if (filteredItems.length > 0) return { ...group, items: filteredItems };
+        return null;
+      })
+      .filter(Boolean) as Array<{ bookTitle: string; items: ParsedBackupFileItem[] }>;
+  }, [groupedBackups, searchBackupQuery]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const gdriveConfig = loadGDriveConfig();
@@ -236,6 +413,7 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
       return;
     }
 
+    setIsGDrivePickerOpen(true);
     setIsLoadingGDriveFiles(true);
     setGdriveError(null);
     try {
@@ -268,6 +446,7 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
       const stats = await inspectBackupBundle(parsed, fileItem.size);
       setPreviewStats(stats);
       setRestoreMode(stats.existsLocally ? 'overwrite' : 'clone_as_new');
+      setIsGDrivePickerOpen(false);
     } catch (err: any) {
       setRestoreErrorMsg(err?.message || 'Gagal mengunduh atau membaca file dari Google Drive.');
     } finally {
@@ -590,39 +769,31 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Google Drive Files List Drawer */}
+                  {/* Google Drive Files List Banner & Trigger */}
                   {gdriveBackups.length > 0 && (
-                    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2.5">
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
-                        <span>Berkas Cadangan di Google Drive ({gdriveBackups.length}):</span>
-                        <button
-                          type="button"
-                          onClick={handleLoadGDriveBackupList}
-                          className="text-[10px] text-indigo-500 hover:underline flex items-center gap-1"
-                        >
-                          <RefreshCw className="w-3 h-3" />
-                          <span>Segarkan</span>
-                        </button>
-                      </span>
-                      <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
-                        {gdriveBackups.map((item) => (
-                          <div
-                            key={item.id}
-                            onClick={() => handleSelectGDriveFileToRestore(item)}
-                            className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-amber-400 dark:hover:border-amber-400 cursor-pointer flex items-center justify-between gap-2 text-xs transition"
-                          >
-                            <div className="min-w-0 flex items-center gap-2">
-                              <Database className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-                              <span className="font-bold text-slate-800 dark:text-slate-200 truncate">
-                                {item.name}
-                              </span>
-                            </div>
-                            <span className="text-[10px] text-slate-400 flex-shrink-0">
-                              {item.size ? `${(item.size / 1024).toFixed(0)} KB` : ''}
-                            </span>
-                          </div>
-                        ))}
+                    <div className="p-4 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-xs">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold flex-shrink-0">
+                          <Cloud className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <span className="font-extrabold text-xs sm:text-sm text-slate-900 dark:text-white block">
+                            {gdriveBackups.length} Berkas Cadangan Terdeteksi
+                          </span>
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                            Tersusun rapi per judul buku (Accordion)
+                          </span>
+                        </div>
                       </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setIsGDrivePickerOpen(true)}
+                        className="py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-500/20 flex items-center justify-center gap-2 active:scale-95 transition"
+                      >
+                        <BookOpen className="w-3.5 h-3.5" />
+                        <span>Buka Daftar Cadangan Buku</span>
+                      </button>
                     </div>
                   )}
 
@@ -805,6 +976,219 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* 🌟 Modal Accordion Cadangan Google Drive */}
+      {isGDrivePickerOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-2.5 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-xl max-h-[92vh] flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/70 flex-shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold flex-shrink-0">
+                  <Cloud className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white leading-tight truncate">
+                    Pilih Cadangan Buku (Google Drive)
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                    Folder: <strong>{gdriveConfig.folderName || 'backup'}</strong> • {gdriveBackups.length} file cadangan
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={handleLoadGDriveBackupList}
+                  disabled={isLoadingGDriveFiles}
+                  className="p-2 rounded-xl text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                  title="Segarkan daftar cadangan"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isLoadingGDriveFiles ? 'animate-spin' : ''}`} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsGDrivePickerOpen(false)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Search Input */}
+            {gdriveBackups.length > 0 && (
+              <div className="p-3 sm:px-5 sm:py-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex-shrink-0">
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={searchBackupQuery}
+                    onChange={(e) => setSearchBackupQuery(e.target.value)}
+                    placeholder="Cari judul buku atau tanggal cadangan..."
+                    className="w-full pl-9 pr-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-indigo-400"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Modal Body / Accordion List */}
+            <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-3">
+              {isLoadingGDriveFiles ? (
+                <div className="py-12 flex flex-col items-center justify-center gap-3 text-center">
+                  <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+                  <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Memuat daftar cadangan dari Google Drive...
+                  </p>
+                </div>
+              ) : gdriveError ? (
+                <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/20 text-xs text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/40 space-y-2">
+                  <div className="flex items-center gap-2 font-bold">
+                    <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                    <span>Perhatian</span>
+                  </div>
+                  <p>{gdriveError}</p>
+                  {onOpenGDriveSettings && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsGDrivePickerOpen(false);
+                        onOpenGDriveSettings();
+                      }}
+                      className="mt-2 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[11px] transition"
+                    >
+                      Buka Pengaturan Google Drive
+                    </button>
+                  )}
+                </div>
+              ) : filteredGroupedBackups.length === 0 ? (
+                <div className="py-10 text-center space-y-2 text-slate-400">
+                  <Database className="w-8 h-8 mx-auto opacity-40" />
+                  <p className="text-xs font-bold">
+                    {searchBackupQuery
+                      ? 'Tidak ada cadangan yang cocok dengan pencarian.'
+                      : 'Belum ada file cadangan (.schemax.json) di folder Google Drive Anda.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredGroupedBackups.map((group) => {
+                    const isExpanded = Boolean(expandedBooks[group.bookTitle]);
+                    return (
+                      <div
+                        key={group.bookTitle}
+                        className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-slate-50/60 dark:bg-slate-950/40 transition-all shadow-sm"
+                      >
+                        {/* Accordion Trigger Header */}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExpandedBooks((prev) => ({
+                              ...prev,
+                              [group.bookTitle]: !prev[group.bookTitle],
+                            }))
+                          }
+                          className="w-full p-3.5 sm:p-4 flex items-center justify-between gap-3 text-left hover:bg-slate-100/80 dark:hover:bg-slate-900/80 transition cursor-pointer"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
+                              <BookOpen className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="font-black text-xs sm:text-sm text-slate-900 dark:text-white leading-snug break-words">
+                                {group.bookTitle}
+                              </h4>
+                              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                Terakhir dicadangkan: <strong className="text-slate-700 dark:text-slate-300">{group.items[0].relativeTimeStr}</strong>
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                              {group.items.length} Cadangan
+                            </span>
+                            <div
+                              className={`p-1 rounded-lg text-slate-400 transition-transform duration-200 ${
+                                isExpanded ? 'transform rotate-180 text-amber-500' : ''
+                              }`}
+                            >
+                              <ChevronDown className="w-4 h-4" />
+                            </div>
+                          </div>
+                        </button>
+
+                        {/* Accordion Content: List of Backups sorted by Date/Time */}
+                        {isExpanded && (
+                          <div className="px-3 pb-3 sm:px-4 sm:pb-4 space-y-2 border-t border-slate-200/80 dark:border-slate-800/80 pt-3 bg-white/70 dark:bg-slate-900/70 animate-in fade-in duration-150">
+                            {group.items.map((item, idx) => (
+                              <div
+                                key={item.id}
+                                className="p-3 rounded-xl border border-slate-200/90 dark:border-slate-800 hover:border-amber-400 dark:hover:border-amber-400 bg-white dark:bg-slate-950 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 transition shadow-xs"
+                              >
+                                <div className="space-y-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <Clock className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" />
+                                    <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white">
+                                      {item.displayDateStr}
+                                    </span>
+                                    {idx === 0 && (
+                                      <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                        Terbaru
+                                      </span>
+                                    )}
+                                    <span className="text-[10px] font-semibold text-slate-400">
+                                      ({item.relativeTimeStr})
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                                    <span className="font-semibold text-slate-500 dark:text-slate-400">
+                                      {formatBytes(item.size)}
+                                    </span>
+                                    <span>•</span>
+                                    <span className="font-mono truncate max-w-[220px] sm:max-w-xs text-slate-400" title={item.name}>
+                                      {item.name}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleSelectGDriveFileToRestore(item)}
+                                  className="w-full sm:w-auto py-2 px-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-sm flex items-center justify-center gap-1.5 active:scale-95 transition flex-shrink-0"
+                                >
+                                  <span>Pilih Cadangan Ini</span>
+                                  <ArrowRight className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/70 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 flex-shrink-0">
+              <span className="text-[11px]">
+                Cadangan diurutkan otomatis dari yang <strong>paling baru</strong>.
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsGDrivePickerOpen(false)}
+                className="font-bold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

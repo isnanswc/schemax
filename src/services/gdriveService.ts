@@ -338,6 +338,20 @@ export async function uploadBackupToGDrive(
   }
 
   if (credential.includes('script.google.com')) {
+    // 📁 Cek terlebih dahulu apakah sudah ada subfolder bernama "backup"
+    let targetFolderId = folderId;
+    try {
+      const items = await fetchGDriveFolderItems(folderId, credential);
+      const existingBackupFolder = items.find(
+        (it) => it.isFolder && it.name.trim().toLowerCase() === 'backup'
+      );
+      if (existingBackupFolder) {
+        targetFolderId = existingBackupFolder.id;
+      }
+    } catch {
+      // Abaikan jika listing folder gagal, fallback ke folderId utama
+    }
+
     // Unggah via Google Apps Script Web App (POST)
     try {
       const response = await fetch(credential, {
@@ -348,7 +362,7 @@ export async function uploadBackupToGDrive(
         },
         body: JSON.stringify({
           action: 'uploadBackup',
-          folderId,
+          folderId: targetFolderId,
           fileName,
           content: backupJsonString,
         }),

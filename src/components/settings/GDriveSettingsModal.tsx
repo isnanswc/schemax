@@ -214,12 +214,14 @@ function doPost(e) {
       var content = data.content;
 
       // 📁 Pastikan ada subfolder "backup", jika belum ada maka otomatis buat baru
-      var backupFolders = rootFolder.getFoldersByName("backup");
-      var targetFolder;
-      if (backupFolders.hasNext()) {
-        targetFolder = backupFolders.next();
-      } else {
-        targetFolder = rootFolder.createFolder("backup");
+      var targetFolder = rootFolder;
+      if (rootFolder.getName().toLowerCase() !== "backup") {
+        var backupFolders = rootFolder.getFoldersByName("backup");
+        if (backupFolders.hasNext()) {
+          targetFolder = backupFolders.next();
+        } else {
+          targetFolder = rootFolder.createFolder("backup");
+        }
       }
 
       // Cek apakah file sudah ada di subfolder backup, jika ada timpa, jika tidak buat baru
