@@ -311,3 +311,153 @@ export async function downloadGDriveImageBlob(fileId: string): Promise<{ blob: B
     mimeType: blob.type || 'image/jpeg',
   };
 }
+
+// ══════════════════════════════════════════════════════════════
+// FITUR BACKUP & RESTORE GOOGLE DRIVE
+// ══════════════════════════════════════════════════════════════
+
+export interface GDriveBackupItem {
+  id: string;
+  name: string;
+  size?: number;
+  updatedAt?: string;
+}
+
+/**
+ * Unggah file cadangan (.schemax.json) langsung ke folder Google Drive
+ */
+export async function uploadBackupToGDrive(
+  folderId: string,
+  fileName: string,
+  backupJsonString: string,
+  credentialInput?: string
+): Promise<{ success: boolean; fileId?: string; name?: string }> {
+  const credential = (credentialInput || '').trim() || getEffectiveGoogleApiKey();
+  if (!credential) {
+    throw new Error('Google Apps Script URL belum diatur di Pengaturan Google Drive.');
+  }
+
+  if (credential.includes('script.google.com')) {
+    // Unggah via Google Apps Script Web App (POST)
+    const response = await fetch(credential, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8', // text/plain menghindari preflight CORS di Google Apps Script
+      },
+      body: JSON.stringify({
+        action: 'uploadBackup',
+        folderId,
+        fileName,
+        content: backupJsonString,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Gagal mengunggah cadangan ke Google Drive (HTTP ${response.status}).`);
+    }
+
+    const data = await response.json();
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
+    return {
+      success: true,
+      fileId: data.fileId,
+      name: data.name || fileName,
+    };
+  } else {
+    throw new Error(
+      'Untuk mengunggah file cadangan ke Google Drive, gunakan Google Apps Script Web App URL di Pengaturan Google Drive.'
+    );
+  }
+}
+
+/**
+ * Daftar file cadangan (.schemax.json atau .json) yang ada di folder Google Drive
+ */
+export async function listBackupFilesFromGDrive(
+  folderId: string,
+  credentialInput?: string
+): Promise<GDriveBackupItem[]> {
+  const credential = (credentialInput || '').trim() || getEffectiveGoogleApiKey();
+  if (!credential) {
+    throw new Error('Kredensial Google Drive belum diatur.');
+  }
+
+  if (credential.includes('script.google.com')) {
+    const url = `${credential}${credential.includes('?') ? '&' : '?'}folderId=${encodeURIComponent(folderId)}&action=listBackups`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Gagal membaca daftar cadangan dari Google Drive (HTTP ${response.status}).`);
+    }
+
+    const data = await response.json();
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
+    const files = data.files || [];
+    return files
+      .filter((f: any) => f.name.endsWith('.json') || f.name.endsWith('.schemax'))
+      .map((f: any) => ({
+        id: f.id,
+        name: f.name,
+        size: f.size,
+        updatedAt: f.updatedAt || f.date,
+      }));
+  } else {
+    // Mode Google API Key
+    const query = `'${folderId}' in parents and trashed = false and (name contains '.json' or name contains '.schemax')`;
+    const fields = 'files(id, name, size, modifiedTime)';
+    const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=${encodeURIComponent(fields)}&pageSize=50&orderBy=modifiedTime desc&key=${credential}`;
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Gagal membaca daftar cadangan Google Drive (HTTP ${response.status}).`);
+    }
+
+    const data = await response.json();
+    const files = data.files || [];
+    return files.map((f: any) => ({
+      id: f.id,
+      name: f.name,
+      size: f.size ? parseInt(f.size, 10) : undefined,
+      updatedAt: f.modifiedTime,
+    }));
+  }
+}
+
+/**
+ * Unduh konten teks file cadangan JSON dari Google Drive
+ */
+export async function fetchBackupContentFromGDrive(
+  fileId: string,
+  credentialInput?: string
+): Promise<string> {
+  const credential = (credentialInput || '').trim() || getEffectiveGoogleApiKey();
+
+  // Coba ambil via Google Apps Script jika ada
+  if (credential.includes('script.google.com')) {
+    const url = `${credential}${credential.includes('?') ? '&' : '?'}fileId=${encodeURIComponent(fileId)}&action=getBackupContent`;
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        const text = await res.text();
+        return text;
+      }
+    } catch (e) {
+      console.warn('Gagal ambil via Apps Script, mencoba direct download link...', e);
+    }
+  }
+
+  // Fallback ke Google Drive uc download endpoint
+  const fallbackUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+  const response = await fetch(fallbackUrl);
+  if (!response.ok) {
+    throw new Error('Gagal mengunduh berkas cadangan dari Google Drive. Pastikan file dapat diakses.');
+  }
+
+  return await response.text();
+}
+

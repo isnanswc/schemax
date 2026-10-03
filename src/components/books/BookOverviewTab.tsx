@@ -21,10 +21,12 @@ import {
   X,
   Printer,
   BookOpen,
-  Maximize2
+  Maximize2,
+  Database
 } from 'lucide-react';
 import { usePrivacy } from '../../contexts/PrivacyContext';
 import { ImageViewerModal } from '../common/ImageViewerModal';
+import { BookBackupModal } from './BookBackupModal';
 
 interface BookOverviewTabProps {
   book: Book;
@@ -55,6 +57,7 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
   const [isSelectCoverModalOpen, setIsSelectCoverModalOpen] = useState(false);
   const [isPdfExportModalOpen, setIsPdfExportModalOpen] = useState(false);
   const [isCoverFullscreenOpen, setIsCoverFullscreenOpen] = useState(false);
+  const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
 
   const { url: coverUrl } = useMediaUrl(book.coverMediaId);
 
@@ -415,15 +418,15 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
             <span>Cetak / Ekspor PDF</span>
           </button>
 
-          {/* Backup JSON Button */}
+          {/* Comprehensive Backup & Restore Button */}
           <button
             type="button"
-            onClick={exportBookJson}
-            className="inline-flex items-center justify-center gap-1.5 py-2.5 px-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-white rounded-2xl text-xs font-bold transition active:scale-95 border border-slate-200 dark:border-slate-700 shadow-xs"
-            title="Download file cadangan JSON"
+            onClick={() => setIsBackupModalOpen(true)}
+            className="inline-flex items-center justify-center gap-1.5 py-2.5 px-4 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-2xl text-xs font-black transition active:scale-95 border border-slate-700 shadow-sm"
+            title="Cadangkan seluruh isi buku (bab, naskah, gambar, relasi, suara TTS) atau pulihkan cadangan"
           >
-            <Download className="w-3.5 h-3.5 text-amber-500" />
-            <span>JSON</span>
+            <Database className="w-3.5 h-3.5 text-amber-400" />
+            <span>Cadangkan &amp; Pulihkan</span>
           </button>
         </div>
       </div>
@@ -534,6 +537,20 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
           onClose={() => setIsCoverFullscreenOpen(false)}
         />
       )}
+
+      {/* Comprehensive Book Backup & Restore Modal */}
+      <BookBackupModal
+        isOpen={isBackupModalOpen}
+        book={book}
+        onClose={() => setIsBackupModalOpen(false)}
+        onRestoreComplete={async (restoredBookId) => {
+          const updated = await db.books.get(restoredBookId);
+          if (updated) {
+            onBookUpdated(updated);
+          }
+        }}
+        onOpenGDriveSettings={onOpenGDriveSettings}
+      />
     </div>
   );
 };

@@ -89,17 +89,54 @@ export const GDriveSettingsModal: React.FC<GDriveSettingsModalProps> = ({
   };
 
   const sampleAppsScriptCode = `function doGet(e) {
+  var action = e.parameter.action;
   var folderId = e.parameter.folderId;
+  var fileId = e.parameter.fileId;
+
+  // 1. Ambil Isi Berkas Cadangan Tertentu
+  if (action === "getBackupContent" && fileId) {
+    try {
+      var file = DriveApp.getFileById(fileId);
+      return ContentService.createTextOutput(file.getBlob().getDataAsString())
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch(err) {
+      return ContentService.createTextOutput(JSON.stringify({error: err.toString()}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
   if (!folderId) {
     return ContentService.createTextOutput(JSON.stringify({error: "folderId required"}))
       .setMimeType(ContentService.MimeType.JSON);
   }
+
   try {
     var folder = DriveApp.getFolderById(folderId);
-    var subfolders = folder.getFolders();
     var files = folder.getFiles();
     var result = [];
 
+    // 2. Daftar File Cadangan (.schemax atau .json)
+    if (action === "listBackups") {
+      while (files.hasNext()) {
+        var f = files.next();
+        var name = f.getName();
+        if (name.indexOf(".json") !== -1 || name.indexOf(".schemax") !== -1) {
+          result.push({
+            id: f.getId(),
+            name: name,
+            size: f.getSize(),
+            updatedAt: f.getLastUpdated().toISOString()
+          });
+        }
+      }
+      return ContentService.createTextOutput(JSON.stringify({
+        folderName: folder.getName(),
+        files: result
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 3. Daftar Gambar Galeri Default
+    var subfolders = folder.getFolders();
     while (subfolders.hasNext()) {
       var sf = subfolders.next();
       result.push({
@@ -109,7 +146,6 @@ export const GDriveSettingsModal: React.FC<GDriveSettingsModalProps> = ({
         isFolder: true
       });
     }
-
     while (files.hasNext()) {
       var f = files.next();
       var mime = f.getMimeType();
@@ -129,6 +165,37 @@ export const GDriveSettingsModal: React.FC<GDriveSettingsModalProps> = ({
       files: result
     })).setMimeType(ContentService.MimeType.JSON);
 
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({error: err.toString()}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// Handler Simpan Cadangan Buku Schemax ke Google Drive
+function doPost(e) {
+  try {
+    var data = JSON.parse(e.postData.contents);
+    if (data.action === "uploadBackup") {
+      var folder = DriveApp.getFolderById(data.folderId);
+      var fileName = data.fileName || "schemax_backup.json";
+      var content = data.content;
+
+      // Cek apakah file sudah ada, jika ada timpa, jika tidak buat baru
+      var existing = folder.getFilesByName(fileName);
+      var file;
+      if (existing.hasNext()) {
+        file = existing.next();
+        file.setContent(content);
+      } else {
+        file = folder.createFile(fileName, content, "application/json");
+      }
+
+      return ContentService.createTextOutput(JSON.stringify({
+        success: true,
+        fileId: file.getId(),
+        name: file.getName()
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
   } catch(err) {
     return ContentService.createTextOutput(JSON.stringify({error: err.toString()}))
       .setMimeType(ContentService.MimeType.JSON);

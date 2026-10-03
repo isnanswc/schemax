@@ -4,9 +4,10 @@ import { BookCoverImage } from './BookCoverImage';
 import { EditBookModal } from './EditBookModal';
 import { useLongPress } from '../../hooks/useLongPress';
 import { navStack } from '../../services/backNavigationService';
-import { FileText, ArrowRight, MoreVertical, Trash2, CheckCircle2, Edit3, X, BookOpen } from 'lucide-react';
+import { FileText, ArrowRight, MoreVertical, Trash2, CheckCircle2, Edit3, X, BookOpen, Database } from 'lucide-react';
 import { db } from '../../db';
 import { usePrivacy } from '../../contexts/PrivacyContext';
+import { BookBackupModal } from './BookBackupModal';
 
 interface BookCardProps {
   book: Book;
@@ -27,6 +28,7 @@ export const BookCard: React.FC<BookCardProps> = ({
   const [showMenu, setShowMenu] = useState(false);
   const [isPressing, setIsPressing] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
 
   const handleOpenMenu = (e?: React.SyntheticEvent) => {
     if (e) {
@@ -311,7 +313,26 @@ export const BookCard: React.FC<BookCardProps> = ({
                 </div>
               </button>
 
-              {/* 3. Delete Book */}
+              {/* 3. Backup & Restore */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCloseMenu();
+                  setIsBackupModalOpen(true);
+                }}
+                className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3 transition text-xs font-semibold text-slate-700 dark:text-slate-200 active:scale-[0.98]"
+              >
+                <div className="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 flex-shrink-0">
+                  <Database className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="leading-tight font-bold text-slate-900 dark:text-white">Cadangkan &amp; Pulihkan</p>
+                  <p className="text-[10px] text-slate-400 font-normal">Backup naskah, gambar, relasi &amp; TTS ke GDrive/Lokal</p>
+                </div>
+              </button>
+
+              {/* 4. Delete Book */}
               <button
                 type="button"
                 onClick={deleteBook}
@@ -346,6 +367,19 @@ export const BookCard: React.FC<BookCardProps> = ({
         onClose={() => setIsEditModalOpen(false)}
         onSuccess={(updated) => {
           onBookUpdated?.(updated);
+        }}
+      />
+
+      {/* 💾 Book Backup & Restore Modal */}
+      <BookBackupModal
+        isOpen={isBackupModalOpen}
+        book={book}
+        onClose={() => setIsBackupModalOpen(false)}
+        onRestoreComplete={async (restoredId) => {
+          const updated = await db.books.get(restoredId);
+          if (updated) {
+            onBookUpdated?.(updated);
+          }
         }}
       />
     </>
