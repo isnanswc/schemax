@@ -16,6 +16,7 @@ import {
   EntityCondition,
   RelationshipType,
 } from '../types';
+import { wrapPromptSandbox } from '../utils/securityUtils';
 
 // Modern baseline defaults (Modern Gemini 3.5+ models & Groq lineup)
 export const DEFAULT_GEMINI_MODELS: AIModelOption[] = [
@@ -1020,7 +1021,7 @@ Judul Buku: "${bookTitle}"
 Judul Bab: "${chapterTitle}"${entityContext}
 
 Isi Naskah Bab:
-${contentText.slice(0, 60000)}
+${wrapPromptSandbox(contentText.slice(0, 60000), 'NASKAH_BAB')}
 
 Instruksi Analisis Tiap Adegan:
 1. Timeline: Tentukan tipe kronologi ("linear", "parallel" / "branched" jika simultan, atau "flashback"), timeMarker (penanda waktu), dan branchGroup.
@@ -1189,7 +1190,7 @@ Informasi Karya:
 - Genre: ${genre || 'Fiksi'}
 
 Tulisan Kasar (Raw Draft):
-${rawText}
+${wrapPromptSandbox(rawText, 'CORETAN_MENTAH')}
 
 Instruksi:
 - Kembangkan poin-poin mentah menjadi adegan bernyawa (show, don't tell).
@@ -1242,7 +1243,7 @@ Daftar Entitas Glosarium yang Sudah Ada di Buku:
 ${existingListStr}
 
 Isi Naskah Bab:
-${chapterText.slice(0, 30000)}
+${wrapPromptSandbox(chapterText.slice(0, 30000), 'NASKAH_BAB')}
 
 Tugas Analisis Mendalam:
 1. DETEKSI ENTITAS BARU (suggestedAction: "register_new"):

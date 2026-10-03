@@ -1,5 +1,6 @@
 import { db, TTSAudioCacheItem } from '../db';
 import { generateTTSCacheId } from './ttsCacheService';
+import { sanitizeStoryHtml } from '../utils/securityUtils';
 import {
   Book,
   StoryChapter,
@@ -321,7 +322,11 @@ export async function restoreBookBackupBundle(
     // Hapus bab lama untuk mencegah duplikasi atau id usang
     await db.chapters.where('bookId').equals(targetBookId).delete();
     if (bundle.chapters.length > 0) {
-      await db.chapters.bulkPut(bundle.chapters);
+      const sanitizedChapters = bundle.chapters.map((ch) => ({
+        ...ch,
+        contentHtml: sanitizeStoryHtml(ch.contentHtml || ''),
+      }));
+      await db.chapters.bulkPut(sanitizedChapters);
     }
 
     onProgress?.('Membersihkan & memulihkan ensiklopedia serta relasi...', 50);
@@ -464,7 +469,7 @@ export async function restoreBookBackupBundle(
         ...ch,
         id: newChId,
         bookId: newBookId,
-        contentHtml: remappedHtml,
+        contentHtml: sanitizeStoryHtml(remappedHtml),
         scenes: remappedScenes,
         coverMediaId: ch.coverMediaId ? mediaIdMap.get(ch.coverMediaId) : undefined,
         createdAt: Date.now(),

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Book, StoryChapter } from '../../types';
 import { db } from '../../db';
+import { sanitizeStoryHtml } from '../../utils/securityUtils';
 import {
   X,
   Printer,
@@ -127,17 +128,18 @@ export const BookPdfExportModal: React.FC<BookPdfExportModalProps> = ({
       ? [...chapters].sort((a, b) => a.order - b.order)
       : chapters.filter((c) => c.id === selectedChapterId);
 
-  // Clean html to printable text / elements
+  // Clean & sanitize html to printable text / elements
   const cleanHtml = (html?: string) => {
     if (!html) return '<p class="empty-text italic text-slate-400"><em>(Naskah bab ini belum ditulis)</em></p>';
+    const safeHtml = sanitizeStoryHtml(html);
     if (!includeInlineImages) {
       // Strip story-image-block figures and inline images if user opted out
-      return html
+      return safeHtml
         .replace(/<figure[^>]*class="[^"]*story-image-block[^"]*"[^>]*>[\s\S]*?<\/figure>/gi, '')
         .replace(/<figure[^>]*>[\s\S]*?<\/figure>/gi, '')
         .replace(/<img[^>]*>/gi, '');
     }
-    return html;
+    return safeHtml;
   };
 
   // Calculate realistic starting page numbers for TOC based on word counts

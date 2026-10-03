@@ -46,6 +46,7 @@ import {
   getTensionColor,
   hashString
 } from '../../utils/tensionUtils';
+import { sanitizeStoryHtml } from '../../utils/securityUtils';
 import { usePrivacy } from '../../contexts/PrivacyContext';
 
 interface RichTextEditorProps {
@@ -397,7 +398,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     };
     setTensionData(initialTension);
     if (editorRef.current) {
-      editorRef.current.innerHTML = chapter.contentHtml || '';
+      editorRef.current.innerHTML = sanitizeStoryHtml(chapter.contentHtml || '');
       updateCounts();
       setTimeout(() => {
         applyTensionStyling(initialTension);
@@ -440,8 +441,9 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
       saveToIndexedDB();
     }
     if (tab === 'manuscript' && editorRef.current) {
-      if (editorRef.current.innerHTML !== (currentChapter.contentHtml || '')) {
-        editorRef.current.innerHTML = currentChapter.contentHtml || '';
+      const sanitized = sanitizeStoryHtml(currentChapter.contentHtml || '');
+      if (editorRef.current.innerHTML !== sanitized) {
+        editorRef.current.innerHTML = sanitized;
         updateCounts();
         applyTensionStyling();
       }
@@ -639,7 +641,7 @@ function cleanContentHtmlForStorage(html: string): string {
     }
   });
 
-  return div.innerHTML;
+  return sanitizeStoryHtml(div.innerHTML);
 }
 
   const saveToIndexedDB = async () => {

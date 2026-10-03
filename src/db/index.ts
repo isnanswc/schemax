@@ -1,5 +1,6 @@
 import Dexie, { Table } from 'dexie';
 import { Book, StoryChapter, WorldEntity, MediaItem, CharacterChatSession, InspirationChatSession } from '../types';
+import { sanitizeSvgXml } from '../utils/securityUtils';
 
 export interface TTSAudioCacheItem {
   id: string; // `${chapterId || 'general'}_${paragraphIndex}_${engine}_${voice}`
@@ -54,15 +55,29 @@ export async function saveMediaItem(
   entityId?: string,
   extra?: Partial<MediaItem>
 ): Promise<string> {
+  let safeBlob = blob;
+  const isSvg = (blob.type && blob.type.includes('svg')) || name.toLowerCase().endsWith('.svg');
+  if (isSvg) {
+    try {
+      const text = await blob.text();
+      const cleaned = sanitizeSvgXml(text);
+      if (cleaned) {
+        safeBlob = new Blob([cleaned], { type: 'image/svg+xml' });
+      }
+    } catch (e) {
+      console.warn('Gagal membaca dan sanitasi berkas SVG:', e);
+    }
+  }
+
   const id = 'med_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
   const mediaItem: MediaItem = {
     id,
     bookId,
     entityId,
     name,
-    mimeType: blob.type || 'image/jpeg',
-    blob,
-    size: blob.size,
+    mimeType: safeBlob.type || 'image/jpeg',
+    blob: safeBlob,
+    size: safeBlob.size,
     createdAt: Date.now(),
     ...extra,
   };

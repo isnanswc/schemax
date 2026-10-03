@@ -1,6 +1,7 @@
 import { ParagraphEmotionTag, EmotionType } from '../types';
 import { generateWithSmartFallback } from './aiService';
 import { hashString } from '../utils/tensionUtils';
+import { wrapPromptSandbox } from '../utils/securityUtils';
 
 export function getEmotionAcoustics(emotion: EmotionType, intensity: number = 3): { pitchMod: number; rateMod: number; icon: string; label: string; color: string } {
   const normIntensity = Math.max(1, Math.min(5, intensity));
@@ -109,7 +110,7 @@ Panduan Emosi Vokal (Pilih salah satu untuk setiap paragraf):
 - "solemn": Khidmat, megah, puitis, berwibawa.
 
 Daftar Paragraf Naskah:
-${sampledList}
+${wrapPromptSandbox(sampledList, 'PARAGRAF_NASKAH')}
 
 INSTRUKSI PENTING:
 Keluarkan HANYA array JSON murni tanpa markdown, tanpa pengantar, tanpa penutup. Format persis:
