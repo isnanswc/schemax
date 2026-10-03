@@ -90,12 +90,13 @@ export const GDriveSettingsModal: React.FC<GDriveSettingsModalProps> = ({
   };
 
   const sampleAppsScriptCode = `// 🌟 1. FUNGSI AKTIVASI IZIN (PENTING DILAKUKAN SEKALI):
-// Pilih 'testAuthorize' di bilah atas editor Apps Script lalu klik tombol 'Run' (Jalankan).
-// Google akan memunculkan jendela persetujuan: Review Permissions -> Advanced -> Allow.
-// Ini WAJIB dijalankan agar script diizinkan membuat & menyimpan berkas cadangan ke Google Drive Anda!
+// Pilih 'testAuthorize' di bilah atas editor Apps Script lalu klik tombol 'Jalankan' (Run).
+// Google AKAN memunculkan pop-up izin: Review Permissions -> Advanced -> Allow.
+// Fungsi ini membuat file sementara lalu menghapusnya agar izin tulis (createFile) aktif.
 function testAuthorize() {
-  DriveApp.getRootFolder().getName();
-  Logger.log("✅ Izin akses Google Drive berhasil diotorisasi!");
+  var file = DriveApp.createFile("schemax_auth_test.txt", "OK");
+  file.setTrashed(true);
+  Logger.log("✅ Izin tulis Google Drive (createFile) BERHASIL aktif!");
 }
 
 function doGet(e) {
