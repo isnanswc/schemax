@@ -339,33 +339,43 @@ export async function uploadBackupToGDrive(
 
   if (credential.includes('script.google.com')) {
     // Unggah via Google Apps Script Web App (POST)
-    const response = await fetch(credential, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'text/plain;charset=utf-8', // text/plain menghindari preflight CORS di Google Apps Script
-      },
-      body: JSON.stringify({
-        action: 'uploadBackup',
-        folderId,
-        fileName,
-        content: backupJsonString,
-      }),
-    });
+    try {
+      const response = await fetch(credential, {
+        method: 'POST',
+        redirect: 'follow',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8', // text/plain menghindari preflight CORS di Google Apps Script
+        },
+        body: JSON.stringify({
+          action: 'uploadBackup',
+          folderId,
+          fileName,
+          content: backupJsonString,
+        }),
+      });
 
-    if (!response.ok) {
-      throw new Error(`Gagal mengunggah cadangan ke Google Drive (HTTP ${response.status}).`);
+      if (!response.ok) {
+        throw new Error(`Gagal mengunggah cadangan ke Google Drive (HTTP ${response.status}).`);
+      }
+
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      return {
+        success: true,
+        fileId: data.fileId,
+        name: data.name || fileName,
+      };
+    } catch (err: any) {
+      if (err?.message?.includes('Failed to fetch') || err?.name === 'TypeError') {
+        throw new Error(
+          'Koneksi ke Google Apps Script ditolak (Failed to fetch). Penyebab utama: Google Apps Script Anda belum diperbarui dengan kode "doPost" terbaru atau akses deployment belum diatur ke "Anyone". Gunakan tombol "Unduh Cadangan ke Komputer" untuk mencadangkan secara instan.'
+        );
+      }
+      throw err;
     }
-
-    const data = await response.json();
-    if (data.error) {
-      throw new Error(data.error);
-    }
-
-    return {
-      success: true,
-      fileId: data.fileId,
-      name: data.name || fileName,
-    };
   } else {
     throw new Error(
       'Untuk mengunggah file cadangan ke Google Drive, gunakan Google Apps Script Web App URL di Pengaturan Google Drive.'

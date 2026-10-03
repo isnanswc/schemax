@@ -27,6 +27,7 @@ export const GDriveSettingsModal: React.FC<GDriveSettingsModalProps> = ({
   const [testError, setTestError] = useState<string | null>(null);
   const [testSuccess, setTestSuccess] = useState<string | null>(null);
   const [showScriptGuide, setShowScriptGuide] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -214,10 +215,10 @@ function doPost(e) {
             </div>
             <div>
               <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white leading-tight">
-                Hubungkan Folder Media Google Drive
+                Hubungkan Google Drive (Galeri &amp; Cadangan)
               </h3>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Pilih &amp; impor aset gambar, avatar entitas &amp; cover langsung dari Google Drive
+                Impor aset gambar serta simpan &amp; pulihkan cadangan buku lengkap langsung ke Google Drive
               </p>
             </div>
           </div>
@@ -234,53 +235,78 @@ function doPost(e) {
         {/* Form Body */}
         <div className="p-5 space-y-4 overflow-y-auto max-h-[75vh]">
           {/* Method 1: Google Apps Script Web App (Recommended) */}
-          <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-500/10 via-indigo-50/40 dark:via-slate-950 to-purple-500/10 border border-blue-300/80 dark:border-blue-500/20 text-xs text-slate-700 dark:text-slate-300 space-y-2">
-            <div className="flex items-center justify-between">
+          <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-500/10 via-indigo-50/40 dark:via-slate-950 to-purple-500/10 border border-blue-300/80 dark:border-blue-500/20 text-xs text-slate-700 dark:text-slate-300 space-y-2.5">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-1.5 font-bold text-blue-800 dark:text-blue-300">
                 <Sparkles className="w-4 h-4 text-blue-500" />
-                <span>Metode 1: Google Script Web App (Rekomendasi Utama)</span>
+                <span>Google Apps Script Web App (Galeri &amp; Cadangan)</span>
               </div>
               <button
                 type="button"
                 onClick={() => setShowScriptGuide((v) => !v)}
-                className="text-[11px] font-bold text-blue-600 dark:text-blue-400 underline"
+                className="text-[11px] font-bold text-blue-600 dark:text-blue-400 underline hover:opacity-80"
               >
-                {showScriptGuide ? 'Tutup Panduan' : 'Lihat Cara Buat (1 Menit)'}
+                {showScriptGuide ? 'Tutup Panduan & Kode' : 'Lihat / Salin Kode Script'}
               </button>
             </div>
 
             <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-snug">
-              Bebas batasan permission &amp; tanpa perlu setup billing Google Cloud. Otomatis membaca folder &amp; semua subfolder Anda.
+              Mendukung sinkronisasi folder galeri gambar serta <strong>unggah &amp; pemulihan cadangan buku (doGet &amp; doPost)</strong> bebas hambatan permission.
             </p>
 
+            {/* Quick 1-Click Copy Script Button */}
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(sampleAppsScriptCode);
+                  setIsCopied(true);
+                  setTimeout(() => setIsCopied(false), 3000);
+                }}
+                className={`w-full py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition active:scale-98 shadow-sm ${
+                  isCopied
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-blue-600 hover:bg-blue-500 text-white'
+                }`}
+              >
+                {isCopied ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>Kode Google Apps Script Berhasil Disalin!</span>
+                  </>
+                ) : (
+                  <>
+                    <HardDrive className="w-4 h-4" />
+                    <span>Salin Kode Script Google Drive (doGet &amp; doPost)</span>
+                  </>
+                )}
+              </button>
+            </div>
+
             {showScriptGuide && (
-              <div className="pt-2 border-t border-blue-200/60 dark:border-blue-800/60 space-y-2 text-[11px]">
+              <div className="pt-2 border-t border-blue-200/60 dark:border-blue-800/60 space-y-2.5 text-[11px]">
+                {/* Alert jika mengalami failed to fetch */}
+                <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700/50 text-amber-800 dark:text-amber-200 text-[10.5px] leading-relaxed">
+                  <strong>⚠️ Mengalami "Failed to fetch" saat mencadangkan?</strong><br />
+                  Buka script Anda di <a href="https://script.google.com" target="_blank" rel="noreferrer" className="underline font-bold text-blue-600 dark:text-blue-400">script.google.com</a>, ganti seluruh kodenya dengan kode di bawah, lalu klik <strong>Deploy &rarr; Manage deployments &rarr; Edit (ikon pensil) &rarr; Version: New version &rarr; Deploy</strong>.
+                </div>
+
                 <ol className="list-decimal list-inside space-y-1 text-slate-600 dark:text-slate-400">
                   <li>Buka <a href="https://script.google.com" target="_blank" rel="noreferrer" className="text-blue-600 underline font-bold">script.google.com</a> &rarr; <strong>New project</strong>.</li>
                   <li>Hapus kode bawaan dan tempel kode berikut:</li>
                 </ol>
 
                 <div className="relative">
-                  <pre className="p-2.5 bg-slate-900 text-slate-200 rounded-xl font-mono text-[10px] overflow-x-auto max-h-36">
+                  <pre className="p-2.5 bg-slate-900 text-slate-200 rounded-xl font-mono text-[10px] overflow-x-auto max-h-48">
                     {sampleAppsScriptCode}
                   </pre>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(sampleAppsScriptCode);
-                      alert('Kode Google Apps Script berhasil disalin!');
-                    }}
-                    className="absolute top-2 right-2 px-2 py-1 rounded bg-blue-600 text-white font-bold text-[10px]"
-                  >
-                    Salin Kode
-                  </button>
                 </div>
 
                 <ol start={3} className="list-decimal list-inside space-y-1.5 text-slate-600 dark:text-slate-400">
-                  <li>Klik tombol biru <strong>Deploy &rarr; New deployment</strong> &rarr; pilih ikon gear/roda gigi lalu pilih jenis <strong>Web app</strong>.</li>
+                  <li>Klik tombol biru <strong>Deploy &rarr; New deployment</strong> &rarr; pilih jenis <strong>Web app</strong> (atau Manage deployments jika perbarui).</li>
                   <li>Di bagian <i>Execute as</i>: pilih <strong>Me (email Anda)</strong>.</li>
-                  <li>Di bagian <i>Who has access</i>: <strong className="text-amber-600 dark:text-amber-400 underline">Wajib pilih "Anyone" (Siapa saja)</strong> agar bisa diakses tanpa error 404.</li>
-                  <li>Klik <strong>Deploy</strong> &rarr; jika muncul jendela otorisasi, klik <strong>Review Permissions</strong> &rarr; pilih akun Google &rarr; klik <strong>Advanced</strong> (Lanjutan) &rarr; klik <strong>Go to Untitled project (unsafe)</strong> &rarr; <strong>Allow</strong>.</li>
+                  <li>Di bagian <i>Who has access</i>: <strong className="text-amber-600 dark:text-amber-400 underline">Wajib pilih "Anyone" (Siapa saja)</strong> agar bisa diakses browser.</li>
+                  <li>Klik <strong>Deploy</strong> &rarr; izinkan akses (Review Permissions &rarr; Advanced &rarr; Go to Untitled (unsafe) &rarr; Allow).</li>
                   <li>Salin <strong>Web app URL</strong> yang berakhiran <code>/exec</code> lalu tempel ke kolom di bawah.</li>
                 </ol>
               </div>

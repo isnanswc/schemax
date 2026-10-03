@@ -172,12 +172,7 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
       });
 
       setBackupProgressMsg('Mengunggah berkas cadangan ke Google Drive...');
-      const safeTitle = bundle.book.title
-        .replace(/[^a-zA-Z0-9_\-\s]/g, '')
-        .trim()
-        .replace(/\s+/g, '_') || 'buku';
-      const dateStr = new Date().toISOString().slice(0, 10);
-      const fileName = `${safeTitle}_backup_${dateStr}.schemax.json`;
+      const fileName = getBackupFileName(bundle.book.title);
       const jsonStr = JSON.stringify(bundle);
 
       const result = await uploadBackupToGDrive(
