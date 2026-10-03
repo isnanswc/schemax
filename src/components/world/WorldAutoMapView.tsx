@@ -233,72 +233,162 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
   // ---------------------------------------------------------------------------
   // Structured Clustered Faction Layout Engine (Mencegah Tumpang Tindih)
   // ---------------------------------------------------------------------------
-  const arrangeNeatFactionLayout = (force = false) => {
+  // ---------------------------------------------------------------------------
+  // Structured Clustered Faction Layout Engine (Mencegah Tumpang Tindih & Rapi)
+  // ---------------------------------------------------------------------------
+  const arrangeNeatFactionLayout = (force = true) => {
     if (entities.length === 0) return;
 
-    // Group entities by faction
+    // Separate entities into Named Factions and Neutral / Unassigned
     const factionGroups: Record<string, WorldEntity[]> = {};
+    const neutralMembers: WorldEntity[] = [];
+
     entities.forEach((e) => {
-      const fac = entityEffectiveData[e.id]?.faction?.trim() || e.faction?.trim() || 'Independen / Netral';
-      if (!factionGroups[fac]) factionGroups[fac] = [];
-      factionGroups[fac].push(e);
+      const fac = entityEffectiveData[e.id]?.faction?.trim() || e.faction?.trim();
+      if (!fac || fac.toLowerCase() === 'independen / netral' || fac.toLowerCase() === 'netral' || fac.toLowerCase() === 'independen') {
+        neutralMembers.push(e);
+      } else {
+        if (!factionGroups[fac]) factionGroups[fac] = [];
+        factionGroups[fac].push(e);
+      }
     });
 
-    const factions = Object.keys(factionGroups);
+    const namedFactions = Object.keys(factionGroups);
     const newPositions: Record<string, NodePosition> = {};
 
-    const canvasCenterX = 450;
-    const canvasCenterY = 380;
-    // Widely space factions with radius based on faction count
-    const factionCenterRadius = Math.max(260, 160 + factions.length * 60);
+    const canvasCenterX = 650;
+    const canvasCenterY = 550;
 
-    factions.forEach((fac, facIdx) => {
-      const members = factionGroups[fac];
-      const facAngle = (2 * Math.PI * facIdx) / Math.max(1, factions.length) - Math.PI / 2;
-
-      const facCenterX =
-        factions.length === 1
-          ? canvasCenterX
-          : canvasCenterX + Math.cos(facAngle) * factionCenterRadius;
-      const facCenterY =
-        factions.length === 1
-          ? canvasCenterY
-          : canvasCenterY + Math.sin(facAngle) * factionCenterRadius;
-
-      // Distribute members inside this faction cluster with minimum 85px clearance
-      if (members.length === 1) {
-        newPositions[members[0].id] = { x: facCenterX, y: facCenterY };
-      } else if (members.length <= 4) {
-        const memberRadius = 85;
-        members.forEach((m, mIdx) => {
-          const mAngle = (2 * Math.PI * mIdx) / members.length;
-          newPositions[m.id] = {
-            x: facCenterX + Math.cos(mAngle) * memberRadius,
-            y: facCenterY + Math.sin(mAngle) * memberRadius,
-          };
+    // Case 1: No named factions at all (all entities are neutral)
+    if (namedFactions.length === 0) {
+      const count = neutralMembers.length;
+      if (count <= 4) {
+        const startX = canvasCenterX - ((count - 1) * 160) / 2;
+        neutralMembers.forEach((m, idx) => {
+          newPositions[m.id] = { x: startX + idx * 160, y: canvasCenterY };
+        });
+      } else if (count <= 9) {
+        const cols = Math.ceil(Math.sqrt(count * 1.3));
+        const spacingX = 175;
+        const spacingY = 145;
+        neutralMembers.forEach((m, idx) => {
+          const col = idx % cols;
+          const row = Math.floor(idx / cols);
+          const totalRows = Math.ceil(count / cols);
+          const startX = canvasCenterX - ((cols - 1) * spacingX) / 2;
+          const startY = canvasCenterY - ((totalRows - 1) * spacingY) / 2;
+          newPositions[m.id] = { x: startX + col * spacingX, y: startY + row * spacingY };
         });
       } else {
-        // Two concentric rings for larger factions
-        const innerCount = Math.min(4, Math.floor(members.length / 2));
-        const outerCount = members.length - innerCount;
-
-        members.slice(0, innerCount).forEach((m, mIdx) => {
-          const mAngle = (2 * Math.PI * mIdx) / innerCount;
+        neutralMembers.forEach((m, idx) => {
+          const radius = Math.sqrt(idx + 1) * 90 + 45;
+          const angle = idx * 2.399963229728653; // Golden angle
           newPositions[m.id] = {
-            x: facCenterX + Math.cos(mAngle) * 75,
-            y: facCenterY + Math.sin(mAngle) * 75,
-          };
-        });
-
-        members.slice(innerCount).forEach((m, mIdx) => {
-          const mAngle = (2 * Math.PI * mIdx) / outerCount;
-          newPositions[m.id] = {
-            x: facCenterX + Math.cos(mAngle) * 155,
-            y: facCenterY + Math.sin(mAngle) * 155,
+            x: canvasCenterX + Math.cos(angle) * radius,
+            y: canvasCenterY + Math.sin(angle) * radius,
           };
         });
       }
-    });
+    } else {
+      // Case 2: Named factions exist!
+      const clusterRadii = namedFactions.map((f) => {
+        const memCount = factionGroups[f].length;
+        return Math.max(140, 90 + Math.sqrt(memCount) * 60);
+      });
+
+      const maxClusterR = Math.max(...clusterRadii);
+      const factionOrbitRadius = Math.max(
+        maxClusterR * 1.65,
+        220 + namedFactions.length * 80
+      );
+
+      namedFactions.forEach((fac, fIdx) => {
+        const members = factionGroups[fac];
+        const angle = (2 * Math.PI * fIdx) / namedFactions.length - Math.PI / 2;
+
+        const facCenterX =
+          namedFactions.length === 1
+            ? canvasCenterX
+            : canvasCenterX + Math.cos(angle) * factionOrbitRadius;
+        const facCenterY =
+          namedFactions.length === 1
+            ? canvasCenterY
+            : canvasCenterY + Math.sin(angle) * factionOrbitRadius;
+
+        if (members.length === 1) {
+          newPositions[members[0].id] = { x: facCenterX, y: facCenterY };
+        } else if (members.length === 2) {
+          newPositions[members[0].id] = { x: facCenterX - 80, y: facCenterY };
+          newPositions[members[1].id] = { x: facCenterX + 80, y: facCenterY };
+        } else if (members.length <= 5) {
+          const r = Math.max(105, members.length * 30);
+          members.forEach((m, mIdx) => {
+            const mAngle = (2 * Math.PI * mIdx) / members.length;
+            newPositions[m.id] = {
+              x: facCenterX + Math.cos(mAngle) * r,
+              y: facCenterY + Math.sin(mAngle) * r,
+            };
+          });
+        } else {
+          const innerCount = Math.min(4, Math.floor(members.length / 2.2));
+          const outerCount = members.length - innerCount;
+
+          members.slice(0, innerCount).forEach((m, mIdx) => {
+            const mAngle = (2 * Math.PI * mIdx) / innerCount;
+            newPositions[m.id] = {
+              x: facCenterX + Math.cos(mAngle) * 95,
+              y: facCenterY + Math.sin(mAngle) * 95,
+            };
+          });
+
+          members.slice(innerCount).forEach((m, mIdx) => {
+            const mAngle = (2 * Math.PI * mIdx) / outerCount;
+            newPositions[m.id] = {
+              x: facCenterX + Math.cos(mAngle) * 195,
+              y: facCenterY + Math.sin(mAngle) * 195,
+            };
+          });
+        }
+      });
+
+      // Distribute neutral / unassigned members along a spacious outer perimeter
+      if (neutralMembers.length > 0) {
+        const neutralRadius = factionOrbitRadius + maxClusterR + 140;
+        neutralMembers.forEach((m, mIdx) => {
+          const nAngle = (2 * Math.PI * mIdx) / neutralMembers.length;
+          newPositions[m.id] = {
+            x: canvasCenterX + Math.cos(nAngle) * neutralRadius,
+            y: canvasCenterY + Math.sin(nAngle) * neutralRadius,
+          };
+        });
+      }
+    }
+
+    // Pass 3: Physics Force Relaxation Simulation (Guarantees zero node overlap)
+    const allIds = Object.keys(newPositions);
+    const minSafeDist = 135;
+
+    for (let iter = 0; iter < 30; iter++) {
+      for (let i = 0; i < allIds.length; i++) {
+        for (let j = i + 1; j < allIds.length; j++) {
+          const id1 = allIds[i], id2 = allIds[j];
+          const p1 = newPositions[id1], p2 = newPositions[id2];
+          const dx = p2.x - p1.x;
+          const dy = p2.y - p1.y;
+          const dist = Math.hypot(dx, dy) || 1;
+
+          if (dist < minSafeDist) {
+            const overlap = (minSafeDist - dist) * 0.5;
+            const nx = dx / dist;
+            const ny = dy / dist;
+            p1.x -= nx * overlap;
+            p1.y -= ny * overlap;
+            p2.x += nx * overlap;
+            p2.y += ny * overlap;
+          }
+        }
+      }
+    }
 
     setNodePositions((prev) => {
       const merged = force ? newPositions : { ...newPositions, ...prev };
@@ -307,15 +397,24 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
       } catch (_) {}
       return merged;
     });
+
+    // Auto fit into viewport
+    setTimeout(() => {
+      handleFitToScreen(newPositions);
+    }, 60);
   };
 
-  // Initialize or re-calculate clean layout on mount if no saved positions exist or when entity count changes
+  // Auto clean layout on mount if missing positions, or fit viewport
   useEffect(() => {
-    // Only arrange if positions are missing
-    const hasMissing = entities.some((e) => !nodePositions[e.id]);
-    if (hasMissing || Object.keys(nodePositions).length === 0) {
-      arrangeNeatFactionLayout();
-    }
+    const timer = setTimeout(() => {
+      const hasMissing = entities.some((e) => !nodePositions[e.id]);
+      if (hasMissing || Object.keys(nodePositions).length === 0) {
+        arrangeNeatFactionLayout(true);
+      } else {
+        handleFitToScreen();
+      }
+    }, 100);
+    return () => clearTimeout(timer);
   }, [entities.length]);
 
   // Filtered entities based on Scope, Faction, Condition, and Search
@@ -674,9 +773,10 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
   };
 
   // Google Maps Style: Fit All Nodes to Screen Center
-  const handleFitToScreen = () => {
+  const handleFitToScreen = (overridePositions?: Record<string, NodePosition>) => {
     const container = containerRef.current;
-    const nodeKeys = Object.keys(nodePositions);
+    const positionsToUse = overridePositions || nodePositions;
+    const nodeKeys = Object.keys(positionsToUse);
     if (!container || nodeKeys.length === 0) {
       setZoom(1);
       setPan({ x: 30, y: 30 });
@@ -684,10 +784,12 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
     }
 
     const rect = container.getBoundingClientRect();
+    if (!rect || rect.width === 0 || rect.height === 0) return;
+
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
 
     nodeKeys.forEach((id) => {
-      const p = nodePositions[id];
+      const p = positionsToUse[id];
       if (p) {
         minX = Math.min(minX, p.x);
         maxX = Math.max(maxX, p.x);
@@ -698,13 +800,13 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
 
     if (minX === Infinity) return;
 
-    const padding = 100;
-    const contentWidth = Math.max(120, maxX - minX + padding * 2);
-    const contentHeight = Math.max(120, maxY - minY + padding * 2);
+    const padding = 120;
+    const contentWidth = Math.max(140, maxX - minX + padding * 2);
+    const contentHeight = Math.max(140, maxY - minY + padding * 2);
 
     const scaleX = rect.width / contentWidth;
     const scaleY = rect.height / contentHeight;
-    const newZoom = Math.min(1.8, Math.max(0.2, Math.min(scaleX, scaleY)));
+    const newZoom = Math.min(1.4, Math.max(0.2, Math.min(scaleX, scaleY)));
 
     const midX = (minX + maxX) / 2;
     const midY = (minY + maxY) / 2;
@@ -718,8 +820,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
   };
 
   const handleResetView = () => {
-    handleFitToScreen();
-    arrangeNeatFactionLayout();
+    arrangeNeatFactionLayout(true);
   };
 
   return (
@@ -958,11 +1059,12 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
 
             <button
               type="button"
-              onClick={arrangeNeatFactionLayout}
-              className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs border border-slate-700 active:scale-95 transition text-amber-400"
-              title="Atur Ulang Rapi"
+              onClick={() => arrangeNeatFactionLayout(true)}
+              className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold rounded-xl text-xs border border-slate-700 active:scale-95 transition flex items-center gap-1.5"
+              title="Atur Ulang Rapi Otomatis (Anti Tumpang Tindih)"
             >
               <Wand2 className="w-3.5 h-3.5" />
+              <span>Rapi</span>
             </button>
           </div>
         </div>

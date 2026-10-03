@@ -1181,63 +1181,234 @@ export interface CoverPromptResult {
   characterReferences: string[];
 }
 
+// Robust Cover Prompt Parser: Guarantees prompt, explanation, and characters are never merged
+export function parseCoverPromptResult(
+  rawText: string,
+  knownEntities: string[] = []
+): CoverPromptResult {
+  if (!rawText || !rawText.trim()) {
+    return { prompt: '', explanation: '', characterReferences: [] };
+  }
+
+  let prompt = '';
+  let explanation = '';
+  let characterReferences: string[] = [];
+
+  // 1. Try resilient JSON parse
+  try {
+    const parsed = resilientParseJsonObject(rawText);
+    if (parsed && typeof parsed === 'object') {
+      if (typeof parsed.prompt === 'string' && parsed.prompt.trim()) {
+        prompt = parsed.prompt.trim();
+      }
+      if (typeof parsed.explanation === 'string' && parsed.explanation.trim()) {
+        explanation = parsed.explanation.trim();
+      }
+      if (Array.isArray(parsed.characterReferences)) {
+        characterReferences = parsed.characterReferences
+          .map((c) => String(c).trim())
+          .filter(Boolean);
+      }
+    }
+  } catch (_) {}
+
+  // 2. Try Tagged Blocks <<<PROMPT>>> ... <<<END_PROMPT>>>
+  if (!prompt) {
+    const promptTagMatch = rawText.match(/<<<PROMPT>>>([\s\S]*?)<<<END_PROMPT>>>/i);
+    if (promptTagMatch) prompt = promptTagMatch[1].trim();
+  }
+  if (!explanation) {
+    const expTagMatch = rawText.match(/<<<EXPLANATION>>>([\s\S]*?)<<<END_EXPLANATION>>>/i);
+    if (expTagMatch) explanation = expTagMatch[1].trim();
+  }
+  if (characterReferences.length === 0) {
+    const charTagMatch = rawText.match(/<<<CHARACTERS>>>([\s\S]*?)<<<END_CHARACTERS>>>/i);
+    if (charTagMatch) {
+      characterReferences = charTagMatch[1]
+        .split(/[,;\n]+/)
+        .map((s) => s.replace(/^[-*•\d.\s]+/, '').trim())
+        .filter(Boolean);
+    }
+  }
+
+  // 3. Regex JSON extraction if rawText had broken quotes/newlines
+  if (!prompt) {
+    const jsonPromptMatch = rawText.match(/"prompt"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+    if (jsonPromptMatch) {
+      prompt = jsonPromptMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n').trim();
+    }
+  }
+  if (!explanation) {
+    const jsonExpMatch = rawText.match(/"explanation"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+    if (jsonExpMatch) {
+      explanation = jsonExpMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n').trim();
+    }
+  }
+
+  // 4. Section headers (PROMPT:, PENJELASAN:)
+  if (!prompt || !explanation) {
+    const promptSection = rawText.match(/(?:^|\n)(?:###?\s*)?(?:PROMPT|VISUAL PROMPT|PROMPT VISUAL)\s*:\s*([\s\S]*?)(?=(?:^|\n)(?:###?\s*)?(?:EXPLANATION|PENJELASAN|DESKRIPSI|CHARACTERS|KARAKTER)|$)/i);
+    if (promptSection && promptSection[1]) {
+      prompt = promptSection[1].trim();
+    }
+
+    const expSection = rawText.match(/(?:^|\n)(?:###?\s*)?(?:EXPLANATION|PENJELASAN|DESKRIPSI)\s*:\s*([\s\S]*?)(?=(?:^|\n)(?:###?\s*)?(?:CHARACTERS|KARAKTER|PROMPT)|$)/i);
+    if (expSection && expSection[1]) {
+      explanation = expSection[1].trim();
+    }
+  }
+
+  // 5. Intelligent Separation if prompt still contains explanation in one chunk
+  if (!prompt) {
+    const cleanRaw = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+    prompt = cleanRaw;
+  }
+
+  // If prompt has an Indonesian explanation appended at the end (e.g. "Desain sampul: ..." or "Penjelasan: ...")
+  const splitKeywords = [
+    '\nDesain sampul',
+    '\nSampul bab',
+    '\nPenjelasan',
+    '\nKarakter yang',
+    '\nTokoh yang',
+    '\nFoto vertikal',
+  ];
+  for (const kw of splitKeywords) {
+    const idx = prompt.indexOf(kw);
+    if (idx !== -1 && idx > 30) {
+      if (!explanation) {
+        explanation = prompt.slice(idx).replace(/^\n+/, '').trim();
+      }
+      prompt = prompt.slice(0, idx).trim();
+      break;
+    }
+  }
+
+  // Clean prompt quotes or formatting remnants
+  prompt = prompt
+    .replace(/^["']|["']$/g, '')
+    .replace(/^PROMPT:\s*/i, '')
+    .trim();
+
+  if (explanation) {
+    explanation = explanation
+      .replace(/^["']|["']$/g, '')
+      .replace(/^(?:PENJELASAN|EXPLANATION|DESKRIPSI):\s*/i, '')
+      .trim();
+  }
+
+  // Ensure prompt has --ar 9:16
+  if (prompt && !prompt.includes('--ar')) {
+    prompt += ' --ar 9:16';
+  }
+
+  // 6. Character References Detection (Auto-detect if AI didn't return array)
+  if (characterReferences.length === 0) {
+    const foundNames = new Set<string>();
+
+    // A. Match "Nama [pria1]" or "Nama [wanita1]" anywhere in explanation or prompt
+    const fullText = `${explanation} ${prompt}`;
+    const tagMatches = fullText.matchAll(/([A-Z][a-zA-Z0-9\s]{1,25})\s*(\[(?:pria|wanita)\d*\])/gi);
+    for (const m of tagMatches) {
+      const candidateName = m[1].replace(/\b(dan|atau|serta|dengan|pada|saat|ketika|foto|gambar|desain|karakter|tokoh|pria|wanita)\b/gi, '').trim();
+      if (candidateName.length >= 2) {
+        foundNames.add(`${candidateName} ${m[2]}`);
+      }
+    }
+
+    // B. Match known entities against text
+    knownEntities.forEach((entName) => {
+      const clean = entName.trim();
+      if (clean.length >= 2 && fullText.toLowerCase().includes(clean.toLowerCase())) {
+        const regex = new RegExp(`${clean}\\s*(\\[(?:pria|wanita)\\d*\\])`, 'i');
+        const tagMatch = fullText.match(regex);
+        if (tagMatch) {
+          foundNames.add(`${clean} ${tagMatch[1]}`);
+        } else {
+          foundNames.add(clean);
+        }
+      }
+    });
+
+    // C. Fallback: extract any isolated brackets like [pria1], [wanita1]
+    if (foundNames.size === 0) {
+      const rawBrackets = prompt.match(/\[(?:pria|wanita)\d*\]/gi);
+      if (rawBrackets) {
+        rawBrackets.forEach((b) => foundNames.add(`Tokoh ${b}`));
+      }
+    }
+
+    characterReferences = Array.from(foundNames);
+  }
+
+  return {
+    prompt,
+    explanation,
+    characterReferences,
+  };
+}
+
 // 3b. AI Book Cover Visual Concept Prompt Engine
 export async function generateBookCoverPrompt(
   params: {
     bookTitle: string;
     genre?: string;
     synopsis?: string;
+    chapterContext?: string;
     entities?: Array<{ name: string; category?: string; shortDescription?: string; initialTraits?: string }>;
   },
   onEvent?: (event: AIGenerationEvent) => void
 ): Promise<CoverPromptResult> {
   const charactersList = (params.entities || [])
     .filter((e) => !e.category || e.category === 'character')
-    .slice(0, 10)
+    .slice(0, 15)
     .map((e) => `- ${e.name}: ${e.shortDescription || e.initialTraits || 'Tokoh cerita'}`)
     .join('\n');
 
-  const prompt = `Anda adalah seorang visual director, concept artist, dan art designer spesialis sampul novel / buku terkemuka.
-Tugas Anda adalah merancang PROMPT VISUAL UNTUK SAMPUL BUKU (BOOK COVER) yang memukau, bernilai seni tinggi, dan berorientasi vertikal.
+  const knownNames = (params.entities || [])
+    .filter((e) => !e.category || e.category === 'character')
+    .map((e) => e.name);
+
+  const prompt = `Anda adalah seorang visual director, concept artist, dan art designer spesialis sampul novel / web novel terkemuka.
+Tugas Anda adalah merancang PROMPT VISUAL UNTUK SAMPUL BUKU (BOOK COVER) yang memukau, bernilai seni tinggi, dan berorientasi vertikal (9:16).
 
 Informasi Buku:
 - Judul Buku: "${params.bookTitle}"
-- Genre: ${params.genre || 'Fiksi Fantasi / Drama'}
+- Genre: ${params.genre || 'Fiksi Fantasi / Drama / Misteri'}
 - Sinopsis / Garis Besar Cerita:
 ${params.synopsis ? wrapPromptSandbox(params.synopsis.slice(0, 3000), 'SINOPSIS') : 'Cerita fiksi mendalam'}
+${params.chapterContext ? `\n- Konteks Bab & Peristiwa Cerita:\n${wrapPromptSandbox(params.chapterContext.slice(0, 2000), 'KONTEKS_BAB')}` : ''}
 
-Daftar Tokoh yang Ada dalam Cerita:
-${charactersList || 'Belum ada tokoh spesifik tercatat'}
+Daftar Tokoh Cerita yang Tercatat:
+${charactersList || '(Belum ada tokoh eksplisit di ensiklopedia. Kenali tokoh utama dari sinopsis atau konteks bab di atas!)'}
 
 ATURAN WAJIB & SANGAT KETAT:
-1. User selalu melampirkan gambar referensi karakter di sebelah prompt.
+1. User selalu melampirkan gambar referensi karakter di generator gambar AI.
 2. JANGAN sebut atau deskripsikan bentuk wajah, warna kulit, atau postur tubuh karakter! Gunakan referensi visual yang dilampirkan.
-3. JANGAN sebut nama karakter di dalam prompt. Ganti dengan label dalam kurung siku seperti "[pria1]" atau "[wanita1]". Jika ada lebih dari satu, beri nomor (contoh: "[pria1]", "[wanita1]", "[pria2]"). Tentukan siapa tokoh utama yang paling tepat menghiasi sampul buku.
-4. JANGAN ubah model pakaian asli karakter secara drastis. HANYA boleh perubahan minor atau elemen khas sampul novel (misal: "jubah berlumur debu petualangan", "gaun anggun tersibak angin", "pakaian formal kusut karena pertempuran").
+3. JANGAN sebut nama karakter di dalam prompt visual. Ganti dengan label dalam kurung siku seperti "[pria1]" atau "[wanita1]". Jika ada lebih dari satu, beri nomor (contoh: "[pria1]", "[wanita1]", "[pria2]"). Tentukan siapa tokoh utama yang paling tepat menghiasi sampul buku.
+4. JANGAN ubah model pakaian asli karakter secara drastis. HANYA boleh perubahan minor yang dramatis (misal: "jubah berlumur debu petualangan", "gaun anggun tersibak angin kencang", "pakaian zirah perang yang retak").
 5. Jelaskan secara sangat mendalam: KOMPOSISI SAMPUL VERTIKAL, POSE UTAMA, EKSPRESI EMOSI, ELEMEN SIMBOLIS / LATAR IKONIK DUNIA CERITA, PENCAHAYAAN (lighting dramatis, volumetric, chiaroscuro, rim light), dan ATMOSFER sinematik.
-6. Format teknis: "Vertical book cover format (9:16), typography-ready negative space at top/bottom, 8k masterpiece, photorealistic cinematic concept art, [deskripsi pose, ekspresi, interaksi, pakaian minor change, latar, lighting] --ar 9:16".
-7. Berikan daftar "characterReferences": Nama-nama karakter asli yang gambarnya harus dilampirkan oleh user (misal: ["Agung", "Santi"]).
-8. Berikan "explanation": Penjelasan isi sampul dalam Bahasa Indonesia yang santai, jelas, dan sebutkan nama karakter yang dimaksud beserta label bracketnya, misal: Agung [pria1] berdiri membelakangi badai, sementara Santi [wanita1] menggenggam liontin bercahaya.
+6. Format teknis prompt: "Vertical book cover format (9:16), typography-ready negative space at top/bottom, 8k masterpiece, photorealistic cinematic concept art, [deskripsi pose, ekspresi, interaksi, pakaian minor change, latar, lighting] --ar 9:16".
+7. WAJIB DAFTARKAN "characterReferences": Nama-nama karakter asli yang gambarnya harus dilampirkan oleh user beserta labelnya, misal: ["Agung [pria1]", "Santi [wanita1]"]. JIKA daftar tokoh di ensiklopedia kosong, kenali dan tentukan nama tokoh protagonis utama dari sinopsis/bab!
+8. WAJIB BERIKAN "explanation": Penjelasan konsep sampul dalam Bahasa Indonesia yang santai, jelas, dan jelaskan siapa tokoh yang dimaksud (misal: "Sampul buku menampilkan Agung [pria1] yang menatap langit berbintang...").
 
-Keluarkan HANYA JSON object valid:
-{
-  "characterReferences": ["Nama Karakter 1", "Nama Karakter 2"],
-  "prompt": "Vertical book cover format 9:16, typography-ready negative space at top/bottom, 8k masterpiece, photorealistic cinematic concept art, [pria1] standing atop a crumbling cliff...",
-  "explanation": "Desain sampul buku menampilkan Agung [pria1] yang menatap ke arah reruntuhan kota..."
-}`;
+FORMAT KELUARAN (PENTING: Pisahkan prompt dan penjelasan menggunakan blok tag atau JSON):
+<<<PROMPT>>>
+Vertical book cover format 9:16, typography-ready negative space at top/bottom, 8k masterpiece, photorealistic cinematic concept art, [pria1] standing atop a crumbling cliff... --ar 9:16
+<<<END_PROMPT>>>
+
+<<<EXPLANATION>>>
+Desain sampul buku menampilkan tokoh utama [pria1] dengan latar pemandangan epik...
+<<<END_EXPLANATION>>>
+
+<<<CHARACTERS>>>
+Nama Tokoh [pria1], Tokoh Pendamping [wanita1]
+<<<END_CHARACTERS>>>`;
 
   const systemPrompt =
-    'Anda adalah visual director dan art designer profesional spesialis sampul buku. Keluarkan HANYA JSON object valid.';
+    'Anda adalah visual director dan art designer profesional spesialis sampul buku. Pisahkan prompt dan penjelasan dengan jelas.';
   const res = await generateWithSmartFallback(prompt, systemPrompt, onEvent);
-  const parsed = resilientParseJsonObject(res.text);
-
-  return {
-    prompt: parsed.prompt || res.text.replace(/^```json|```$/g, '').trim(),
-    explanation: parsed.explanation || '',
-    characterReferences: Array.isArray(parsed.characterReferences)
-      ? parsed.characterReferences
-      : [],
-  };
+  return parseCoverPromptResult(res.text, knownNames);
 }
 
 // 3c. AI Chapter Cover Visual Concept Prompt Engine
@@ -1254,16 +1425,20 @@ export async function generateChapterCoverPrompt(
 ): Promise<CoverPromptResult> {
   const charactersList = (params.entities || [])
     .filter((e) => !e.category || e.category === 'character')
-    .slice(0, 10)
+    .slice(0, 15)
     .map((e) => `- ${e.name}: ${e.shortDescription || e.initialTraits || 'Tokoh cerita'}`)
     .join('\n');
+
+  const knownNames = (params.entities || [])
+    .filter((e) => !e.category || e.category === 'character')
+    .map((e) => e.name);
 
   const contentSnippet = (params.contentText || '')
     .slice(0, 4000)
     .trim();
 
   const prompt = `Anda adalah visual director dan concept artist profesional spesialis sampul bab / chapter cover & web novel banner.
-Tugas Anda adalah merancang PROMPT VISUAL UNTUK SAMPUL BAB (CHAPTER COVER) yang menangkap momen klimaks, ketegangan, atau suasana paling emosional dari bab ini.
+Tugas Anda adalah merancang PROMPT VISUAL UNTUK SAMPUL BAB (CHAPTER COVER) yang menangkap momen klimaks, ketegangan, atau suasana paling emosional dari bab ini (rasio vertikal 9:16).
 
 Informasi Bab:
 - Judul Buku: "${params.bookTitle}"
@@ -1271,38 +1446,36 @@ Informasi Bab:
 - Premis Bab: ${params.premise || 'Momen penting dalam cerita'}
 ${contentSnippet ? `- Cuplikan Naskah Bab:\n${wrapPromptSandbox(contentSnippet, 'CUPLIKAN_NASKAH')}` : ''}
 
-Daftar Tokoh yang Berpotensi Hadir:
-${charactersList || 'Tokoh cerita'}
+Daftar Tokoh Cerita yang Berpotensi Hadir:
+${charactersList || '(Belum ada tokoh spesifik di ensiklopedia. Kenali tokoh utama dari naskah/premis bab di atas!)'}
 
 ATURAN WAJIB & SANGAT KETAT:
-1. User selalu melampirkan gambar referensi karakter di sebelah prompt.
+1. User selalu melampirkan gambar referensi karakter di generator gambar AI.
 2. JANGAN sebut atau deskripsikan bentuk wajah, warna kulit, atau postur tubuh karakter! Gunakan referensi visual yang dilampirkan.
 3. JANGAN sebut nama karakter di dalam prompt. Ganti dengan label dalam kurung siku seperti "[pria1]" atau "[wanita1]". Jika ada lebih dari satu, beri nomor (contoh: "[pria1]", "[wanita1]", "[pria2]").
 4. JANGAN ubah pakaian asli secara drastis. HANYA boleh perubahan minor realistis sesuai momen bab (misal: "baju robek di siku", "basah kuyup kena hujan", "jubah tersampir santai").
 5. Jelaskan secara sangat mendalam: FOKUS ADEGAN UTAMA BAB, POSE KARAKTER, EKSPRESI EMOSI, LATAR LINGKUNGAN, PENCAHAYAAN (lighting dramatis), dan ATMOSFER cerita bab ini.
-6. Format teknis: "Vertical chapter cover (9:16), 8k hyper realistic, photorealistic cinematic concept art, [deskripsi pose, emosi, interaksi tokoh, latar bab, lighting dramatis] --ar 9:16".
-7. Berikan daftar "characterReferences": Nama-nama karakter asli yang gambarnya harus dilampirkan oleh user (misal: ["Budi", "Rina"]).
-8. Berikan "explanation": Penjelasan isi sampul bab dalam Bahasa Indonesia yang santai, jelas, dan sebutkan nama karakter yang dimaksud beserta label bracketnya, misal: Budi [pria1] berhadapan sengit dengan musuh di tengah lorong gelap.
+6. Format teknis prompt: "Vertical chapter cover (9:16), 8k hyper realistic, photorealistic cinematic concept art, [deskripsi pose, emosi, interaksi tokoh, latar bab, lighting dramatis] --ar 9:16".
+7. WAJIB DAFTARKAN "characterReferences": Nama-nama karakter asli yang gambarnya harus dilampirkan oleh user beserta labelnya, misal: ["Budi [pria1]", "Rina [wanita1]"].
+8. WAJIB BERIKAN "explanation": Penjelasan isi sampul bab dalam Bahasa Indonesia yang santai, jelas, dan sebutkan siapa nama karakter yang dimaksud beserta label bracketnya.
 
-Keluarkan HANYA JSON object valid:
-{
-  "characterReferences": ["Nama Karakter"],
-  "prompt": "Vertical chapter cover 9:16, 8k hyper realistic, photorealistic cinematic concept art, [pria1]...",
-  "explanation": "Sampul bab memperlihatkan momen ketika Budi [pria1]..."
-}`;
+FORMAT KELUARAN (PENTING: Pisahkan prompt dan penjelasan menggunakan blok tag atau JSON):
+<<<PROMPT>>>
+Vertical chapter cover 9:16, 8k hyper realistic, photorealistic cinematic concept art, [pria1]... --ar 9:16
+<<<END_PROMPT>>>
+
+<<<EXPLANATION>>>
+Sampul bab memperlihatkan momen ketika [pria1]...
+<<<END_EXPLANATION>>>
+
+<<<CHARACTERS>>>
+Nama Tokoh [pria1], Nama Tokoh [wanita1]
+<<<END_CHARACTERS>>>`;
 
   const systemPrompt =
-    'Anda adalah visual director dan concept artist profesional spesialis chapter cover. Keluarkan HANYA JSON object valid.';
+    'Anda adalah visual director dan concept artist profesional spesialis chapter cover. Pisahkan prompt dan penjelasan dengan jelas.';
   const res = await generateWithSmartFallback(prompt, systemPrompt, onEvent);
-  const parsed = resilientParseJsonObject(res.text);
-
-  return {
-    prompt: parsed.prompt || res.text.replace(/^```json|```$/g, '').trim(),
-    explanation: parsed.explanation || '',
-    characterReferences: Array.isArray(parsed.characterReferences)
-      ? parsed.characterReferences
-      : [],
-  };
+  return parseCoverPromptResult(res.text, knownNames);
 }
 
 // 4. Polish Raw Draft to Prose Engine

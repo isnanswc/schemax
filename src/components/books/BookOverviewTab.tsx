@@ -583,6 +583,7 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
         isOpen={isCoverPromptModalOpen}
         onClose={() => setIsCoverPromptModalOpen(false)}
         type="book"
+        bookId={book.id}
         bookTitle={book.title}
         genre={book.genre}
         synopsis={book.synopsis}

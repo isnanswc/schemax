@@ -721,6 +721,7 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
         isOpen={isCoverPromptModalOpen}
         onClose={() => setIsCoverPromptModalOpen(false)}
         type="chapter"
+        bookId={chapter.bookId}
         bookTitle={bookTitle}
         chapterTitle={chapter.title}
         chapterOrder={chapter.order}

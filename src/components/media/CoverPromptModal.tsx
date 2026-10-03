@@ -19,11 +19,13 @@ import {
   AIGenerationEvent,
 } from '../../services/aiService';
 import { WorldEntity } from '../../types';
+import { db } from '../../db';
 
 interface CoverPromptModalProps {
   isOpen: boolean;
   onClose: () => void;
   type: 'book' | 'chapter';
+  bookId?: string;
   bookTitle: string;
   genre?: string;
   synopsis?: string;
@@ -40,6 +42,7 @@ export const CoverPromptModal: React.FC<CoverPromptModalProps> = ({
   isOpen,
   onClose,
   type,
+  bookId,
   bookTitle,
   genre,
   synopsis,
@@ -80,13 +83,36 @@ export const CoverPromptModal: React.FC<CoverPromptModalProps> = ({
     };
 
     try {
+      // Ensure we have entities and story context even if props were empty
+      let effectiveEntities = entities;
+      if (effectiveEntities.length === 0 && bookId) {
+        try {
+          const fromDb = await db.worldEntities.where('bookId').equals(bookId).toArray();
+          if (fromDb.length > 0) effectiveEntities = fromDb;
+        } catch (_) {}
+      }
+
+      let chapterContext = '';
+      if (bookId) {
+        try {
+          const bookChapters = await db.chapters.where('bookId').equals(bookId).toArray();
+          if (bookChapters.length > 0) {
+            chapterContext = bookChapters
+              .slice(0, 8)
+              .map((c) => `Bab ${c.order}: "${c.title}" - ${c.premise || c.aiSummary || ''}`)
+              .join('\n');
+          }
+        } catch (_) {}
+      }
+
       if (type === 'book') {
         const res = await generateBookCoverPrompt(
           {
             bookTitle,
             genre,
             synopsis,
-            entities: entities.map((e) => ({
+            chapterContext,
+            entities: effectiveEntities.map((e) => ({
               name: e.name,
               category: e.category,
               shortDescription: e.shortDescription,
@@ -104,7 +130,7 @@ export const CoverPromptModal: React.FC<CoverPromptModalProps> = ({
             chapterOrder,
             premise,
             contentText,
-            entities: entities.map((e) => ({
+            entities: effectiveEntities.map((e) => ({
               name: e.name,
               category: e.category,
               shortDescription: e.shortDescription,
