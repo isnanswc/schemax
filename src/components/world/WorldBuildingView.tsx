@@ -31,9 +31,9 @@ import {
   X,
   BookOpen,
   Bookmark,
-  Library
+  Library,
 } from 'lucide-react';
-import { db } from '../../db';
+import { db, deleteEntityCascade } from '../../db';
 import { navStack } from '../../services/backNavigationService';
 import { usePrivacy } from '../../contexts/PrivacyContext';
 import { ImageViewerModal } from '../common/ImageViewerModal';
@@ -306,7 +306,7 @@ export const WorldBuildingView: React.FC<WorldBuildingViewProps> = ({
 
   const handleDelete = async (id: string, name: string) => {
     if (confirm(`Hapus entitas "${name}" dari worldbuilding?`)) {
-      await db.worldEntities.delete(id);
+      await deleteEntityCascade(id, bookId);
       onRefresh();
     }
   };

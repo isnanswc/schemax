@@ -78,6 +78,63 @@ export async function deleteMediaItem(id: string): Promise<void> {
   await db.media.delete(id);
 }
 
+/**
+ * Cascade Delete for a Chapter:
+ * Removes chapter record and sweeps away all associated TTS persistent audio caches & media.
+ */
+export async function deleteChapterCascade(chapterId: string): Promise<void> {
+  await db.transaction('rw', [db.chapters, db.ttsAudioCaches, db.media], async () => {
+    await db.chapters.delete(chapterId);
+    await db.ttsAudioCaches.where('chapterId').equals(chapterId).delete();
+    await db.media.where('chapterId').equals(chapterId).delete();
+  });
+}
+
+/**
+ * Cascade Delete for a World Entity:
+ * Removes entity record, associated character roleplay chats, avatar/gallery media,
+ * and clears dangling relationship references from other entities in the same book.
+ */
+export async function deleteEntityCascade(entityId: string, bookId?: string): Promise<void> {
+  await db.transaction('rw', [db.worldEntities, db.characterChats, db.media], async () => {
+    await db.worldEntities.delete(entityId);
+    await db.characterChats.where('entityId').equals(entityId).delete();
+    await db.media.where('entityId').equals(entityId).delete();
+
+    // Clean dangling relationship pointers from other entities in the same book
+    if (bookId) {
+      const peers = await db.worldEntities.where('bookId').equals(bookId).toArray();
+      for (const peer of peers) {
+        if (peer.relationships && peer.relationships.some((r) => r.targetEntityId === entityId)) {
+          const cleaned = peer.relationships.filter((r) => r.targetEntityId !== entityId);
+          await db.worldEntities.update(peer.id, { relationships: cleaned, updatedAt: Date.now() });
+        }
+      }
+    }
+  });
+}
+
+/**
+ * Atomic Cascade Delete for an entire Book:
+ * Atomically cleans chapters, TTS audio files, entities, media binaries,
+ * and character chats, preventing orphan data accumulation in local IndexedDB.
+ */
+export async function deleteBookCascade(bookId: string): Promise<void> {
+  const chapters = await db.chapters.where('bookId').equals(bookId).toArray();
+  const chapterIds = chapters.map((c) => c.id);
+
+  await db.transaction('rw', [db.books, db.chapters, db.worldEntities, db.media, db.characterChats, db.ttsAudioCaches], async () => {
+    await db.books.delete(bookId);
+    await db.chapters.where('bookId').equals(bookId).delete();
+    await db.worldEntities.where('bookId').equals(bookId).delete();
+    await db.media.where('bookId').equals(bookId).delete();
+    await db.characterChats.where('bookId').equals(bookId).delete();
+    if (chapterIds.length > 0) {
+      await db.ttsAudioCaches.where('chapterId').anyOf(chapterIds).delete();
+    }
+  });
+}
+
 // Generate an SVG blob for mock/preset covers & avatars
 export function createSvgBlob(text: string, bgColor: string, icon = '📖'): Blob {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500" width="400" height="500">

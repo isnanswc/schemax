@@ -218,13 +218,13 @@ export const ChapterReaderView: React.FC<ChapterReaderViewProps> = ({
     }
   }, [activeTTSParagraph, isTTSActive]);
 
-  // Theme style mapping
+  // Theme style mapping (Explicit hex values ensure Reader dark/black/sepia themes are never overridden by global light-mode CSS)
   const themeClasses: Record<ReaderTheme, { bg: string; text: string; headerBg: string; border: string; accent: string }> = {
     light: {
-      bg: 'bg-white',
-      text: 'text-slate-800',
-      headerBg: 'bg-white/95 border-slate-200',
-      border: 'border-slate-200',
+      bg: 'bg-[#ffffff]',
+      text: 'text-[#1e293b]',
+      headerBg: 'bg-[#ffffff]/95 border-[#e2e8f0]',
+      border: 'border-[#e2e8f0]',
       accent: 'text-amber-600',
     },
     sepia: {
@@ -235,17 +235,17 @@ export const ChapterReaderView: React.FC<ChapterReaderViewProps> = ({
       accent: 'text-[#8c501e]',
     },
     dark: {
-      bg: 'bg-slate-900',
-      text: 'text-slate-200',
-      headerBg: 'bg-slate-900/95 border-slate-800',
-      border: 'border-slate-800',
+      bg: 'bg-[#0f172a]',
+      text: 'text-[#e2e8f0]',
+      headerBg: 'bg-[#0f172a]/95 border-[#1e293b]',
+      border: 'border-[#1e293b]',
       accent: 'text-amber-400',
     },
     black: {
-      bg: 'bg-black',
-      text: 'text-slate-300',
-      headerBg: 'bg-black/95 border-slate-900',
-      border: 'border-slate-900',
+      bg: 'bg-[#000000]',
+      text: 'text-[#cbd5e1]',
+      headerBg: 'bg-[#000000]/95 border-[#1e293b]',
+      border: 'border-[#1e293b]',
       accent: 'text-amber-400',
     },
   };
@@ -411,13 +411,19 @@ export const ChapterReaderView: React.FC<ChapterReaderViewProps> = ({
                 const cacheStatus = cacheStatuses[idx];
                 const isRegenerating = regeneratingIndex === idx;
 
+                const isDarkTheme = settings.theme === 'dark' || settings.theme === 'black';
+
                 return (
                   <div
                     key={idx}
                     id={`reader-p-${idx}`}
                     className={`group/para relative transition-all duration-300 rounded-2xl ${
                       isTTSCurrent
-                        ? 'p-3.5 sm:p-4 bg-amber-500/10 dark:bg-amber-500/15 ring-2 ring-amber-500/50 shadow-lg shadow-amber-500/10'
+                        ? isDarkTheme
+                          ? 'p-3.5 sm:p-4 bg-amber-500/20 ring-2 ring-amber-400/60 shadow-lg shadow-amber-500/10'
+                          : settings.theme === 'sepia'
+                          ? 'p-3.5 sm:p-4 bg-amber-700/15 ring-2 ring-amber-800/40 shadow-sm'
+                          : 'p-3.5 sm:p-4 bg-amber-500/15 ring-2 ring-amber-500/60 shadow-md shadow-amber-500/10'
                         : 'p-1 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
                     }`}
                   >
@@ -484,7 +490,7 @@ export const ChapterReaderView: React.FC<ChapterReaderViewProps> = ({
                           </div>
                         )}
 
-                        {/* Quick Play from this paragraph */}
+                        {/* Quick Play from this paragraph (Visible with soft opacity on mobile touchscreen) */}
                         {!isTTSCurrent && (
                           <button
                             type="button"
@@ -493,7 +499,7 @@ export const ChapterReaderView: React.FC<ChapterReaderViewProps> = ({
                               setActiveTTSParagraph(idx);
                               setIsTTSActive(true);
                             }}
-                            className="opacity-0 group-hover/para:opacity-100 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500 hover:text-slate-950 transition active:scale-95"
+                            className="opacity-70 sm:opacity-0 group-hover/para:opacity-100 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500 hover:text-slate-950 transition active:scale-95"
                             title="Dengarkan mulai dari paragraf ini"
                           >
                             <Play className="w-2.5 h-2.5 fill-current" />
@@ -514,7 +520,11 @@ export const ChapterReaderView: React.FC<ChapterReaderViewProps> = ({
                       }}
                       className={`transition-all duration-200 cursor-pointer ${
                         isTTSCurrent
-                          ? 'text-slate-950 dark:text-amber-50 font-medium leading-relaxed'
+                          ? isDarkTheme
+                            ? 'text-amber-200 font-semibold leading-relaxed drop-shadow-xs'
+                            : settings.theme === 'sepia'
+                            ? 'text-[#2b1805] font-semibold leading-relaxed'
+                            : 'text-slate-950 font-semibold leading-relaxed'
                           : 'hover:opacity-90'
                       } ${getBlurTextClass()}`}
                       style={{
@@ -623,15 +633,15 @@ export const ChapterReaderView: React.FC<ChapterReaderViewProps> = ({
       {/* 6. Quick Chapter Switcher Drawer */}
       {isChapterListOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white dark:bg-slate-900 border-t sm:border border-slate-200 dark:border-slate-800 rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-md w-full max-h-[80vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200 safe-bottom">
-            <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-              <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+          <div className={`${settings.theme === 'dark' || settings.theme === 'black' ? 'bg-slate-900 border-slate-800 text-slate-100' : settings.theme === 'sepia' ? 'bg-[#fbf0d9] border-[#dfcca5] text-[#433422]' : 'bg-white border-slate-200 text-slate-900'} border-t sm:border rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-md w-full max-h-[80vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200 safe-bottom`}>
+            <div className={`px-5 py-4 border-b ${settings.theme === 'dark' || settings.theme === 'black' ? 'border-slate-800' : settings.theme === 'sepia' ? 'border-[#dfcca5]' : 'border-slate-100'} flex items-center justify-between`}>
+              <h3 className="font-bold text-sm">
                 Daftar Bab Novel ({sortedChapters.length})
               </h3>
               <button
                 type="button"
                 onClick={() => setIsChapterListOpen(false)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                className="p-1.5 rounded-xl opacity-60 hover:opacity-100 transition"
               >
                 ✕
               </button>

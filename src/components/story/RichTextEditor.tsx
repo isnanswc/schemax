@@ -249,7 +249,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
         const earlierChapters = await db.chapters
           .where('bookId')
           .equals(currentChapter.bookId)
-          .filter((c) => c.order < currentChapter.order)
+          .filter((c) => (c.order || 0) < (currentChapter.order || 0))
           .sortBy('order');
 
         if (earlierChapters.length > 0) {
@@ -616,8 +616,35 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     }, 1000);
   };
 
+function cleanContentHtmlForStorage(html: string): string {
+  if (!html) return '';
+  const div = document.createElement('div');
+  div.innerHTML = html;
+
+  div.querySelectorAll('[data-paragraph-index]').forEach((el) => {
+    const htmlEl = el as HTMLElement;
+    htmlEl.removeAttribute('data-paragraph-index');
+    htmlEl.removeAttribute('title');
+    if (htmlEl.style.borderLeft?.includes('solid')) htmlEl.style.borderLeft = '';
+    if (htmlEl.style.paddingLeft) htmlEl.style.paddingLeft = '';
+    if (htmlEl.style.backgroundColor) htmlEl.style.backgroundColor = '';
+    if (htmlEl.style.borderRadius) htmlEl.style.borderRadius = '';
+    if (htmlEl.style.borderBottom?.includes('dashed') || htmlEl.style.borderBottom?.includes('solid')) {
+      htmlEl.style.borderBottom = '';
+    }
+    if (htmlEl.style.paddingBottom) htmlEl.style.paddingBottom = '';
+    if (htmlEl.style.transition) htmlEl.style.transition = '';
+    if (!htmlEl.getAttribute('style') || htmlEl.getAttribute('style')?.trim() === '') {
+      htmlEl.removeAttribute('style');
+    }
+  });
+
+  return div.innerHTML;
+}
+
   const saveToIndexedDB = async () => {
-    const currentHtml = editorRef.current ? editorRef.current.innerHTML : currentChapter.contentHtml;
+    const rawHtml = editorRef.current ? editorRef.current.innerHTML : currentChapter.contentHtml;
+    const currentHtml = cleanContentHtmlForStorage(rawHtml || '');
     const text = editorRef.current ? editorRef.current.innerText || '' : '';
     const words = text.trim() ? text.trim().split(/\s+/).filter(Boolean).length : wordCount;
 

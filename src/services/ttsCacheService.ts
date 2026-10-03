@@ -92,27 +92,43 @@ export async function saveTTSAudioBlob(
   return URL.createObjectURL(audioBlob);
 }
 
-export interface ParagraphTTSStatus {
-  isCached: boolean;
+export interface TTSCacheStatus {
+  hasCache: boolean;
   isStale: boolean;
+  engine?: string;
+  model?: string;
+  voice?: string;
   updatedAt?: number;
 }
 
+export type ParagraphTTSStatus = TTSCacheStatus;
+
 /**
  * Scan all paragraphs of a chapter and return cache status for each.
+ * Supports flexible engine/voice matching: if engine is not strictly specified or set to 'unified'/'all',
+ * it matches any cached audio for that paragraph and reports the latest one.
  */
 export async function getChapterParagraphAudioStatuses(
   chapterId: string | undefined,
   paragraphs: string[],
-  engine: string = 'unified',
-  voice: string = 'default'
-): Promise<Map<number, ParagraphTTSStatus>> {
-  const statusMap = new Map<number, ParagraphTTSStatus>();
+  engine?: string,
+  voice?: string
+): Promise<Record<number, TTSCacheStatus>> {
+  const result: Record<number, TTSCacheStatus> = {};
+
+  // Inisialisasi default
+  paragraphs.forEach((_, idx) => {
+    result[idx] = { hasCache: false, isStale: false };
+  });
 
   try {
     const cleanChapter = chapterId ? chapterId.trim() : 'general';
-    const cleanEngine = engine.toLowerCase().trim();
-    const cleanVoice = voice.toLowerCase().trim();
+    const filterEngine = engine && !['unified', 'all', 'auto'].includes(engine.toLowerCase().trim())
+      ? engine.toLowerCase().trim()
+      : null;
+    const filterVoice = voice && !['default', 'all'].includes(voice.toLowerCase().trim())
+      ? voice.toLowerCase().trim()
+      : null;
 
     // Fetch all caches matching this chapter
     const items = await db.ttsAudioCaches
@@ -120,32 +136,47 @@ export async function getChapterParagraphAudioStatuses(
       .equals(cleanChapter)
       .toArray();
 
+    // Map by paragraph index (keep most recently updated if duplicates)
     const itemByParaIndex = new Map<number, TTSAudioCacheItem>();
     items.forEach((item) => {
-      if (item.engine.toLowerCase() === cleanEngine && item.voice.toLowerCase() === cleanVoice) {
+      if (filterEngine && item.engine.toLowerCase() !== filterEngine) {
+        return;
+      }
+      if (filterVoice && item.voice.toLowerCase() !== filterVoice) {
+        return;
+      }
+
+      const existing = itemByParaIndex.get(item.paragraphIndex);
+      if (!existing || item.updatedAt > existing.updatedAt) {
         itemByParaIndex.set(item.paragraphIndex, item);
       }
     });
 
     paragraphs.forEach((text, idx) => {
       const item = itemByParaIndex.get(idx);
-      if (!item) {
-        statusMap.set(idx, { isCached: false, isStale: false });
-      } else {
+      if (item) {
         const currentHash = hashString(text.trim());
         const isStale = item.textHash !== currentHash;
-        statusMap.set(idx, { isCached: true, isStale, updatedAt: item.updatedAt });
+        result[idx] = {
+          hasCache: true,
+          isStale,
+          engine: item.engine,
+          model: item.model,
+          voice: item.voice,
+          updatedAt: item.updatedAt,
+        };
       }
     });
   } catch (err) {
     console.warn('[TTS Cache] Error scanning statuses:', err);
   }
 
-  return statusMap;
+  return result;
 }
 
 /**
  * Delete cached audio for a specific paragraph (used when user chooses "Generate Ulang").
+ * If engine/voice is default or omitted, deletes all audio variants for this paragraph.
  */
 export async function deleteParagraphTTSCache(
   chapterId: string | undefined,
@@ -153,8 +184,23 @@ export async function deleteParagraphTTSCache(
   engine: string = 'unified',
   voice: string = 'default'
 ): Promise<void> {
-  const id = generateTTSCacheId(chapterId, paragraphIndex, engine, voice);
-  await db.ttsAudioCaches.delete(id);
+  const cleanChapter = chapterId ? chapterId.trim() : 'general';
+  
+  if (engine === 'unified' || engine === 'auto' || engine === 'all') {
+    // Hapus semua cache audio paragraf ini dari berbagai engine
+    const items = await db.ttsAudioCaches
+      .where('chapterId')
+      .equals(cleanChapter)
+      .filter((item) => item.paragraphIndex === paragraphIndex)
+      .toArray();
+    
+    if (items.length > 0) {
+      await db.ttsAudioCaches.bulkDelete(items.map((i) => i.id));
+    }
+  } else {
+    const id = generateTTSCacheId(chapterId, paragraphIndex, engine, voice);
+    await db.ttsAudioCaches.delete(id);
+  }
 }
 
 /**
@@ -163,3 +209,4 @@ export async function deleteParagraphTTSCache(
 export async function clearChapterTTSCache(chapterId: string): Promise<void> {
   await db.ttsAudioCaches.where('chapterId').equals(chapterId).delete();
 }
+

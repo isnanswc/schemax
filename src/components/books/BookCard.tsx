@@ -4,8 +4,7 @@ import { BookCoverImage } from './BookCoverImage';
 import { EditBookModal } from './EditBookModal';
 import { useLongPress } from '../../hooks/useLongPress';
 import { navStack } from '../../services/backNavigationService';
-import { FileText, ArrowRight, MoreVertical, Trash2, CheckCircle2, Edit3, X, BookOpen, Database } from 'lucide-react';
-import { db } from '../../db';
+import { db, deleteBookCascade } from '../../db';
 import { usePrivacy } from '../../contexts/PrivacyContext';
 import { BookBackupModal } from './BookBackupModal';
 
@@ -75,12 +74,9 @@ export const BookCard: React.FC<BookCardProps> = ({
 
   const deleteBook = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm(`Hapus buku "${book.title}" beserta seluruh bab dan worldbuilding-nya?`)) {
+    if (confirm(`Hapus buku "${book.title}" beserta seluruh bab, gambar, worldbuilding, dan suara TTS-nya?`)) {
       handleCloseMenu();
-      await db.books.delete(book.id);
-      await db.chapters.where('bookId').equals(book.id).delete();
-      await db.worldEntities.where('bookId').equals(book.id).delete();
-      await db.media.where('bookId').equals(book.id).delete();
+      await deleteBookCascade(book.id);
     }
   };
 

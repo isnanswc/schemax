@@ -10,8 +10,7 @@ import {
   Sparkles,
   Info,
   Maximize2
-} from 'lucide-react';
-import { db } from '../../db';
+import { db, deleteChapterCascade } from '../../db';
 import { navStack } from '../../services/backNavigationService';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { ImageViewerModal } from '../common/ImageViewerModal';
@@ -85,9 +84,9 @@ export const StoryPlannerView: React.FC<StoryPlannerViewProps> = ({
   const completedChapters = chapters.filter((c) => c.status === 'completed').length;
 
   const handleDelete = async (id: string, title: string) => {
-    if (confirm(`Hapus bab "${title}"?`)) {
+    if (confirm(`Hapus bab "${title}" beserta file audio dan medianya?`)) {
       setActiveSheetChapter(null);
-      await db.chapters.delete(id);
+      await deleteChapterCascade(id);
       onRefresh();
     }
   };
@@ -123,13 +122,16 @@ export const StoryPlannerView: React.FC<StoryPlannerViewProps> = ({
     const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
     if (targetIndex < 0 || targetIndex >= sorted.length) return;
 
-    const targetChapter = sorted[targetIndex];
-    const currentOrder = chapter.order || currentIndex + 1;
-    const targetOrder = targetChapter.order || targetIndex + 1;
+    // Geser elemen dalam array dan normalisasi urutan ordinal 1..N
+    const reordered = [...sorted];
+    const [moved] = reordered.splice(currentIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
 
-    // Swap orders
-    await db.chapters.update(chapter.id, { order: targetOrder, updatedAt: Date.now() });
-    await db.chapters.update(targetChapter.id, { order: currentOrder, updatedAt: Date.now() });
+    await Promise.all(
+      reordered.map((ch, idx) =>
+        db.chapters.update(ch.id, { order: idx + 1, updatedAt: Date.now() })
+      )
+    );
     onRefresh();
   };
 

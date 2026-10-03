@@ -841,7 +841,7 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
 
   return (
     <>
-      <div className="fixed bottom-3 inset-x-2 sm:inset-x-auto sm:right-6 sm:w-[480px] max-w-full z-40 animate-in slide-in-from-bottom-4 duration-250 select-none">
+      <div className="fixed bottom-3 sm:bottom-4 inset-x-2 sm:inset-x-auto sm:right-6 sm:w-[480px] max-w-full z-40 animate-in slide-in-from-bottom-4 duration-250 select-none pb-[env(safe-area-inset-bottom,0px)]">
         <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-amber-500/30 dark:border-amber-500/25 rounded-3xl shadow-2xl p-3 sm:p-4 space-y-2.5">
           {/* Top Info Bar */}
           <div className="flex items-center justify-between gap-2">

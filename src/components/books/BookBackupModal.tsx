@@ -112,16 +112,17 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
         const entities = await db.worldEntities.where('bookId').equals(book.id).toArray();
         const media = await db.media.where('bookId').equals(book.id).toArray();
 
-        const chapterIdSet = new Set(chapters.map((c) => c.id));
-        const allTTS = await db.ttsAudioCaches.toArray();
-        const bookTTS = allTTS.filter((t) => t.chapterId && chapterIdSet.has(t.chapterId));
+        const chapterIds = chapters.map((c) => c.id);
+        const ttsCount = chapterIds.length > 0
+          ? await db.ttsAudioCaches.where('chapterId').anyOf(chapterIds).count()
+          : 0;
 
         setBookStats({
           chapterCount: chapters.length,
           wordCount: words,
           entityCount: entities.length,
           mediaCount: media.length,
-          ttsCount: bookTTS.length,
+          ttsCount,
         });
       };
 
@@ -317,31 +318,31 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
         </div>
 
         {/* Tab Selector */}
-        <div className="flex border-b border-slate-200 dark:border-slate-800 px-5 pt-2 bg-slate-50/30 dark:bg-slate-950/20">
+        <div className="flex border-b border-slate-200 dark:border-slate-800 px-3 sm:px-5 pt-2 bg-slate-50/30 dark:bg-slate-950/20">
           <button
             type="button"
             onClick={() => setActiveTab('backup')}
-            className={`flex items-center gap-2 py-3 px-4 font-bold text-xs sm:text-sm border-b-2 transition ${
+            className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-3 px-2 sm:px-4 font-bold text-xs sm:text-sm border-b-2 transition min-w-0 ${
               activeTab === 'backup'
                 ? 'border-amber-500 text-amber-600 dark:text-amber-400'
                 : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
-            <Download className="w-4 h-4" />
-            <span>Cadangkan Buku (Backup)</span>
+            <Download className="w-4 h-4 flex-shrink-0" />
+            <span className="truncate">Cadangkan <span className="hidden sm:inline">Buku (Backup)</span></span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('restore')}
-            className={`flex items-center gap-2 py-3 px-4 font-bold text-xs sm:text-sm border-b-2 transition ${
+            className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-3 px-2 sm:px-4 font-bold text-xs sm:text-sm border-b-2 transition min-w-0 ${
               activeTab === 'restore'
                 ? 'border-amber-500 text-amber-600 dark:text-amber-400'
                 : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
-            <Upload className="w-4 h-4" />
-            <span>Pulihkan Buku (Restore)</span>
+            <Upload className="w-4 h-4 flex-shrink-0" />
+            <span className="truncate">Pulihkan <span className="hidden sm:inline">Buku (Restore)</span></span>
           </button>
         </div>
 
@@ -442,10 +443,10 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
                   type="button"
                   onClick={handleDownloadLocalBackup}
                   disabled={isBackingUp}
-                  className="w-full py-3.5 px-4 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 transition active:scale-98 shadow-md shadow-amber-500/10 disabled:opacity-50"
+                  className="w-full py-3.5 px-3 sm:px-4 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition active:scale-98 shadow-md shadow-amber-500/10 disabled:opacity-50 text-center"
                 >
-                  <Download className="w-4 h-4" />
-                  <span>Unduh Berkas Cadangan ke Komputer (.schemax.json)</span>
+                  <Download className="w-4 h-4 flex-shrink-0" />
+                  <span className="truncate">Unduh Berkas Cadangan (.schemax.json)</span>
                 </button>
 
                 <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-3">

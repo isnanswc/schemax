@@ -1,4 +1,5 @@
 import { db, TTSAudioCacheItem } from '../db';
+import { generateTTSCacheId } from './ttsCacheService';
 import {
   Book,
   StoryChapter,
@@ -155,9 +156,10 @@ export async function createBookBackupBundle(
   }
 
   onProgress?.('Mengumpulkan audio AI TTS yang telah digenerate...', 78);
-  const chapterIdSet = new Set(chapters.map((c) => c.id));
-  const allTTS = await db.ttsAudioCaches.toArray();
-  const bookTTS = allTTS.filter((t) => t.chapterId && chapterIdSet.has(t.chapterId));
+  const chapterIds = chapters.map((c) => c.id);
+  const bookTTS = chapterIds.length > 0
+    ? await db.ttsAudioCaches.where('chapterId').anyOf(chapterIds).toArray()
+    : [];
   const backupTTS: BackupTTSAudioItem[] = [];
 
   for (let j = 0; j < bookTTS.length; j++) {
@@ -357,11 +359,9 @@ export async function restoreBookBackupBundle(
     }
 
     onProgress?.('Memulihkan cache suara TTS AI...', 85);
-    const chapterIdSet = new Set(bundle.chapters.map((c) => c.id));
-    const existingTTS = await db.ttsAudioCaches.toArray();
-    const ttsToDelete = existingTTS.filter((t) => t.chapterId && chapterIdSet.has(t.chapterId)).map((t) => t.id);
-    if (ttsToDelete.length > 0) {
-      await db.ttsAudioCaches.bulkDelete(ttsToDelete);
+    const chapterIds = bundle.chapters.map((c) => c.id);
+    if (chapterIds.length > 0) {
+      await db.ttsAudioCaches.where('chapterId').anyOf(chapterIds).delete();
     }
 
     const ttsToInsert: TTSAudioCacheItem[] = [];
@@ -535,7 +535,7 @@ export async function restoreBookBackupBundle(
     const newTTSItems: TTSAudioCacheItem[] = [];
     for (const t of bundle.ttsAudioCaches || []) {
       const mappedChapId = t.chapterId ? chapterIdMap.get(t.chapterId) : undefined;
-      const newTtsId = `${mappedChapId || 'general'}_${t.paragraphIndex}_${t.engine}_${t.voice}`;
+      const newTtsId = generateTTSCacheId(mappedChapId, t.paragraphIndex, t.engine, t.voice);
       const audioBlob = t.base64Data ? base64ToBlob(t.base64Data, t.mimeType) : new Blob([]);
 
       newTTSItems.push({
