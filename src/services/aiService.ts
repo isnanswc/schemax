@@ -162,17 +162,18 @@ export function loadAISettings(): AISettingsConfig {
       defaults: [string, string, string],
       defaultCached: AIModelOption[]
     ): { fallbackModels: [string, string, string]; cachedModels: AIModelOption[]; lastFetchedAt?: number } => {
-      // Retain saved cachedModels if available, only fallback to defaultCached if null/empty
+      // 1. Preserve user-fetched live API models, or use defaults if never fetched
       const cached = (existing?.cachedModels && Array.isArray(existing.cachedModels) && existing.cachedModels.length > 0)
         ? existing.cachedModels
         : defaultCached;
 
-      const fb = Array.isArray(existing?.fallbackModels) ? [...existing.fallbackModels] : [];
+      // 2. Preserve user-selected fallback models exactly as chosen
+      let fb = Array.isArray(existing?.fallbackModels) ? [...existing.fallbackModels] : [];
 
-      // Preserve user choices exactly as saved; only use default if entry is completely empty/undefined
+      // Guarantee model 0 has a valid value, while model 1 and 2 can be empty string (disabled) or user's choice
       const m0 = (typeof fb[0] === 'string' && fb[0].trim().length > 0) ? fb[0].trim() : defaults[0];
-      const m1 = (typeof fb[1] === 'string' && fb[1].trim().length > 0) ? fb[1].trim() : defaults[1];
-      const m2 = (typeof fb[2] === 'string' && fb[2].trim().length > 0) ? fb[2].trim() : defaults[2];
+      const m1 = (typeof fb[1] === 'string') ? fb[1].trim() : defaults[1];
+      const m2 = (typeof fb[2] === 'string') ? fb[2].trim() : defaults[2];
 
       return {
         fallbackModels: [m0, m1, m2],

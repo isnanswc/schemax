@@ -4,7 +4,7 @@ import { BookCoverImage } from './BookCoverImage';
 import { EditBookModal } from './EditBookModal';
 import { useLongPress } from '../../hooks/useLongPress';
 import { navStack } from '../../services/backNavigationService';
-import { FileText, ArrowRight, MoreVertical, Trash2, CheckCircle2, Edit3, X } from 'lucide-react';
+import { FileText, ArrowRight, MoreVertical, Trash2, CheckCircle2, Edit3, X, BookOpen } from 'lucide-react';
 import { db } from '../../db';
 import { usePrivacy } from '../../contexts/PrivacyContext';
 
@@ -180,6 +180,12 @@ export const BookCard: React.FC<BookCardProps> = ({
               {onRead && (
                 <button
                   type="button"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onMouseUp={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  onTouchEnd={(e) => {
+                    e.stopPropagation();
+                  }}
                   onClick={(e) => {
                     e.stopPropagation();
                     onRead(book);

@@ -15,6 +15,7 @@ import { getConditionMeta, ENTITY_CONDITIONS } from './entityConditionMeta';
 import { getRelationshipMeta, RELATIONSHIP_META } from './relationshipMeta';
 import { EntityImagePickerModal } from './EntityImagePickerModal';
 import { WorldEntityHologramModal } from './WorldEntityHologramModal';
+import { usePrivacy } from '../../contexts/PrivacyContext';
 import {
   Sparkles,
   GitFork,
@@ -79,6 +80,8 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
   chapters = [],
   onClose,
 }) => {
+  const { getBlurTextClass, getBlurTitleClass, getBlurGlossaryClass, getBlurImageClass, bindEmptyAreaLongPress } = usePrivacy();
+
   // Modes: 'network' (Garis Relasi) or 'clusters' (Himpunan Faksi)
   const [viewMode, setViewMode] = useState<'network' | 'clusters'>('network');
   
@@ -705,7 +708,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col overflow-hidden select-none">
+    <div {...bindEmptyAreaLongPress()} className="fixed inset-0 z-50 bg-slate-950 flex flex-col overflow-hidden select-none">
       {/* ========================================================================= */}
       {/* 1. TOP-LEFT: Judul & Context Pill                                         */}
       {/* ========================================================================= */}
@@ -715,7 +718,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
             <GitFork className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-xs font-black text-white truncate">
+            <h3 className={`text-xs font-black text-white truncate ${getBlurTitleClass()}`}>
               {activeChapter ? activeChapter.title : bookTitle}
             </h3>
             <div className="flex items-center gap-1.5 text-[9px] text-slate-400 font-bold truncate">
@@ -1169,7 +1172,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                         fontSize="9.5"
                         fontWeight="bold"
                         textAnchor="middle"
-                        className="pointer-events-none select-none font-sans"
+                        className={`pointer-events-none select-none font-sans ${getBlurGlossaryClass()}`}
                       >
                         {entity.name}
                       </text>
@@ -1212,6 +1215,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                           width="48"
                           height="48"
                           preserveAspectRatio="xMidYMid slice"
+                          className={getBlurImageClass()}
                         />
                       </g>
                     ) : (
@@ -1251,7 +1255,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                         fontSize="10"
                         fontWeight="bold"
                         textAnchor="middle"
-                        className="pointer-events-none select-none font-sans"
+                        className={`pointer-events-none select-none font-sans ${getBlurGlossaryClass()}`}
                       >
                         {entity.name}
                       </text>
@@ -1306,7 +1310,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                   </div>
 
                   <div className="min-w-0">
-                    <h4 className="font-bold text-sm text-white truncate">{selectedEntity.name}</h4>
+                    <h4 className={`font-bold text-sm text-white truncate ${getBlurGlossaryClass()}`}>{selectedEntity.name}</h4>
                     <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                       {entityEffectiveData[selectedEntity.id]?.faction && (
                         <span
@@ -1347,7 +1351,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
               {entityEffectiveData[selectedEntity.id]?.conditionDetails && (
                 <p className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/20 p-2 rounded-xl mb-2.5 leading-snug">
                   <strong>Kondisi {activeChapter ? 'di Bab Ini' : 'Terkini'}:</strong>{' '}
-                  {entityEffectiveData[selectedEntity.id]?.conditionDetails}
+                  <span className={getBlurTextClass()}>{entityEffectiveData[selectedEntity.id]?.conditionDetails}</span>
                 </p>
               )}
 
@@ -1369,7 +1373,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                         key={rIdx}
                         className="flex items-center justify-between text-[11px] bg-slate-950/60 border border-slate-800 rounded-lg px-2 py-1"
                       >
-                        <span className="font-semibold text-slate-200 truncate">
+                        <span className={`font-semibold text-slate-200 truncate ${getBlurGlossaryClass()}`}>
                           {rel.label}: {targetEnt?.name || rel.targetEntityName || 'Entitas Lain'}
                         </span>
                         <span
@@ -1416,7 +1420,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                 <span>Struktur &amp; Himpunan Faksi</span>
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Daftar kelompok faksi dan anggota tokoh di {activeChapter ? `Bab: ${activeChapter.title}` : bookTitle}
+                Daftar kelompok faksi dan anggota tokoh di <span className={getBlurTitleClass()}>{activeChapter ? `Bab: ${activeChapter.title}` : bookTitle}</span>
               </p>
             </div>
             <div className="flex items-center gap-2 self-start sm:self-auto">
@@ -1481,7 +1485,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                         >
                           <div className="relative w-11 h-11 rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-900 flex-shrink-0 flex items-center justify-center border border-slate-200 dark:border-slate-700">
                             {avatarUrl ? (
-                              <img src={avatarUrl} alt={member.name} className="w-full h-full object-cover" />
+                              <img src={avatarUrl} alt={member.name} className={`w-full h-full object-cover ${getBlurImageClass()}`} />
                             ) : (
                               <User className="w-5 h-5 text-slate-400" />
                             )}
@@ -1491,14 +1495,14 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
                           </div>
 
                           <div className="flex-1 min-w-0">
-                            <h5 className="font-bold text-xs text-slate-900 dark:text-white truncate group-hover:text-pink-500 transition">
+                            <h5 className={`font-bold text-xs text-slate-900 dark:text-white truncate group-hover:text-pink-500 transition ${getBlurGlossaryClass()}`}>
                               {member.name}
                             </h5>
                             <span className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-semibold border ${condMeta.badgeClass} mt-0.5`}>
                               {condMeta.label}
                             </span>
                             {eff?.conditionDetails && (
-                              <p className="text-[10px] text-slate-400 line-clamp-1 mt-0.5 italic">
+                              <p className={`text-[10px] text-slate-400 line-clamp-1 mt-0.5 italic ${getBlurTextClass()}`}>
                                 {eff.conditionDetails}
                               </p>
                             )}

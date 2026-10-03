@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { WorldEntity, StoryChapter, ChapterSceneItem, EntityCondition } from '../../types';
 import { db } from '../../db';
 import { getConditionMeta, ENTITY_CONDITIONS } from './entityConditionMeta';
+import { usePrivacy } from '../../contexts/PrivacyContext';
 import {
   BookOpen,
   Film,
@@ -28,6 +29,7 @@ export const ChapterSceneChronologyAccordion: React.FC<ChapterSceneChronologyAcc
   bookId,
   onUpdate,
 }) => {
+  const { getBlurTextClass, getBlurTitleClass, getBlurGlossaryClass, bindEmptyAreaLongPress } = usePrivacy();
   const [chapters, setChapters] = useState<StoryChapter[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedChapterIds, setExpandedChapterIds] = useState<Record<string, boolean>>({});
@@ -136,7 +138,7 @@ export const ChapterSceneChronologyAccordion: React.FC<ChapterSceneChronologyAcc
   }
 
   return (
-    <div className="space-y-3">
+    <div {...bindEmptyAreaLongPress()} className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
           <span className="text-[10px] font-bold uppercase tracking-wider text-pink-500">
@@ -196,7 +198,7 @@ export const ChapterSceneChronologyAccordion: React.FC<ChapterSceneChronologyAcc
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h5 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate">
+                      <h5 className={`font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate ${getBlurTitleClass()}`}>
                         {ch.title}
                       </h5>
                       {isMentionedInChapter && (
@@ -273,12 +275,12 @@ export const ChapterSceneChronologyAccordion: React.FC<ChapterSceneChronologyAcc
                           <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
                             Keterangan Kejadian Khusus di Bab Ini
                           </label>
-                          <input
-                            type="text"
+                          <textarea
+                            rows={1}
                             value={editDetails}
                             onChange={(e) => setEditDetails(e.target.value)}
                             placeholder="Cth: Mengalami luka di bahu kanan saat kabur"
-                            className="w-full p-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white"
+                            className={`w-full p-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white resize-none leading-relaxed ${getBlurTextClass()}`}
                           />
                         </div>
                       </div>
@@ -314,7 +316,7 @@ export const ChapterSceneChronologyAccordion: React.FC<ChapterSceneChronologyAcc
                           </span>
                         </div>
                         {effDetails ? (
-                          <p className="text-[11px] text-amber-600 dark:text-amber-300 italic">
+                          <p className={`text-[11px] text-amber-600 dark:text-amber-300 italic ${getBlurTextClass()}`}>
                             "{effDetails}"
                           </p>
                         ) : (
@@ -353,19 +355,19 @@ export const ChapterSceneChronologyAccordion: React.FC<ChapterSceneChronologyAcc
                                 <span className="w-5 h-5 rounded-md bg-amber-500/15 text-amber-500 text-[10px] flex items-center justify-center font-bold">
                                   {sc.sceneNumber}
                                 </span>
-                                <span>{sc.title}</span>
+                                <span className={getBlurTitleClass()}>{sc.title}</span>
                               </div>
 
                               {sc.setting && (
                                 <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
                                   <MapPin className="w-2.5 h-2.5 text-cyan-500" />
-                                  <span>{sc.setting}</span>
+                                  <span className={getBlurGlossaryClass()}>{sc.setting}</span>
                                 </span>
                               )}
                             </div>
 
                             {/* Scene Action Summary */}
-                            <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
+                            <p className={`text-[11px] text-slate-600 dark:text-slate-300 leading-snug ${getBlurTextClass()}`}>
                               {sc.summary}
                             </p>
 
@@ -377,7 +379,7 @@ export const ChapterSceneChronologyAccordion: React.FC<ChapterSceneChronologyAcc
                                 <span>{condMeta.label}</span>
                               </span>
                               {effDetails && (
-                                <span className="text-amber-500 dark:text-amber-400 truncate">
+                                <span className={`text-amber-500 dark:text-amber-400 truncate ${getBlurTextClass()}`}>
                                   ({effDetails})
                                 </span>
                               )}

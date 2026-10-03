@@ -174,6 +174,10 @@ export const ChapterCard: React.FC<ChapterCardProps> = ({
           {onOpenReader && (
             <button
               type="button"
+              onMouseDown={(e) => e.stopPropagation()}
+              onMouseUp={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              onTouchEnd={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 onOpenReader(chapter);
@@ -188,6 +192,10 @@ export const ChapterCard: React.FC<ChapterCardProps> = ({
 
           <button
             type="button"
+            onMouseDown={(e) => e.stopPropagation()}
+            onMouseUp={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
               onOpenEditor(chapter);

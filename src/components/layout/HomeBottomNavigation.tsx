@@ -13,8 +13,12 @@ export const HomeBottomNavigation: React.FC<HomeBottomNavigationProps> = ({
   worksCount,
 }) => {
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-40 bg-white/80 dark:bg-slate-950/80 backdrop-blur-2xl border-t border-slate-200/80 dark:border-white/10 px-3 py-2 safe-bottom sm:max-w-md sm:mx-auto sm:rounded-t-2xl sm:border-x shadow-2xl transition-colors">
-      <div className="grid grid-cols-3 gap-1.5">
+    <nav className={`${
+      currentView === 'inspiration'
+        ? 'relative flex-shrink-0 w-full sm:rounded-none sm:border-x-0'
+        : 'fixed bottom-0 sm:max-w-md sm:rounded-t-2xl sm:border-x'
+    } inset-x-0 z-40 bg-white/80 dark:bg-slate-950/80 backdrop-blur-2xl border-t border-slate-200/80 dark:border-white/10 px-3 py-2 safe-bottom sm:mx-auto shadow-2xl transition-colors`}>
+      <div className="grid grid-cols-3 gap-1.5 max-w-lg mx-auto">
         {/* Dashboard Tab */}
         <button
           type="button"

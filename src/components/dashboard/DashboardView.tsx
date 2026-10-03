@@ -20,6 +20,7 @@ import {
   Zap,
   ChevronRight
 } from 'lucide-react';
+import { usePrivacy } from '../../contexts/PrivacyContext';
 
 interface DashboardViewProps {
   books: Book[];
@@ -179,6 +180,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     .slice(0, 2);
 
   // Quick Resume calculations
+  const { getBlurTitleClass, getBlurTextClass, bindEmptyAreaLongPress } = usePrivacy();
+
   const progressPercent = recentChapter
     ? Math.min(
         100,
@@ -189,7 +192,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     : 0;
 
   return (
-    <div className="relative space-y-5 pb-28">
+    <div {...bindEmptyAreaLongPress()} className="relative space-y-5 pb-28">
       {/* ========================================================
           🌌 FULL CINEMATIC AMBIENT AURORA NEBULA
           Continuous edge-to-edge organic light without rigid blocks
@@ -206,7 +209,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* ========================================================
           🌟 1. THE MUSE SANCTUM (Cinematic Greeting & Typewriter Quote)
           ======================================================== */}
-      <section className="cinematic-glass-card p-5 sm:p-7 relative overflow-hidden group">
+      <section className="anim-entrance-1 cinematic-glass-card p-5 sm:p-7 relative overflow-hidden group">
         {/* Ambient watermark quotation mark */}
         <Quote className="absolute right-4 -bottom-6 w-32 h-32 text-amber-500/[0.04] dark:text-amber-400/[0.03] pointer-events-none rotate-12 transition-transform duration-700 group-hover:scale-105" />
 
@@ -219,7 +222,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <GreetingIcon className="w-3.5 h-3.5" />
               </span>
               <span className="text-xs font-bold text-slate-800 dark:text-slate-200 tracking-wide">
-                {greeting.text}, <span className="text-amber-600 dark:text-amber-400 font-black">Penulis</span>
+                {greeting.text}, <span className="text-shimmer-gold font-black">Penulis</span>
               </span>
             </div>
 
@@ -280,7 +283,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {recentChapter && recentBook && onResumeChapter && (
         <section
           onClick={() => onResumeChapter(recentBook, recentChapter)}
-          className="cinematic-glass-card cinematic-glass-card-interactive p-5 sm:p-6 group relative overflow-hidden"
+          className="anim-entrance-2 cinematic-glass-card cinematic-glass-card-interactive p-5 sm:p-6 group relative overflow-hidden"
         >
           {/* Subtle Warm Amber Glow Behind Card on Hover */}
           <div className="absolute inset-0 bg-gradient-to-r from-amber-500/[0.08] via-transparent to-indigo-500/[0.05] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -295,7 +298,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </span>
                 <span className="text-xs text-slate-600 dark:text-slate-400 truncate font-semibold flex items-center gap-1">
                   <Feather className="w-3 h-3 text-amber-500/80 flex-shrink-0" />
-                  <span className="truncate">{recentBook.title}</span>
+                  <span className={`truncate ${getBlurTitleClass()}`}>{recentBook.title}</span>
                 </span>
               </div>
 
@@ -308,7 +311,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             {/* Title & Action Button Row */}
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0 flex-1">
-                <h3 className="text-base sm:text-xl font-black text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors truncate">
+                <h3 className={`text-base sm:text-xl font-black text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors truncate ${getBlurTitleClass()}`}>
                   Bab {recentChapter.order || 1}: {recentChapter.title || 'Bab Tanpa Judul'}
                 </h3>
                 <div className="flex items-center gap-3 text-xs text-slate-600 dark:text-slate-400 mt-1 font-medium">
@@ -351,15 +354,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {onOpenStoryArchitect && (
         <section
           onClick={onOpenStoryArchitect}
-          className="cinematic-glass-card cinematic-glass-card-interactive p-4 sm:p-5 group relative overflow-hidden"
+          className="anim-entrance-3 cinematic-glass-card cinematic-glass-card-interactive p-4 sm:p-5 group relative overflow-hidden"
         >
           {/* Subtle Cosmic Nebula Flare */}
           <div className="absolute -right-8 -top-8 w-40 h-40 bg-gradient-to-br from-indigo-500/20 via-purple-500/15 to-transparent rounded-full blur-2xl pointer-events-none" />
 
           <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-start gap-3.5 min-w-0">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 via-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
-                <Sparkles className="w-5 h-5 text-amber-200" />
+              <div className="relative w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 via-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25 flex-shrink-0 group-hover:scale-110 transition-transform duration-300">
+                <div className="absolute inset-0 rounded-2xl bg-amber-400/30 blur-sm animate-pulse" />
+                <Sparkles className="w-5 h-5 text-amber-200 animate-star-sparkle relative z-10" />
               </div>
               <div className="space-y-0.5">
                 <div className="flex items-center gap-2">
@@ -390,7 +394,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           📊 4. FLOATING TELEMETRY GLASS HUD RIBBON
           Unified momentum telemetry replacing 3 chunky separate boxes
           ======================================================== */}
-      <section className="cinematic-hud-ribbon p-3 sm:p-4">
+      <section className="anim-entrance-4 cinematic-hud-ribbon p-3 sm:p-4">
         <div className="grid grid-cols-3 divide-x divide-slate-200/80 dark:divide-white/[0.08]">
           {/* Stat 1: Total Works */}
           <div className="px-2 sm:px-4 text-center space-y-0.5">
@@ -433,7 +437,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* ========================================================
           📚 5. KARYA TERKINI (Recent Works Gallery)
           ======================================================== */}
-      <section className="space-y-3.5 pt-1">
+      <section className="anim-entrance-5 space-y-3.5 pt-1">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-2">
             <h3 className="font-black text-sm sm:text-base text-slate-900 dark:text-white tracking-tight">

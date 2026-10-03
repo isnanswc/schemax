@@ -31,6 +31,7 @@ import {
   ChapterBranchOption,
 } from '../../../services/aiService';
 import { db } from '../../../db';
+import { usePrivacy } from '../../../contexts/PrivacyContext';
 
 interface ChapterPlotTabProps {
   chapter: StoryChapter;
@@ -47,6 +48,8 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
   onUpdateChapter,
   onSwitchChapter,
 }) => {
+  const { getBlurTextClass, getBlurTitleClass, getBlurGlossaryClass, bindEmptyAreaLongPress } = usePrivacy();
+
   // Sync summary with chapter.aiSummary or chapter.premise
   const [summary, setSummary] = useState(chapter.aiSummary || chapter.premise || '');
   const [plot, setPlot] = useState<ChapterPlotBreakdown | undefined>(chapter.aiPlot);
@@ -305,7 +308,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
   };
 
   return (
-    <div className="space-y-4 pb-28 max-w-3xl mx-auto animate-fade-in-up px-1 sm:px-2">
+    <div {...bindEmptyAreaLongPress()} className="space-y-4 pb-28 max-w-3xl mx-auto animate-fade-in-up px-1 sm:px-2">
       {/* 1. Header Card with Generate Semua */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -409,7 +412,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
 
         {summary ? (
           <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed space-y-2">
-            <p className="whitespace-pre-line">{summary}</p>
+            <p className={`whitespace-pre-line ${getBlurTextClass()}`}>{summary}</p>
             <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-800/60 text-[10px] text-slate-400">
               <span>Sinkron otomatis dengan Chapter Info</span>
               <button
@@ -472,7 +475,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
               <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-extrabold text-xs">
                 <span>🎣 1. Hook (Pembuka)</span>
               </div>
-              <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+              <p className={`text-xs text-slate-700 dark:text-slate-300 leading-relaxed ${getBlurTextClass()}`}>
                 {plot.hook || 'Belum terpetakan'}
               </p>
             </div>
@@ -482,7 +485,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
               <div className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 font-extrabold text-xs">
                 <span>📈 2. Rising Action (Eskalasi)</span>
               </div>
-              <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+              <p className={`text-xs text-slate-700 dark:text-slate-300 leading-relaxed ${getBlurTextClass()}`}>
                 {plot.risingAction || 'Belum terpetakan'}
               </p>
             </div>
@@ -492,7 +495,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
               <div className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400 font-extrabold text-xs">
                 <span>⚡ 3. Climax (Titik Puncak)</span>
               </div>
-              <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+              <p className={`text-xs text-slate-700 dark:text-slate-300 leading-relaxed ${getBlurTextClass()}`}>
                 {plot.climax || 'Belum terpetakan'}
               </p>
             </div>
@@ -502,7 +505,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
               <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-extrabold text-xs">
                 <span>🚪 4. Resolution / Cliffhanger</span>
               </div>
-              <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+              <p className={`text-xs text-slate-700 dark:text-slate-300 leading-relaxed ${getBlurTextClass()}`}>
                 {plot.resolution || 'Belum terpetakan'}
               </p>
             </div>
@@ -577,7 +580,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
             onChange={(e) => setRoughDraft(e.target.value)}
             rows={4}
             placeholder="Tulis ide kasar atau adegan yang kamu rencanakan untuk bab selanjutnya... (Contoh: Setelah kabur dari rumah, Arya dan Shinta bersembunyi di gudang tua pelabuhan, tapi mereka dikejar orang bertopeng...)"
-            className="w-full p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 shadow-inner resize-y min-h-[90px] leading-relaxed"
+            className={`w-full p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 shadow-inner resize-y min-h-[90px] leading-relaxed ${getBlurTextClass()}`}
           />
 
           <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-0.5">
@@ -604,7 +607,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
                 Bab Selanjutnya Tersedia:
               </span>
               <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
-                Bab {nextChapter.order}: {nextChapter.title}
+                Bab {nextChapter.order}: <span className={getBlurTitleClass()}>{nextChapter.title}</span>
               </p>
             </div>
 
@@ -635,7 +638,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
                     <span className="w-6 h-6 rounded-full bg-purple-600 text-white text-xs font-black flex items-center justify-center flex-shrink-0">
                       {String.fromCharCode(65 + idx)}
                     </span>
-                    <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
+                    <h4 className={`text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate ${getBlurTitleClass()}`}>
                       {b.title}
                     </h4>
                   </div>
@@ -665,7 +668,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
                           ? 'Analisa Kesinambungan: Koheren dengan Bab Sebelumnya'
                           : 'Catatan Koreksi Alur (Mencegah Melenceng):'}
                       </strong>
-                      <span className="text-[11px]">{b.continuityNote}</span>
+                      <span className={`text-[11px] ${getBlurTextClass()}`}>{b.continuityNote}</span>
                     </div>
                   </div>
                 )}
@@ -673,7 +676,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
                 {/* Premise */}
                 <div className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed bg-white/70 dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800/80">
                   <span className="font-bold text-slate-900 dark:text-white block mb-0.5">Premis Rencana:</span>
-                  <p>{b.premise}</p>
+                  <p className={getBlurTextClass()}>{b.premise}</p>
                 </div>
 
                 {/* Detailed Story Plan (Rencana Alur Cerita yang Masuk Akal) */}
@@ -683,7 +686,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
                       <Bookmark className="w-3.5 h-3.5 text-amber-500" />
                       <span>Rencana Cerita Berkelanjutan:</span>
                     </span>
-                    <p className="text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line text-xs">
+                    <p className={`text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line text-xs ${getBlurTextClass()}`}>
                       {b.storyPlan}
                     </p>
                   </div>
@@ -701,7 +704,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
                         {b.involvedCharacters.map((cName, cIdx) => (
                           <span
                             key={cIdx}
-                            className="px-2 py-0.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 font-semibold text-[10px]"
+                            className={`px-2 py-0.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 font-semibold text-[10px] ${getBlurGlossaryClass()}`}
                           >
                             {cName}
                           </span>
@@ -711,7 +714,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
 
                     {b.characterConditions && (
                       <p className="text-slate-700 dark:text-slate-300 text-[11px] leading-relaxed pt-0.5">
-                        <strong className="text-slate-900 dark:text-white">Kondisi &amp; Peran:</strong> {b.characterConditions}
+                        <strong className="text-slate-900 dark:text-white">Kondisi &amp; Peran:</strong> <span className={getBlurTextClass()}>{b.characterConditions}</span>
                       </p>
                     )}
                   </div>
@@ -725,7 +728,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
                         <Flame className="w-3 h-3 text-rose-500" />
                         <span>Puncak Klimaks:</span>
                       </span>
-                      <p className="text-slate-700 dark:text-slate-300 text-[11px] leading-snug">
+                      <p className={`text-slate-700 dark:text-slate-300 text-[11px] leading-snug ${getBlurTextClass()}`}>
                         {b.climax}
                       </p>
                     </div>
@@ -737,7 +740,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
                         <Zap className="w-3 h-3 text-purple-500" />
                         <span>Potensi Twist:</span>
                       </span>
-                      <p className="text-slate-700 dark:text-slate-300 text-[11px] leading-snug">
+                      <p className={`text-slate-700 dark:text-slate-300 text-[11px] leading-snug ${getBlurTextClass()}`}>
                         {b.potentialTwist}
                       </p>
                     </div>
@@ -747,7 +750,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
                 {/* Opening Hook Quote */}
                 {b.hook && (
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 italic bg-white dark:bg-slate-900/80 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800">
-                    <strong>Hook Awal:</strong> "{b.hook}"
+                    <strong>Hook Awal:</strong> <span className={getBlurTextClass()}>"{b.hook}"</span>
                   </p>
                 )}
 
