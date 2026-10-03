@@ -588,6 +588,12 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
         genre={book.genre}
         synopsis={book.synopsis}
         entities={entities}
+        initialData={book.coverPromptData}
+        onSave={async (data) => {
+          await db.books.update(book.id, { coverPromptData: data, updatedAt: Date.now() });
+          const updated = await db.books.get(book.id);
+          if (updated) onBookUpdated(updated);
+        }}
         onOpenLocalUpload={() => {
           setIsCoverPromptModalOpen(false);
           setIsSelectCoverModalOpen(true);

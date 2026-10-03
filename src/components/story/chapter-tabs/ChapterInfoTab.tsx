@@ -728,6 +728,8 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
         premise={premise}
         contentText={contentText}
         entities={entities}
+        initialData={chapter.coverPromptData}
+        onSave={(data) => onUpdateChapter({ coverPromptData: data })}
         onOpenLocalUpload={() => {
           setIsCoverPromptModalOpen(false);
           setIsMediaPickerOpen(true);

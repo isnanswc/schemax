@@ -1,5 +1,12 @@
 export type BookStatus = 'draft' | 'released';
 
+export interface CoverPromptData {
+  prompt: string;
+  explanation: string;
+  characterReferences: string[];
+  generatedAt?: number;
+}
+
 export interface Book {
   id: string;
   title: string;
@@ -7,6 +14,7 @@ export interface Book {
   genre: string;
   status: BookStatus;
   coverMediaId?: string;
+  coverPromptData?: CoverPromptData;
   wordCountTarget?: number;
   currentWordCount?: number;
   createdAt: number;
@@ -102,6 +110,7 @@ export interface StoryChapter {
   aiDetectedEntities?: DetectedEntityCandidate[];
   coverMediaId?: string;
   coverImageUrl?: string;
+  coverPromptData?: CoverPromptData;
   chapterEntityStates?: Record<string, ChapterEntityState>;
   chapterRelationships?: EntityRelationship[];
   tensionData?: ChapterTensionData;

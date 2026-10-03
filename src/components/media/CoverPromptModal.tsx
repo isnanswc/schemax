@@ -36,6 +36,8 @@ interface CoverPromptModalProps {
   entities?: WorldEntity[];
   onOpenLocalUpload?: () => void;
   onOpenGDrive?: () => void;
+  initialData?: CoverPromptResult | null;
+  onSave?: (data: CoverPromptResult) => void;
 }
 
 export const CoverPromptModal: React.FC<CoverPromptModalProps> = ({
@@ -53,6 +55,8 @@ export const CoverPromptModal: React.FC<CoverPromptModalProps> = ({
   entities = [],
   onOpenLocalUpload,
   onOpenGDrive,
+  initialData,
+  onSave,
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<CoverPromptResult | null>(null);
@@ -122,6 +126,7 @@ export const CoverPromptModal: React.FC<CoverPromptModalProps> = ({
           onEvent
         );
         setResult(res);
+        onSave?.(res);
       } else {
         const res = await generateChapterCoverPrompt(
           {
@@ -140,6 +145,7 @@ export const CoverPromptModal: React.FC<CoverPromptModalProps> = ({
           onEvent
         );
         setResult(res);
+        onSave?.(res);
       }
     } catch (err: any) {
       console.error('Gagal generate prompt cover:', err);
@@ -150,7 +156,12 @@ export const CoverPromptModal: React.FC<CoverPromptModalProps> = ({
   };
 
   useEffect(() => {
-    if (isOpen && !result && !isLoading) {
+    if (!isOpen) return;
+    if (initialData && initialData.prompt) {
+      setResult(initialData);
+      return;
+    }
+    if (!result && !isLoading) {
       runGenerate();
     }
   }, [isOpen]);
@@ -198,11 +209,39 @@ export const CoverPromptModal: React.FC<CoverPromptModalProps> = ({
     const cleanText = text
       .replace(/^```[a-z]*\s*/i, '')
       .replace(/\s*```$/g, '')
+      .replace(/\\r\\n|\\n/g, '\n')
       .replace(/\\"/g, '"')
+      .replace(/`/g, '')
       .replace(/^["']|["']$/g, '')
+      // Force headings / bold labels ("**Konsep:**", "### Karakter") onto their own line
+      .replace(/\s*(#{1,4}\s)/g, '\n$1')
+      .replace(/\s*(\*\*[^*\n]{2,40}:\*\*)\s*/g, '\n$1\n')
+      .replace(/\s+(\d+\.\s+)(?=[A-Z\[])/g, '\n$1')
+      .replace(/\s+([-•]\s+)(?=[A-Z\[])/g, '\n$1')
       .trim();
 
-    const rawLines = cleanText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    // Break very long paragraphs into readable chunks of ~2 sentences
+    const splitParagraph = (para: string): string[] => {
+      if (para.length < 220) return [para];
+      const sentences = para.match(/[^.!?]+[.!?]+(?:\s|$)|[^.!?]+$/g) || [para];
+      const chunks: string[] = [];
+      let buf = '';
+      sentences.forEach((s) => {
+        buf += s;
+        if (buf.length > 160) {
+          chunks.push(buf.trim());
+          buf = '';
+        }
+      });
+      if (buf.trim()) chunks.push(buf.trim());
+      return chunks;
+    };
+
+    const rawLines = cleanText
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .flatMap((l) => (/^(#{1,4}\s|[-*•]\s|\d+\.\s|\*\*[^*]+:\*\*$)/.test(l) ? [l] : splitParagraph(l)));
 
     const renderInline = (str: string) => {
       const tokens = str.split(/(\[(?:pria|wanita)\d*\]|\*\*[^*]+\*\*|\*[^*]+\*|_[^_]+_)/gi);
@@ -252,7 +291,7 @@ export const CoverPromptModal: React.FC<CoverPromptModalProps> = ({
     return (
       <div className="space-y-2 text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-sans">
         {rawLines.map((line, idx) => {
-          const headingMatch = line.match(/^#{1,4}\s*(.*)$/);
+          const headingMatch = line.match(/^#{1,4}\s*(.*)$/) || line.match(/^\*\*([^*]+?):?\*\*$/);
           if (headingMatch) {
             const headingText = headingMatch[1].replace(/[:\-–]+$/, '').trim();
             return (

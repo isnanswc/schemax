@@ -1179,6 +1179,7 @@ export interface CoverPromptResult {
   prompt: string;
   explanation: string;
   characterReferences: string[];
+  generatedAt?: number;
 }
 
 // Robust Cover Prompt Parser: Guarantees prompt, explanation, and characters are never merged
@@ -1306,7 +1307,11 @@ export function parseCoverPromptResult(
     explanation = explanation
       .replace(/^```[a-z]*\s*/i, '')
       .replace(/\s*```$/g, '')
+      .replace(/\\r\\n/g, '\n')
+      .replace(/\\n/g, '\n')
+      .replace(/\\t/g, ' ')
       .replace(/\\"/g, '"')
+      .replace(/\\'/g, "'")
       .replace(/^["']|["']$/g, '')
       .replace(/^(?:PENJELASAN|EXPLANATION|DESKRIPSI):\s*/i, '')
       .trim();
@@ -1422,6 +1427,7 @@ export function parseCoverPromptResult(
     prompt,
     explanation,
     characterReferences,
+    generatedAt: Date.now(),
   };
 }
 
