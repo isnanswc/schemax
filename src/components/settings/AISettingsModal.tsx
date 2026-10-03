@@ -55,12 +55,15 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
   const [testResults, setTestResults] = useState<Record<string, { success: boolean; message: string }>>({});
   const [isFetchingModels, setIsFetchingModels] = useState(false);
   const [fetchModelNotice, setFetchModelNotice] = useState<string | null>(null);
+  const [customModelInput, setCustomModelInput] = useState('');
+  const [customTargetSlot, setCustomTargetSlot] = useState<0 | 1 | 2>(0);
 
   useEffect(() => {
     if (isOpen) {
       setConfig(loadAISettings());
       setTestResults({});
       setFetchModelNotice(null);
+      setCustomModelInput('');
     }
   }, [isOpen]);
 
@@ -104,8 +107,17 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
       const configKey = getProviderConfigKey(activeTab);
       const targetConfig = { ...prev[configKey] };
       const newFallback = [...targetConfig.fallbackModels] as [string, string, string];
-      newFallback[modelIndex] = modelId;
+      const trimmedId = modelId.trim();
+      newFallback[modelIndex] = trimmedId;
       targetConfig.fallbackModels = newFallback;
+
+      // Ensure model is registered in cachedModels so it persists and is visible in dropdown
+      if (trimmedId && !targetConfig.cachedModels.some((m) => m.id === trimmedId)) {
+        targetConfig.cachedModels = [
+          { id: trimmedId, name: `${trimmedId} (Dipilih)`, description: 'Model kustom pilihan pengguna' },
+          ...targetConfig.cachedModels,
+        ];
+      }
 
       const newConfig = {
         ...prev,
@@ -141,21 +153,28 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
       setConfig((prev) => {
         const configKey = getProviderConfigKey(activeTab);
         const targetConfig = { ...prev[configKey] };
-        targetConfig.cachedModels = liveModels;
+
+        // Keep existing user-selected models so they are never lost
+        const userSelectedModels = targetConfig.fallbackModels.filter(Boolean);
+        const mergedModels = [...liveModels];
+        for (const userMod of userSelectedModels) {
+          if (!mergedModels.some((m) => m.id === userMod)) {
+            mergedModels.unshift({
+              id: userMod,
+              name: `${userMod} (Pilihan Tersimpan)`,
+              description: 'Model pilihan pengguna yang tersimpan',
+            });
+          }
+        }
+
+        targetConfig.cachedModels = mergedModels;
         targetConfig.lastFetchedAt = Date.now();
 
-        // If current fallback models are not in the new list, pick top 3 available
-        const availableIds = liveModels.map((m) => m.id);
+        // 100% PRESERVE user's existing fallback choices! NEVER overwrite them!
         const newFallbacks: [string, string, string] = [
-          targetConfig.fallbackModels[0] && availableIds.includes(targetConfig.fallbackModels[0])
-            ? targetConfig.fallbackModels[0]
-            : '',
-          targetConfig.fallbackModels[1] && availableIds.includes(targetConfig.fallbackModels[1])
-            ? targetConfig.fallbackModels[1]
-            : '',
-          targetConfig.fallbackModels[2] && availableIds.includes(targetConfig.fallbackModels[2])
-            ? targetConfig.fallbackModels[2]
-            : '',
+          targetConfig.fallbackModels[0] || (liveModels[0]?.id || ''),
+          targetConfig.fallbackModels[1] || (liveModels[1]?.id || ''),
+          targetConfig.fallbackModels[2] || (liveModels[2]?.id || ''),
         ];
         targetConfig.fallbackModels = newFallbacks;
 
@@ -527,6 +546,13 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
                   className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-2 text-xs text-amber-800 dark:text-amber-300 font-bold focus:outline-none focus:border-amber-400 shadow-sm"
                 >
                   <option value="">-- Pilih Model Utama --</option>
+                  {/* Pastikan model pilihan pengguna selalu muncul di dropdown */}
+                  {currentGlobalConfig.fallbackModels[0] &&
+                    !currentGlobalConfig.cachedModels.some((m) => m.id === currentGlobalConfig.fallbackModels[0]) && (
+                      <option value={currentGlobalConfig.fallbackModels[0]}>
+                        {currentGlobalConfig.fallbackModels[0]} (Pilihan Tersimpan)
+                      </option>
+                    )}
                   {currentGlobalConfig.cachedModels.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name}
@@ -546,6 +572,13 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
                   className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-2 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-amber-400 shadow-sm"
                 >
                   <option value="">-- Nonaktif (Opsional) --</option>
+                  {/* Pastikan model pilihan pengguna selalu muncul di dropdown */}
+                  {currentGlobalConfig.fallbackModels[1] &&
+                    !currentGlobalConfig.cachedModels.some((m) => m.id === currentGlobalConfig.fallbackModels[1]) && (
+                      <option value={currentGlobalConfig.fallbackModels[1]}>
+                        {currentGlobalConfig.fallbackModels[1]} (Pilihan Tersimpan)
+                      </option>
+                    )}
                   {currentGlobalConfig.cachedModels.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name}
@@ -565,12 +598,64 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
                   className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-2 text-xs text-slate-700 dark:text-slate-300 focus:outline-none focus:border-amber-400 shadow-sm"
                 >
                   <option value="">-- Nonaktif (Opsional) --</option>
+                  {/* Pastikan model pilihan pengguna selalu muncul di dropdown */}
+                  {currentGlobalConfig.fallbackModels[2] &&
+                    !currentGlobalConfig.cachedModels.some((m) => m.id === currentGlobalConfig.fallbackModels[2]) && (
+                      <option value={currentGlobalConfig.fallbackModels[2]}>
+                        {currentGlobalConfig.fallbackModels[2]} (Pilihan Tersimpan)
+                      </option>
+                    )}
                   {currentGlobalConfig.cachedModels.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name}
                     </option>
                   ))}
                 </select>
+              </div>
+            </div>
+
+            {/* Input Model Kustom Manual */}
+            <div className="p-2.5 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl text-xs space-y-1.5">
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                Input Model Kustom Manual (Bebas Ketik ID Model):
+              </span>
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Contoh: gemini-3.5-flash atau gemini-3.8-flash-preview"
+                  value={customModelInput}
+                  onChange={(e) => setCustomModelInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && customModelInput.trim()) {
+                      e.preventDefault();
+                      handleUpdateGlobalModel(customTargetSlot, customModelInput.trim());
+                      setCustomModelInput('');
+                    }
+                  }}
+                  className="flex-1 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200 font-mono focus:outline-none focus:border-amber-500 shadow-sm"
+                />
+                <select
+                  value={customTargetSlot}
+                  onChange={(e) => setCustomTargetSlot(Number(e.target.value) as 0 | 1 | 2)}
+                  className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-700 dark:text-slate-300 shadow-sm"
+                >
+                  <option value={0}>Sebagai Model Utama</option>
+                  <option value={1}>Sebagai Cadangan 1</option>
+                  <option value={2}>Sebagai Cadangan 2</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (customModelInput.trim()) {
+                      handleUpdateGlobalModel(customTargetSlot, customModelInput.trim());
+                      setCustomModelInput('');
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-lg transition active:scale-95 whitespace-nowrap shadow-sm"
+                >
+                  Terapkan
+                </button>
               </div>
             </div>
 
@@ -765,9 +850,6 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
             type="button"
             onClick={() => {
               saveAISettings(config);
-              // Re-read with loadAISettings sanitization to ensure state permanence
-              const ensured = loadAISettings();
-              saveAISettings(ensured);
               onSaved?.();
               onClose();
             }}

@@ -17,13 +17,14 @@ import {
   RelationshipType,
 } from '../types';
 
-// Modern baseline defaults (Stable official Gemini models & Groq lineup)
+// Modern baseline defaults (Modern Gemini 3.5+ models & Groq lineup)
 export const DEFAULT_GEMINI_MODELS: AIModelOption[] = [
-  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (Rekomendasi Utama & Stabil)', description: 'Generasi 2.5: Cepat, Cerdas, Stabil & Kuota Hemat untuk Penulisan Novel' },
-  { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash (Paling Handal)', description: 'Generasi 1.5: Sangat Stabil, Kuota Besar, Bebas Error' },
-  { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', description: 'Generasi 2.0: Respons Sangat Cepat & Analisis Alur Cerita' },
-  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', description: 'Generasi 2.5: Penalaran Mendalam & Analisis Sastra Luas' },
-  { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', description: 'Generasi 1.5: Kapasitas Konteks Hingga 1 Juta Token' },
+  { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash (Rekomendasi Utama & Cepat)', description: 'Generasi 3.5: Kecepatan tinggi, penalaran cerdas, kuota optimal untuk penulisan' },
+  { id: 'gemini-3.8-flash-preview', name: 'Gemini 3.8 Flash Preview (Paling Cerdas)', description: 'Generasi 3.8: Kemampuan pemahaman narasi dan plot sangat tinggi' },
+  { id: 'gemini-3.5-pro', name: 'Gemini 3.5 Pro (Penalaran Mendalam)', description: 'Generasi 3.5: Analisis sastra, karakter, dan alur cerita kompleks' },
+  { id: 'gemini-3.8-pro-preview', name: 'Gemini 3.8 Pro Preview', description: 'Generasi 3.8: Penalaran tingkat lanjut untuk worldbuilding luas' },
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: 'Generasi 2.5: Cepat & Handal' },
+  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', description: 'Generasi 2.5: Kapasitas konteks tinggi' },
 ];
 
 export const DEFAULT_GROQ_MODELS: AIModelOption[] = [
@@ -44,9 +45,9 @@ export const DEFAULT_OPENROUTER_MODELS: AIModelOption[] = [
 const STORAGE_KEY = 'schemax_ai_config_v3';
 
 export const DEFAULT_GEMINI_FALLBACKS: [string, string, string] = [
+  'gemini-3.5-flash',
+  'gemini-3.8-flash-preview',
   'gemini-2.5-flash',
-  'gemini-1.5-flash',
-  'gemini-2.0-flash',
 ];
 
 export const DEFAULT_GROQ_FALLBACKS: [string, string, string] = [
@@ -155,29 +156,23 @@ export function loadAISettings(): AISettingsConfig {
       parsed.providerPriority.push('openrouter');
     }
 
-    // Helper to sanitize and guarantee fallback models are NEVER empty or lost
+    // Helper to preserve user's chosen models 100% without resetting or altering strings
     const sanitizeProviderConfig = (
       existing: any,
       defaults: [string, string, string],
       defaultCached: AIModelOption[]
     ): { fallbackModels: [string, string, string]; cachedModels: AIModelOption[]; lastFetchedAt?: number } => {
-      let cached = (existing?.cachedModels && Array.isArray(existing.cachedModels) && existing.cachedModels.length > 0)
+      // Retain saved cachedModels if available, only fallback to defaultCached if null/empty
+      const cached = (existing?.cachedModels && Array.isArray(existing.cachedModels) && existing.cachedModels.length > 0)
         ? existing.cachedModels
         : defaultCached;
 
-      // Filter out non-existent 3.8 models from cache
-      if (cached.some((m: any) => m.id?.includes('3.8'))) {
-        cached = defaultCached;
-      }
+      const fb = Array.isArray(existing?.fallbackModels) ? [...existing.fallbackModels] : [];
 
-      let fb = Array.isArray(existing?.fallbackModels) ? [...existing.fallbackModels] : [];
-      // Clean non-existent 3.8 or 3.1
-      fb = fb.map((m: string) => (m && (m.includes('3.8') || m.includes('3.1')) ? defaults[0] : m));
-
-      // Guarantee fallback models are never empty
-      const m0 = fb[0] && fb[0].trim().length > 0 ? fb[0] : defaults[0];
-      const m1 = fb[1] && fb[1].trim().length > 0 ? fb[1] : defaults[1];
-      const m2 = fb[2] && fb[2].trim().length > 0 ? fb[2] : defaults[2];
+      // Preserve user choices exactly as saved; only use default if entry is completely empty/undefined
+      const m0 = (typeof fb[0] === 'string' && fb[0].trim().length > 0) ? fb[0].trim() : defaults[0];
+      const m1 = (typeof fb[1] === 'string' && fb[1].trim().length > 0) ? fb[1].trim() : defaults[1];
+      const m2 = (typeof fb[2] === 'string' && fb[2].trim().length > 0) ? fb[2].trim() : defaults[2];
 
       return {
         fallbackModels: [m0, m1, m2],
@@ -192,8 +187,9 @@ export function loadAISettings(): AISettingsConfig {
 
     if (Array.isArray(parsed.slots)) {
       parsed.slots = parsed.slots.map((s: any) => {
-        if (s.provider === 'gemini' && Array.isArray(s.models)) {
-          s.models = s.models.map((m: string) => (m.includes('3.8') || m.includes('3.1') ? DEFAULT_GEMINI_FALLBACKS[0] : m));
+        // Clear deprecated slot-level models so user's configured provider fallback models always take effect
+        if (s.models) {
+          delete s.models;
         }
         return s;
       });
@@ -645,7 +641,7 @@ export async function generateWithSmartFallback(
         fallbackModels = providerGlobal.cachedModels.slice(0, 3).map((m) => m.id);
       } else {
         if (slot.provider === 'gemini') {
-          fallbackModels = ['gemini-2.5-flash', 'gemini-1.5-flash'];
+          fallbackModels = [...DEFAULT_GEMINI_FALLBACKS];
         } else if (slot.provider === 'groq') {
           fallbackModels = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
         } else {
@@ -1672,8 +1668,8 @@ export async function analyzeImageWithVision(
 
   const visionModels = [
     ...(geminiSlot.models && geminiSlot.models.length > 0 ? geminiSlot.models : config.geminiConfig?.fallbackModels || []),
-    'gemini-3.1-flash',
-    'gemini-3.0-flash',
+    'gemini-3.5-flash',
+    'gemini-3.8-flash-preview',
     'gemini-2.5-flash',
   ].filter((v, i, a) => a.indexOf(v) === i);
 
@@ -1763,9 +1759,9 @@ export async function analyzeCharacterPhotoWithVision(
 
   const visionModels = [
     ...(geminiSlot.models && geminiSlot.models.length > 0 ? geminiSlot.models : config.geminiConfig?.fallbackModels || []),
+    'gemini-3.5-flash',
+    'gemini-3.8-flash-preview',
     'gemini-2.5-flash',
-    'gemini-3.1-flash',
-    'gemini-3.0-flash',
   ].filter((v, i, a) => a.indexOf(v) === i);
 
   const isChar = category === 'character';
