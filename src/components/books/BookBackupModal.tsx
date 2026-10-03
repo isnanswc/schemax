@@ -41,6 +41,7 @@ import {
   uploadBackupToGDrive,
   listBackupFilesFromGDrive,
   fetchBackupContentFromGDrive,
+  clearGDriveFolderCache,
   GDriveBackupItem,
 } from '../../services/gdriveService';
 
@@ -413,6 +414,8 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
       return;
     }
 
+    // Selalu hapus cache agar file yang baru saja dibuat/dipindahkan langsung terbaca
+    clearGDriveFolderCache(gdriveConfig.folderId);
     setIsGDrivePickerOpen(true);
     setIsLoadingGDriveFiles(true);
     setGdriveError(null);
@@ -423,7 +426,9 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
       );
       setGdriveBackups(files);
       if (files.length === 0) {
-        setGdriveError('Tidak ada file cadangan (.schemax.json) yang ditemukan di folder Google Drive ini.');
+        setGdriveError(
+          'Tidak ada file cadangan (.schemax.json atau .json) yang ditemukan di folder utama maupun subfolder "backup". Pastikan file cadangan memiliki ekstensi .json atau .schemax.json.'
+        );
       }
     } catch (err: any) {
       setGdriveError(err?.message || 'Gagal membaca daftar cadangan Google Drive.');

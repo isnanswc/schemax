@@ -338,12 +338,12 @@ export async function uploadBackupToGDrive(
   }
 
   if (credential.includes('script.google.com')) {
-    // 📁 Cek terlebih dahulu apakah sudah ada subfolder bernama "backup"
+    // 📁 Cek terlebih dahulu apakah sudah ada subfolder bernama "backup" (case-insensitive & bypass cache)
     let targetFolderId = folderId;
     try {
-      const items = await fetchGDriveFolderItems(folderId, credential);
+      const items = await fetchGDriveFolderItems(folderId, credential, true);
       const existingBackupFolder = items.find(
-        (it) => it.isFolder && it.name.trim().toLowerCase() === 'backup'
+        (it) => it.isFolder && /^(backup|backups|cadangan)$/i.test(it.name.trim())
       );
       if (existingBackupFolder) {
         targetFolderId = existingBackupFolder.id;
@@ -386,6 +386,12 @@ export async function uploadBackupToGDrive(
         throw new Error(data.error);
       }
 
+      // Bersihkan cache folder agar perubahan file langsung terlihat
+      clearGDriveFolderCache(folderId);
+      if (targetFolderId !== folderId) {
+        clearGDriveFolderCache(targetFolderId);
+      }
+
       return {
         success: true,
         fileId: data.fileId,
@@ -409,6 +415,7 @@ export async function uploadBackupToGDrive(
 
 /**
  * Daftar file cadangan (.schemax.json atau .json) yang ada di folder Google Drive
+ * Secara cerdas memeriksa subfolder "backup" serta folder root utama
  */
 export async function listBackupFilesFromGDrive(
   folderId: string,
@@ -419,47 +426,109 @@ export async function listBackupFilesFromGDrive(
     throw new Error('Kredensial Google Drive belum diatur.');
   }
 
-  if (credential.includes('script.google.com')) {
-    const url = `${credential}${credential.includes('?') ? '&' : '?'}folderId=${encodeURIComponent(folderId)}&action=listBackups`;
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Gagal membaca daftar cadangan dari Google Drive (HTTP ${response.status}).`);
+  // 1. Periksa apakah terdapat subfolder bernama "backup" di dalam folderId utama (bypass cache)
+  let backupFolderId: string | null = null;
+  try {
+    const folderItems = await fetchGDriveFolderItems(folderId, credential, true);
+    const backupFolder = folderItems.find(
+      (item) => item.isFolder && /^(backup|backups|cadangan)$/i.test(item.name.trim())
+    );
+    if (backupFolder) {
+      backupFolderId = backupFolder.id;
     }
+  } catch (e) {
+    console.warn('Gagal membaca subfolder backup:', e);
+  }
 
-    const data = await response.json();
-    if (data.error) {
-      throw new Error(data.error);
-    }
+  // Helper untuk mengambil file dari satu folder ID tertentu
+  const fetchFromFolderId = async (targetId: string): Promise<GDriveBackupItem[]> => {
+    if (credential.includes('script.google.com')) {
+      const url = `${credential}${credential.includes('?') ? '&' : '?'}folderId=${encodeURIComponent(targetId)}&action=listBackups`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Gagal membaca daftar cadangan dari Google Drive (HTTP ${response.status}).`);
+      }
 
-    const files = data.files || [];
-    return files
-      .filter((f: any) => f.name.endsWith('.json') || f.name.endsWith('.schemax'))
-      .map((f: any) => ({
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      const files = data.files || [];
+      return files
+        .filter((f: any) => {
+          const n = (f.name || '').toLowerCase();
+          return (
+            n.endsWith('.json') ||
+            n.endsWith('.schemax') ||
+            n.includes('.schemax.') ||
+            n.includes('.json')
+          );
+        })
+        .map((f: any) => ({
+          id: f.id,
+          name: f.name,
+          size: f.size,
+          updatedAt: f.updatedAt || f.date,
+        }));
+    } else {
+      // Mode Google API Key
+      const query = `'${targetId}' in parents and trashed = false and (name contains '.json' or name contains '.schemax')`;
+      const fields = 'files(id, name, size, modifiedTime)';
+      const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=${encodeURIComponent(fields)}&pageSize=50&orderBy=modifiedTime desc&key=${credential}`;
+
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Gagal membaca daftar cadangan Google Drive (HTTP ${response.status}).`);
+      }
+
+      const data = await response.json();
+      const files = data.files || [];
+      return files.map((f: any) => ({
         id: f.id,
         name: f.name,
-        size: f.size,
-        updatedAt: f.updatedAt || f.date,
+        size: f.size ? parseInt(f.size, 10) : undefined,
+        updatedAt: f.modifiedTime,
       }));
-  } else {
-    // Mode Google API Key
-    const query = `'${folderId}' in parents and trashed = false and (name contains '.json' or name contains '.schemax')`;
-    const fields = 'files(id, name, size, modifiedTime)';
-    const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=${encodeURIComponent(fields)}&pageSize=50&orderBy=modifiedTime desc&key=${credential}`;
-
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Gagal membaca daftar cadangan Google Drive (HTTP ${response.status}).`);
     }
+  };
 
-    const data = await response.json();
-    const files = data.files || [];
-    return files.map((f: any) => ({
-      id: f.id,
-      name: f.name,
-      size: f.size ? parseInt(f.size, 10) : undefined,
-      updatedAt: f.modifiedTime,
-    }));
+  const results: GDriveBackupItem[] = [];
+  const seenIds = new Set<string>();
+
+  // Prioritas 1: Ambil dari subfolder "backup" jika ditemukan
+  if (backupFolderId) {
+    try {
+      const backupFiles = await fetchFromFolderId(backupFolderId);
+      for (const item of backupFiles) {
+        if (!seenIds.has(item.id)) {
+          seenIds.add(item.id);
+          results.push(item);
+        }
+      }
+    } catch (err) {
+      console.warn('Gagal membaca isi subfolder backup:', err);
+    }
   }
+
+  // Prioritas 2: Ambil dari folder utama (root) untuk menangkap cadangan di root atau jika script sudah scan subfolder
+  try {
+    const rootFiles = await fetchFromFolderId(folderId);
+    for (const item of rootFiles) {
+      if (!seenIds.has(item.id)) {
+        seenIds.add(item.id);
+        results.push(item);
+      }
+    }
+  } catch (err) {
+    console.warn('Gagal membaca isi folder root Google Drive:', err);
+    // Jika sudah ada file dari subfolder backup, jangan lemparkan error
+    if (results.length === 0) {
+      throw err;
+    }
+  }
+
+  return results;
 }
 
 /**

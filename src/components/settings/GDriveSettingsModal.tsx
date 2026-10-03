@@ -128,14 +128,26 @@ function doGet(e) {
 
     // 2. Daftar File Cadangan (.schemax atau .json)
     if (action === "listBackups") {
-      var backupFolders = folder.getFoldersByName("backup");
-      var targetFolder = backupFolders.hasNext() ? backupFolders.next() : folder;
-      var filesIterator = targetFolder.getFiles();
+      var targetFolder = folder;
+      // Cari subfolder backup secara fleksibel & case-insensitive
+      if (folder.getName().toLowerCase() !== "backup") {
+        var subdirs = folder.getFolders();
+        while (subdirs.hasNext()) {
+          var sd = subdirs.next();
+          var sdName = sd.getName().toLowerCase().trim();
+          if (sdName === "backup" || sdName === "backups" || sdName === "cadangan") {
+            targetFolder = sd;
+            break;
+          }
+        }
+      }
 
+      var filesIterator = targetFolder.getFiles();
       while (filesIterator.hasNext()) {
         var f = filesIterator.next();
         var name = f.getName();
-        if (name.indexOf(".json") !== -1 || name.indexOf(".schemax") !== -1) {
+        var lower = name.toLowerCase();
+        if (lower.indexOf(".json") !== -1 || lower.indexOf(".schemax") !== -1) {
           result.push({
             id: f.getId(),
             name: name,
@@ -145,13 +157,14 @@ function doGet(e) {
         }
       }
 
-      // Sertakan cadangan dari root folder jika ada (kompatibilitas mundur)
+      // Sertakan cadangan dari root folder jika targetFolder berbeda (kompatibilitas mundur)
       if (targetFolder.getId() !== folder.getId()) {
         var rootFiles = folder.getFiles();
         while (rootFiles.hasNext()) {
           var rf = rootFiles.next();
           var rname = rf.getName();
-          if ((rname.indexOf(".json") !== -1 || rname.indexOf(".schemax") !== -1) && !result.some(function(it){ return it.id === rf.getId(); })) {
+          var rlower = rname.toLowerCase();
+          if ((rlower.indexOf(".json") !== -1 || rlower.indexOf(".schemax") !== -1) && !result.some(function(it){ return it.id === rf.getId(); })) {
             result.push({
               id: rf.getId(),
               name: rname,
@@ -213,12 +226,21 @@ function doPost(e) {
       var fileName = data.fileName || "schemax_backup.json";
       var content = data.content;
 
-      // 📁 Pastikan ada subfolder "backup", jika belum ada maka otomatis buat baru
+      // 📁 Pastikan ada subfolder "backup", cari secara case-insensitive
       var targetFolder = rootFolder;
       if (rootFolder.getName().toLowerCase() !== "backup") {
-        var backupFolders = rootFolder.getFoldersByName("backup");
-        if (backupFolders.hasNext()) {
-          targetFolder = backupFolders.next();
+        var subdirs = rootFolder.getFolders();
+        var foundFolder = null;
+        while (subdirs.hasNext()) {
+          var sd = subdirs.next();
+          var sdName = sd.getName().toLowerCase().trim();
+          if (sdName === "backup" || sdName === "backups" || sdName === "cadangan") {
+            foundFolder = sd;
+            break;
+          }
+        }
+        if (foundFolder) {
+          targetFolder = foundFolder;
         } else {
           targetFolder = rootFolder.createFolder("backup");
         }
