@@ -29,6 +29,7 @@ interface ChapterInfoTabProps {
   chapter: StoryChapter;
   bookTitle: string;
   contentText: string;
+  onOpenGDriveSettings?: () => void;
   onUpdateChapter: (fields: Partial<StoryChapter>) => void;
   onNavigateToManuscript: () => void;
 }
@@ -37,6 +38,7 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
   chapter,
   bookTitle,
   contentText,
+  onOpenGDriveSettings,
   onUpdateChapter,
   onNavigateToManuscript,
 }) => {
@@ -348,25 +350,30 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
 
           <div className="flex items-center gap-2">
             {!coverUrl && (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <label className="py-1 px-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-400 text-xs font-bold transition flex items-center gap-1 cursor-pointer border border-amber-200/60 dark:border-amber-800/60 active:scale-95 shadow-xs">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Galeri HP</span>
+                  <input type="file" accept="image/*" onChange={handleUploadCoverFile} className="hidden" />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsGDrivePickerOpen(true)}
+                  className="py-1 px-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400 text-xs font-bold transition flex items-center gap-1 border border-blue-200/60 dark:border-blue-800/60 active:scale-95 shadow-xs"
+                >
+                  <HardDrive className="w-3.5 h-3.5" />
+                  <span>GDrive</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => {
                     loadMediaItems();
                     setIsMediaPickerOpen(true);
                   }}
-                  className="py-1 px-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-slate-700 dark:text-slate-300 text-xs font-bold transition flex items-center gap-1"
+                  className="py-1 px-2.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/50 text-purple-600 dark:text-purple-400 text-xs font-bold transition flex items-center gap-1 border border-purple-200/60 dark:border-purple-800/60 active:scale-95 shadow-xs"
                 >
-                  <ImageIcon className="w-3.5 h-3.5 text-amber-500" />
-                  <span>+ Sampul Bab</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsGDrivePickerOpen(true)}
-                  className="py-1 px-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500 hover:text-slate-950 text-amber-700 dark:text-amber-400 text-xs font-bold transition flex items-center gap-1 border border-amber-500/20"
-                >
-                  <HardDrive className="w-3.5 h-3.5 text-amber-500" />
-                  <span>+ Google Drive</span>
+                  <ImageIcon className="w-3.5 h-3.5" />
+                  <span>Galeri</span>
                 </button>
               </div>
             )}
@@ -586,12 +593,12 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
               {/* Upload New Button */}
               <div className="flex items-center justify-between p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-500/20">
                 <div className="text-xs">
-                  <p className="font-bold text-amber-900 dark:text-amber-200">Upload dari Perangkat</p>
+                  <p className="font-bold text-amber-900 dark:text-amber-200">Galeri HP / File</p>
                   <p className="text-[10px] text-amber-700 dark:text-amber-300">File PNG, JPG, WebP</p>
                 </div>
                 <label className="py-1.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs cursor-pointer flex items-center gap-1 shadow-sm active:scale-95 transition">
                   <Upload className="w-3.5 h-3.5" />
-                  <span>Upload</span>
+                  <span>Pilih</span>
                   <input type="file" accept="image/*" onChange={handleUploadCoverFile} className="hidden" />
                 </label>
               </div>
@@ -677,6 +684,7 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
         entityId={chapter.id}
         category="cover_chapter"
         title={`Pilih Sampul Bab ${chapter.order} dari Google Drive`}
+        onOpenSettings={onOpenGDriveSettings}
       />
     </div>
   );

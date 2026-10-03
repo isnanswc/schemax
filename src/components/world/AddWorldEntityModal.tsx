@@ -354,22 +354,11 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
           {/* Upload Image & Gallery Picker Buttons */}
           <div className="space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
-              <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl cursor-pointer border border-slate-200 dark:border-slate-700 transition shadow-sm">
+              <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl cursor-pointer border border-slate-200 dark:border-slate-700 transition shadow-sm">
                 <ImageIcon className="w-3.5 h-3.5 text-amber-500" />
-                <span>{previewUrl ? 'Ganti Berkas Foto' : 'Unggah Foto/Ilustrasi'}</span>
+                <span>{previewUrl ? 'Ganti Galeri HP' : 'Galeri HP / File'}</span>
                 <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
               </label>
-
-              {galleryItems.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setShowGalleryPicker(!showGalleryPicker)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 transition shadow-sm"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-pink-500" />
-                  <span>Pilih dari Galeri ({galleryItems.length})</span>
-                </button>
-              )}
 
               {/* 🌐 Pilih dari Google Drive Button */}
               <button
@@ -378,8 +367,19 @@ export const AddWorldEntityModal: React.FC<AddWorldEntityModalProps> = ({
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/40 active:scale-95 text-blue-700 dark:text-blue-300 text-xs font-semibold rounded-xl border border-blue-200 dark:border-blue-800 transition shadow-sm"
               >
                 <HardDrive className="w-3.5 h-3.5 text-blue-500" />
-                <span>Pilih dari Google Drive</span>
+                <span>Google Drive</span>
               </button>
+
+              {galleryItems.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowGalleryPicker(!showGalleryPicker)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 transition shadow-sm"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-pink-500" />
+                  <span>Galeri Buku ({galleryItems.length})</span>
+                </button>
+              )}
             </div>
 
             {/* 🌟 Permanent, High-Visibility AI Vision Scanner Card */}

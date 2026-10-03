@@ -22,11 +22,13 @@ import {
   Printer,
   BookOpen,
   Maximize2,
-  Database
+  Database,
+  HardDrive
 } from 'lucide-react';
 import { usePrivacy } from '../../contexts/PrivacyContext';
 import { ImageViewerModal } from '../common/ImageViewerModal';
 import { BookBackupModal } from './BookBackupModal';
+import { GDriveMediaPickerModal } from '../media/GDriveMediaPickerModal';
 
 interface BookOverviewTabProps {
   book: Book;
@@ -58,6 +60,7 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
   const [isPdfExportModalOpen, setIsPdfExportModalOpen] = useState(false);
   const [isCoverFullscreenOpen, setIsCoverFullscreenOpen] = useState(false);
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
+  const [isGDrivePickerOpen, setIsGDrivePickerOpen] = useState(false);
 
   const { url: coverUrl } = useMediaUrl(book.coverMediaId);
 
@@ -166,20 +169,27 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
               )}
             </div>
 
-            <div className="flex items-center gap-2 pt-0.5">
-              <label className="text-[11px] text-amber-700 dark:text-amber-400 hover:underline font-semibold cursor-pointer flex items-center gap-1">
+            <div className="flex items-center flex-wrap justify-center gap-1.5 pt-1">
+              <label className="px-2 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 cursor-pointer flex items-center gap-1 text-[11px] font-semibold transition active:scale-95 shadow-xs border border-amber-200/50 dark:border-amber-800/50">
                 <Upload className="w-3 h-3" />
-                <span>Upload</span>
+                <span>Galeri HP</span>
                 <input type="file" accept="image/*" onChange={handleCoverUpload} className="hidden" />
               </label>
-              <span className="text-slate-300 dark:text-slate-700 text-xs">•</span>
+              <button
+                type="button"
+                onClick={() => setIsGDrivePickerOpen(true)}
+                className="px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 flex items-center gap-1 text-[11px] font-semibold transition active:scale-95 shadow-xs border border-blue-200/50 dark:border-blue-800/50"
+              >
+                <HardDrive className="w-3 h-3" />
+                <span>GDrive</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setIsSelectCoverModalOpen(true)}
-                className="text-[11px] text-purple-600 dark:text-purple-400 hover:underline font-semibold flex items-center gap-1"
+                className="px-2 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/50 flex items-center gap-1 text-[11px] font-semibold transition active:scale-95 shadow-xs border border-purple-200/50 dark:border-purple-800/50"
               >
                 <ImageIcon className="w-3 h-3" />
-                <span>Galeri ({mediaList.length})</span>
+                <span>Buku ({mediaList.length})</span>
               </button>
             </div>
           </div>
@@ -471,9 +481,37 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
             </div>
 
             {mediaList.length === 0 ? (
-              <p className="text-xs text-slate-400 text-center py-8 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
-                Belum ada gambar yang diunggah di buku ini.
-              </p>
+              <div className="text-center py-8 px-4 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl space-y-3">
+                <p className="text-xs text-slate-400">
+                  Belum ada gambar yang diunggah di buku ini.
+                </p>
+                <div className="flex items-center justify-center gap-2">
+                  <label className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs cursor-pointer flex items-center gap-1.5 transition shadow-sm">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Galeri HP / File</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        await handleCoverUpload(e);
+                        setIsSelectCoverModalOpen(false);
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSelectCoverModalOpen(false);
+                      setIsGDrivePickerOpen(true);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm"
+                  >
+                    <HardDrive className="w-3.5 h-3.5" />
+                    <span>Google Drive</span>
+                  </button>
+                </div>
+              </div>
             ) : (
               <div className="grid grid-cols-3 gap-2.5 p-1 max-h-72 overflow-y-auto">
                 {mediaList.map((m) => {
@@ -550,6 +588,20 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
           }
         }}
         onOpenGDriveSettings={onOpenGDriveSettings}
+      />
+
+      {/* Google Drive Media Picker */}
+      <GDriveMediaPickerModal
+        isOpen={isGDrivePickerOpen}
+        onClose={() => setIsGDrivePickerOpen(false)}
+        bookId={book.id}
+        category="cover"
+        title={`Pilih Sampul Buku: ${book.title}`}
+        onOpenSettings={onOpenGDriveSettings}
+        onSelectImage={async (mediaId) => {
+          await handleSelectCover(mediaId);
+          setIsGDrivePickerOpen(false);
+        }}
       />
     </div>
   );

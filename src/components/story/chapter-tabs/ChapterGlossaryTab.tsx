@@ -31,7 +31,8 @@ import {
   Camera,
   GitFork,
   RefreshCw,
-  Maximize2
+  Maximize2,
+  HardDrive
 } from 'lucide-react';
 import {
   StoryChapter,
@@ -59,12 +60,14 @@ import { WorldAutoMapView } from '../../world/WorldAutoMapView';
 import { VerticalSceneTimeline } from './VerticalSceneTimeline';
 import { usePrivacy } from '../../../contexts/PrivacyContext';
 import { ImageViewerModal } from '../../common/ImageViewerModal';
+import { GDriveMediaPickerModal } from '../../media/GDriveMediaPickerModal';
 
 interface ChapterGlossaryTabProps {
   chapter: StoryChapter;
   bookTitle: string;
   entities: WorldEntity[];
   contentText: string;
+  onOpenGDriveSettings?: () => void;
   onUpdateChapter: (fields: Partial<StoryChapter>) => void;
   onInsertTextToManuscript: (text: string) => void;
 }
@@ -113,6 +116,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
   bookTitle,
   entities = [],
   contentText,
+  onOpenGDriveSettings,
   onUpdateChapter,
   onInsertTextToManuscript,
 }) => {
@@ -184,6 +188,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
   const [imageCategoryFilter, setImageCategoryFilter] = useState<'all' | MediaCategory>('all');
   const [imageSearchQuery, setImageSearchQuery] = useState('');
   const [isUploadImageModalOpen, setIsUploadImageModalOpen] = useState(false);
+  const [isGDriveOpen, setIsGDriveOpen] = useState(false);
   const [mediaActionToast, setMediaActionToast] = useState<string | null>(null);
   const [previewImageModal, setPreviewImageModal] = useState<{ url: string; name: string; caption?: string } | null>(null);
 
@@ -848,6 +853,24 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
     if (!uploadTitle) {
       setUploadTitle(file.name.replace(/\.[^/.]+$/, ''));
     }
+  };
+
+  const handleSelectGDriveMedia = async (mediaId: string, directUrl?: string) => {
+    let url = directUrl;
+    try {
+      const m = await db.media.get(mediaId);
+      if (m) {
+        setUploadFileBlob(m.blob);
+        url = URL.createObjectURL(m.blob);
+        if (!uploadTitle) setUploadTitle(m.name.replace(/\.[^/.]+$/, ''));
+      }
+    } catch (e) {
+      console.warn('Failed to load media from gdrive picker:', e);
+    }
+    if (url) {
+      setUploadPreviewUrl(url);
+    }
+    setIsGDriveOpen(false);
   };
 
   const handleScanUploadVision = async () => {
@@ -2360,19 +2383,33 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
               </button>
             </div>
 
-            {/* File Picker */}
-            <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-4 text-center hover:border-purple-500 transition cursor-pointer relative bg-slate-50 dark:bg-slate-800/40">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleUploadFileChange}
-                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-              />
-              <Upload className="w-7 h-7 mx-auto text-slate-400 mb-1" />
-              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                {uploadFileBlob ? uploadFileBlob.name : 'Pilih file gambar (PNG, JPG, WebP)'}
-              </p>
-              <p className="text-[10px] text-slate-400 mt-0.5">Klik untuk memilih gambar</p>
+            {/* Source Options: Galeri HP & Google Drive */}
+            <div className="grid grid-cols-2 gap-2">
+              <label className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-purple-500 rounded-2xl p-4 text-center cursor-pointer transition relative bg-slate-50 dark:bg-slate-800/40 flex flex-col items-center justify-center">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleUploadFileChange}
+                  className="hidden"
+                />
+                <Upload className="w-6 h-6 text-amber-500 mb-1" />
+                <p className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate max-w-[130px]">
+                  {uploadFileBlob ? (uploadFileBlob as File).name || 'Gambar Terpilih' : 'Galeri HP / File'}
+                </p>
+                <p className="text-[10px] text-slate-400 mt-0.5">Dari galeri perangkat</p>
+              </label>
+
+              <button
+                type="button"
+                onClick={() => setIsGDriveOpen(true)}
+                className="border-2 border-dashed border-blue-200 dark:border-blue-800 hover:border-blue-500 rounded-2xl p-4 text-center cursor-pointer transition bg-blue-50/50 dark:bg-blue-950/20 flex flex-col items-center justify-center"
+              >
+                <HardDrive className="w-6 h-6 text-blue-500 mb-1" />
+                <p className="text-xs font-bold text-blue-700 dark:text-blue-300">
+                  Google Drive
+                </p>
+                <p className="text-[10px] text-blue-400 mt-0.5">Dari cloud storage</p>
+              </button>
             </div>
 
             {/* Preview & AI Vision trigger */}
@@ -2529,6 +2566,18 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
           </div>
         </div>
       )}
+
+      {/* Google Drive Media Picker for Glossary Gallery */}
+      <GDriveMediaPickerModal
+        isOpen={isGDriveOpen}
+        onClose={() => setIsGDriveOpen(false)}
+        bookId={chapter.bookId}
+        entityId={chapter.id}
+        category={uploadCategory}
+        title="Pilih Gambar dari Google Drive"
+        onOpenSettings={onOpenGDriveSettings}
+        onSelectImage={handleSelectGDriveMedia}
+      />
 
       {/* ========================================================================= */}
       {/* 🔍 FULLSIZE IMAGE PREVIEW MODAL                                           */}

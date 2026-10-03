@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { X, Image as ImageIcon, Sparkles, BookOpen, Check, Layers } from 'lucide-react';
+import { X, Image as ImageIcon, Sparkles, BookOpen, Check, Layers, HardDrive, Upload, Trash2 } from 'lucide-react';
 import { Book, BookStatus } from '../../types';
 import { db, saveMediaItem, createSvgBlob } from '../../db';
+import { GDriveMediaPickerModal } from '../media/GDriveMediaPickerModal';
 
 interface CreateBookModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (newBook: Book) => void;
   initialStatus?: BookStatus;
+  onOpenGDriveSettings?: () => void;
 }
 
 const GENRE_SUGGESTIONS = [
@@ -24,8 +26,10 @@ export const CreateBookModal: React.FC<CreateBookModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
-  initialStatus = 'draft'
+  initialStatus = 'draft',
+  onOpenGDriveSettings,
 }) => {
+  const [bookId] = useState(() => 'book_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36));
   const [title, setTitle] = useState('');
   const [synopsis, setSynopsis] = useState('');
   const [genre, setGenre] = useState(GENRE_SUGGESTIONS[0]);
@@ -33,7 +37,9 @@ export const CreateBookModal: React.FC<CreateBookModalProps> = ({
   const [status, setStatus] = useState<BookStatus>(initialStatus);
   const [wordTarget, setWordTarget] = useState('50000');
   const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [selectedCoverMediaId, setSelectedCoverMediaId] = useState<string | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
+  const [isGDrivePickerOpen, setIsGDrivePickerOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
@@ -42,8 +48,26 @@ export const CreateBookModal: React.FC<CreateBookModalProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       setCoverFile(file);
+      setSelectedCoverMediaId(null);
       const url = URL.createObjectURL(file);
       setCoverPreviewUrl(url);
+    }
+  };
+
+  const handleRemoveCover = () => {
+    setCoverFile(null);
+    setSelectedCoverMediaId(null);
+    setCoverPreviewUrl(null);
+  };
+
+  const loadPreviewFromMediaId = async (mediaId: string) => {
+    try {
+      const m = await db.media.get(mediaId);
+      if (m && m.blob) {
+        setCoverPreviewUrl(URL.createObjectURL(m.blob));
+      }
+    } catch (e) {
+      console.error('Gagal memuat pratinjau media:', e);
     }
   };
 
@@ -53,10 +77,11 @@ export const CreateBookModal: React.FC<CreateBookModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      const bookId = 'book_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
       let coverMediaId: string | undefined;
 
-      if (coverFile) {
+      if (selectedCoverMediaId) {
+        coverMediaId = selectedCoverMediaId;
+      } else if (coverFile) {
         // Save uploaded user image blob to IndexedDB
         coverMediaId = await saveMediaItem(bookId, coverFile, coverFile.name);
       } else {
@@ -189,18 +214,45 @@ export const CreateBookModal: React.FC<CreateBookModalProps> = ({
               </div>
 
               <div className="flex-1 space-y-2">
-                <label className="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl cursor-pointer border border-slate-200 dark:border-slate-700 transition shadow-sm">
-                  <ImageIcon className="w-4 h-4 text-amber-500" />
-                  <span>Pilih Gambar Sampul</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Button 1: Galeri HP / File */}
+                  <label className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl cursor-pointer border border-slate-200 dark:border-slate-700 transition shadow-sm">
+                    <Upload className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Galeri HP / File</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  </label>
+
+                  {/* Button 2: Google Drive */}
+                  <button
+                    type="button"
+                    onClick={() => setIsGDrivePickerOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 dark:bg-blue-500/15 hover:dark:bg-blue-500/25 active:scale-95 text-blue-700 dark:text-blue-300 text-xs font-bold rounded-xl border border-blue-200 dark:border-blue-500/30 transition shadow-sm"
+                  >
+                    <HardDrive className="w-3.5 h-3.5 text-blue-500" />
+                    <span>Google Drive</span>
+                  </button>
+
+                  {/* Button 3: Hapus jika ada preview */}
+                  {coverPreviewUrl && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveCover}
+                      className="inline-flex items-center gap-1 px-2.5 py-2 text-rose-600 hover:text-rose-700 dark:text-rose-400 text-xs font-semibold rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/30 transition"
+                      title="Hapus sampul pilihan dan gunakan gradien default"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Hapus</span>
+                    </button>
+                  )}
+                </div>
+
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-normal">
-                  Disimpan langsung sebagai <strong>Blob di IndexedDB</strong> lokal tanpa upload ke server luar.
+                  Pilih gambar dari galeri HP Anda atau langsung ambil dari folder Google Drive.
                 </p>
               </div>
             </div>
@@ -271,6 +323,25 @@ export const CreateBookModal: React.FC<CreateBookModalProps> = ({
           </div>
         </form>
       </div>
+
+      {/* GDrive Media Picker Modal */}
+      <GDriveMediaPickerModal
+        isOpen={isGDrivePickerOpen}
+        onClose={() => setIsGDrivePickerOpen(false)}
+        bookId={bookId}
+        category="cover_book"
+        title="Pilih Sampul Buku dari Google Drive"
+        onOpenSettings={onOpenGDriveSettings}
+        onSelectImage={(newMediaId, directUrl) => {
+          setSelectedCoverMediaId(newMediaId);
+          setCoverFile(null);
+          if (directUrl) {
+            setCoverPreviewUrl(directUrl);
+          } else {
+            loadPreviewFromMediaId(newMediaId);
+          }
+        }}
+      />
     </div>
   );
 };

@@ -22,7 +22,9 @@ import {
   Feather,
   BookMarked,
   Image as ImageIcon,
-  Loader2
+  Loader2,
+  Upload,
+  HardDrive
 } from 'lucide-react';
 import { StoryBlueprint, BlueprintCharacter, BlueprintLocation, BlueprintItem, BlueprintChapter } from '../../types/blueprint';
 import { Book } from '../../types';
@@ -31,12 +33,15 @@ import { AIGenerationEvent } from '../../types/ai';
 import { analyzeCharacterPhotoWithVision } from '../../services/aiService';
 import { parseStoryOptions } from '../../utils/storyOptionsParser';
 import { usePrivacy } from '../../contexts/PrivacyContext';
+import { db } from '../../db';
+import { GDriveMediaPickerModal } from '../media/GDriveMediaPickerModal';
 
 interface AIStoryArchitectModalProps {
   isOpen: boolean;
   onClose: () => void;
   onProjectCreated: (book: Book) => void;
   onOpenAISettings: () => void;
+  onOpenGDriveSettings?: () => void;
   initialRawIdea?: string;
   autoStart?: boolean;
 }
@@ -46,6 +51,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
   onClose,
   onProjectCreated,
   onOpenAISettings,
+  onOpenGDriveSettings,
   initialRawIdea,
   autoStart,
 }) => {
@@ -79,6 +85,7 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
   });
   const [attemptHistory, setAttemptHistory] = useState<AIGenerationEvent[]>([]);
   const [scanningCharIndex, setScanningCharIndex] = useState<number | null>(null);
+  const [gdriveScanCharIndex, setGdriveScanCharIndex] = useState<number | null>(null);
   const [scanSuccessIndex, setScanSuccessIndex] = useState<{ index: number; msg: string } | null>(null);
 
   // Ensure modal always starts on input if no blueprint is loaded yet
@@ -227,6 +234,53 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
 
       updateBlueprint({ characters: updated });
       setScanSuccessIndex({ index, msg: `Berhasil dipindai: ${res.gender}, ${res.estimatedAge}` });
+      setTimeout(() => setScanSuccessIndex(null), 4500);
+    } catch (err: any) {
+      console.error('Vision scan error in AIStoryArchitectModal:', err);
+      alert('Gagal memindai foto tokoh: ' + (err?.message || 'Periksa API Key Gemini Anda'));
+    } finally {
+      setScanningCharIndex(null);
+    }
+  };
+
+  const handleScanCharacterFromGDrive = async (mediaId: string) => {
+    if (gdriveScanCharIndex === null || !blueprint) return;
+    const targetIndex = gdriveScanCharIndex;
+    setGdriveScanCharIndex(null);
+    setScanningCharIndex(targetIndex);
+    setScanSuccessIndex(null);
+    try {
+      const m = await db.media.get(mediaId);
+      if (!m) throw new Error('Media tidak ditemukan di database.');
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(m.blob);
+      });
+
+      const charName = blueprint.characters[targetIndex]?.name;
+      const res = await analyzeCharacterPhotoWithVision(base64, m.mimeType || 'image/jpeg', charName);
+
+      const detailedPhysical = [
+        res.physicalTraits ? `Ciri Fisik: ${res.physicalTraits}` : '',
+        res.clothingAttire ? `Pakaian: ${res.clothingAttire}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n\n');
+
+      const updated = [...blueprint.characters];
+      const curr = updated[targetIndex];
+      updated[targetIndex] = {
+        ...curr,
+        age: res.estimatedAge || curr.age,
+        physicalTraits: detailedPhysical || curr.physicalTraits,
+        visualPrompt: res.englishVisualPrompt || curr.visualPrompt,
+        shortDescription: curr.shortDescription?.trim() ? curr.shortDescription : res.shortSummary,
+      };
+
+      updateBlueprint({ characters: updated });
+      setScanSuccessIndex({ index: targetIndex, msg: `Berhasil dipindai: ${res.gender}, ${res.estimatedAge}` });
       setTimeout(() => setScanSuccessIndex(null), 4500);
     } catch (err: any) {
       console.error('Vision scan error in AIStoryArchitectModal:', err);
@@ -873,29 +927,41 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                         </span>
                       </div>
 
-                      <label className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold text-[11px] cursor-pointer shadow-xs active:scale-95 transition flex-shrink-0">
-                        {scanningCharIndex === i ? (
-                          <>
-                            <Loader2 className="w-3 h-3 animate-spin text-white" />
-                            <span>Memindai...</span>
-                          </>
-                        ) : (
-                          <>
-                            <ImageIcon className="w-3 h-3 text-white" />
-                            <span>Pindai Foto Tokoh</span>
-                          </>
-                        )}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <label className="inline-flex items-center gap-1 px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold text-[11px] cursor-pointer shadow-xs active:scale-95 transition">
+                          {scanningCharIndex === i ? (
+                            <>
+                              <Loader2 className="w-3 h-3 animate-spin text-white" />
+                              <span>Memindai...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-3 h-3 text-white" />
+                              <span>Galeri HP</span>
+                            </>
+                          )}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={scanningCharIndex !== null}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleScanCharacterPhoto(i, file);
+                            }}
+                          />
+                        </label>
+
+                        <button
+                          type="button"
                           disabled={scanningCharIndex !== null}
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleScanCharacterPhoto(i, file);
-                          }}
-                        />
-                      </label>
+                          onClick={() => setGdriveScanCharIndex(i)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-[11px] shadow-xs active:scale-95 transition disabled:opacity-50"
+                        >
+                          <HardDrive className="w-3 h-3 text-white" />
+                          <span>Google Drive</span>
+                        </button>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -1287,6 +1353,20 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
           </div>
         )}
       </div>
+
+      {/* Google Drive Media Picker for Character Vision Scan */}
+      <GDriveMediaPickerModal
+        isOpen={gdriveScanCharIndex !== null}
+        onClose={() => setGdriveScanCharIndex(null)}
+        category="character"
+        title={
+          gdriveScanCharIndex !== null && blueprint?.characters[gdriveScanCharIndex]
+            ? `Pindai Foto Tokoh: ${blueprint.characters[gdriveScanCharIndex].name}`
+            : 'Pindai Foto Tokoh dari Google Drive'
+        }
+        onOpenSettings={onOpenGDriveSettings}
+        onSelectImage={handleScanCharacterFromGDrive}
+      />
     </div>
   );
 };

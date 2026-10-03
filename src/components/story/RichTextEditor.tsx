@@ -57,6 +57,7 @@ interface RichTextEditorProps {
   onBack: () => void;
   onChapterUpdated: (updated: StoryChapter) => void;
   onSwitchChapter?: (chapter: StoryChapter) => void;
+  onOpenGDriveSettings?: () => void;
 }
 
 export const RichTextEditor: React.FC<RichTextEditorProps> = ({
@@ -67,6 +68,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   onBack,
   onChapterUpdated,
   onSwitchChapter,
+  onOpenGDriveSettings,
 }) => {
   const { getBlurTextClass, getBlurTitleClass, bindEmptyAreaLongPress } = usePrivacy();
   const editorRef = useRef<HTMLDivElement>(null);
@@ -891,6 +893,7 @@ ${afterHtml}
             chapter={currentChapter}
             bookTitle={bookTitle}
             contentText={contentText}
+            onOpenGDriveSettings={onOpenGDriveSettings}
             onUpdateChapter={handleUpdateChapterFields}
             onNavigateToManuscript={() => handleTabChange('manuscript')}
           />
@@ -1036,6 +1039,7 @@ ${afterHtml}
             bookTitle={bookTitle}
             entities={entities}
             contentText={contentText}
+            onOpenGDriveSettings={onOpenGDriveSettings}
             onUpdateChapter={handleUpdateChapterFields}
             onInsertTextToManuscript={handleInsertEntityName}
           />
@@ -1272,6 +1276,7 @@ ${afterHtml}
         chapterTitle={currentChapter.title}
         chapterId={currentChapter.id}
         entities={entities}
+        onOpenGDriveSettings={onOpenGDriveSettings}
         onInsertImage={handleInsertImage}
       />
 

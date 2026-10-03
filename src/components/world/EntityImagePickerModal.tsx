@@ -158,7 +158,7 @@ export const EntityImagePickerModal: React.FC<EntityImagePickerModalProps> = ({
             }`}
           >
             <Upload className="w-4 h-4" />
-            <span>Upload dari Perangkat</span>
+            <span>Galeri HP / File</span>
           </button>
           <button
             type="button"
@@ -190,7 +190,6 @@ export const EntityImagePickerModal: React.FC<EntityImagePickerModalProps> = ({
                 <input
                   type="file"
                   accept="image/*"
-                  capture="environment"
                   onChange={handleFileChange}
                   className="hidden"
                 />
@@ -201,7 +200,7 @@ export const EntityImagePickerModal: React.FC<EntityImagePickerModalProps> = ({
                       alt="Preview Avatar"
                       className="w-32 h-32 rounded-2xl object-cover mx-auto shadow-md border-2 border-pink-500"
                     />
-                    <p className="text-xs text-slate-500">Klik untuk mengganti berkas gambar</p>
+                    <p className="text-xs text-slate-500">Klik untuk mengganti dari Galeri HP</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -209,7 +208,7 @@ export const EntityImagePickerModal: React.FC<EntityImagePickerModalProps> = ({
                       <Upload className="w-6 h-6" />
                     </div>
                     <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                      Sentuh atau tarik berkas foto/kamera ke sini
+                      Pilih foto dari Galeri HP / File ke sini
                     </p>
                     <p className="text-[11px] text-slate-400">
                       Mendukung JPG, PNG, WEBP untuk foto karakter, peta lokasi, atau wujud relik

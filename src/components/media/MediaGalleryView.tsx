@@ -170,7 +170,7 @@ export const MediaGalleryView: React.FC<MediaGalleryViewProps> = ({
 
           <label className="inline-flex items-center justify-center gap-2 py-2.5 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-95 text-slate-950 font-bold rounded-xl text-xs shadow-md shadow-amber-500/20 cursor-pointer transition">
             <Plus className="w-4 h-4" />
-            <span>{isUploading ? 'Menyimpan...' : 'Unggah File'}</span>
+            <span>{isUploading ? 'Menyimpan...' : 'Galeri HP / File'}</span>
             <input
               type="file"
               accept="image/*"
@@ -203,17 +203,27 @@ export const MediaGalleryView: React.FC<MediaGalleryViewProps> = ({
           <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-4">
             Simpan gambar konsep, denah peta dunia, atau potret karakter ke dalam IndexedDB.
           </p>
-          <label className="inline-flex items-center gap-2 py-2 px-4 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-white font-semibold rounded-xl text-xs border border-slate-300 dark:border-slate-700 cursor-pointer transition shadow-sm">
-            <Plus className="w-4 h-4 text-amber-500" />
-            <span>Pilih File Gambar</span>
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-          </label>
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            <label className="inline-flex items-center gap-2 py-2 px-4 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs cursor-pointer transition shadow-sm active:scale-95">
+              <Plus className="w-4 h-4" />
+              <span>Galeri HP / File</span>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => setIsGDrivePickerOpen(true)}
+              className="inline-flex items-center gap-2 py-2 px-4 bg-blue-50 hover:bg-blue-100 dark:bg-blue-500/15 hover:dark:bg-blue-500/25 text-blue-700 dark:text-blue-300 font-bold rounded-xl text-xs border border-blue-200 dark:border-blue-500/30 transition shadow-sm active:scale-95"
+            >
+              <HardDrive className="w-4 h-4 text-blue-500" />
+              <span>Google Drive</span>
+            </button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">

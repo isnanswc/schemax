@@ -326,6 +326,7 @@ export function App() {
             setStudioChapter(newChapter);
             triggerRefresh();
           }}
+          onOpenGDriveSettings={handleOpenGDriveSettings}
         />
       ) : (
         <>
@@ -471,6 +472,7 @@ export function App() {
             isOpen={isCreateModalOpen}
             initialStatus={createModalInitialStatus}
             onClose={handleCloseCreateModal}
+            onOpenGDriveSettings={handleOpenGDriveSettings}
             onSuccess={(newBook) => {
               triggerRefresh();
               setCurrentBook(newBook);
@@ -508,6 +510,7 @@ export function App() {
               setArchitectAutoStart(false);
             }}
             onOpenAISettings={handleOpenAISettings}
+            onOpenGDriveSettings={handleOpenGDriveSettings}
           />
 
           {/* Toast Notification for back button exit guard */}

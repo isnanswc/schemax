@@ -15,11 +15,13 @@ import {
   Sparkles,
   RotateCcw,
   Loader2,
-  FileText
+  FileText,
+  HardDrive
 } from 'lucide-react';
 import { WorldEntity, WorldCategory } from '../../../types';
 import { db, saveMediaItem } from '../../../db';
 import { analyzeImageWithVision, ImageVisionAnalysis } from '../../../services/aiService';
+import { GDriveMediaPickerModal } from '../../media/GDriveMediaPickerModal';
 
 interface InsertStoryImageModalProps {
   isOpen: boolean;
@@ -29,6 +31,7 @@ interface InsertStoryImageModalProps {
   chapterTitle?: string;
   chapterId?: string;
   entities: WorldEntity[];
+  onOpenGDriveSettings?: () => void;
   onInsertImage: (
     imageUrl: string,
     caption: string,
@@ -46,6 +49,7 @@ export const InsertStoryImageModal: React.FC<InsertStoryImageModalProps> = ({
   chapterTitle = 'Bab Ini',
   chapterId,
   entities = [],
+  onOpenGDriveSettings,
   onInsertImage,
 }) => {
   const [sourceType, setSourceType] = useState<'upload' | 'url' | 'library'>('upload');
@@ -55,6 +59,7 @@ export const InsertStoryImageModal: React.FC<InsertStoryImageModalProps> = ({
   const [categoryFilter, setCategoryFilter] = useState<'all' | WorldCategory>('all');
   const [galleryImages, setGalleryImages] = useState<Array<{ id: string; name: string; url: string; mimeType: string }>>([]);
   const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const [isGDrivePickerOpen, setIsGDrivePickerOpen] = useState(false);
 
   // AI Vision states
   const [isAnalyzingVision, setIsAnalyzingVision] = useState(false);
@@ -183,6 +188,32 @@ export const InsertStoryImageModal: React.FC<InsertStoryImageModalProps> = ({
     reader.readAsDataURL(file);
   };
 
+  const handleGDriveSelect = async (mediaId: string, directUrl?: string) => {
+    let url = directUrl;
+    let mime = 'image/jpeg';
+    let name = 'Gambar Cerita';
+    try {
+      const m = await db.media.get(mediaId);
+      if (m) {
+        url = URL.createObjectURL(m.blob);
+        mime = m.mimeType;
+        name = m.name;
+        setCurrentFileBlob(null); // Already persisted in IndexedDB by GDriveMediaPickerModal
+        setCurrentMimeType(mime);
+      }
+    } catch (e) {
+      console.warn('Error reading media item from db:', e);
+    }
+
+    if (url) {
+      setImageUrl(url);
+      setCaption((prev) => prev || name.replace(/\.[^/.]+$/, ''));
+      setIsGDrivePickerOpen(false);
+      // Run AI Vision
+      runVisionAnalysis(url, mime);
+    }
+  };
+
   const toggleEntityTag = (entityId: string) => {
     setSelectedEntityIds((prev) =>
       prev.includes(entityId) ? prev.filter((id) => id !== entityId) : [...prev, entityId]
@@ -295,43 +326,52 @@ export const InsertStoryImageModal: React.FC<InsertStoryImageModalProps> = ({
         </div>
 
         {/* Source Switcher */}
-        <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80">
           <button
             type="button"
             onClick={() => setSourceType('upload')}
-            className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+            className={`py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
               sourceType === 'upload'
                 ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <Upload className="w-3.5 h-3.5" />
-            <span>Upload File</span>
+            <Upload className="w-3.5 h-3.5 text-amber-500" />
+            <span>Galeri HP</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsGDrivePickerOpen(true)}
+            className="py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 text-blue-600 dark:text-blue-400 hover:bg-white dark:hover:bg-slate-900 shadow-xs"
+          >
+            <HardDrive className="w-3.5 h-3.5" />
+            <span>Google Drive</span>
           </button>
 
           <button
             type="button"
             onClick={() => setSourceType('library')}
-            className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+            className={`py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
               sourceType === 'library'
                 ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <ImageIcon className="w-3.5 h-3.5" />
-            <span>Galeri Buku ({galleryImages.length})</span>
+            <ImageIcon className="w-3.5 h-3.5 text-purple-500" />
+            <span>Galeri ({galleryImages.length})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setSourceType('url')}
-            className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+            className={`py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
               sourceType === 'url'
                 ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <Link2 className="w-3.5 h-3.5" />
+            <Link2 className="w-3.5 h-3.5 text-emerald-500" />
             <span>Link URL</span>
           </button>
         </div>
@@ -345,9 +385,9 @@ export const InsertStoryImageModal: React.FC<InsertStoryImageModalProps> = ({
               onChange={handleFileUpload}
               className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
             />
-            <Upload className="w-7 h-7 mx-auto text-slate-400 mb-1" />
-            <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
-              {isProcessingFile ? 'Memproses gambar...' : 'Klik atau seret file gambar ke sini'}
+            <Upload className="w-7 h-7 mx-auto text-amber-500 mb-1" />
+            <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
+              {isProcessingFile ? 'Memproses gambar...' : 'Pilih dari Galeri HP / File Gambar'}
             </p>
             <p className="text-[10px] text-slate-400 mt-0.5">PNG, JPG, WebP, GIF</p>
           </div>
@@ -630,6 +670,18 @@ export const InsertStoryImageModal: React.FC<InsertStoryImageModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Google Drive Media Picker */}
+      <GDriveMediaPickerModal
+        isOpen={isGDrivePickerOpen}
+        onClose={() => setIsGDrivePickerOpen(false)}
+        bookId={bookId}
+        entityId={chapterId}
+        category="scene"
+        title="Pilih Gambar Cerita dari Google Drive"
+        onOpenSettings={onOpenGDriveSettings}
+        onSelectImage={handleGDriveSelect}
+      />
     </div>
   );
 };
