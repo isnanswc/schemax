@@ -10,6 +10,7 @@ import {
   Sparkles,
   Info,
   Maximize2
+} from 'lucide-react';
 import { db, deleteChapterCascade } from '../../db';
 import { navStack } from '../../services/backNavigationService';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
