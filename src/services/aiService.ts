@@ -1469,15 +1469,15 @@ ATURAN WAJIB & SANGAT KETAT:
 1. User selalu melampirkan gambar referensi karakter di generator gambar AI.
 2. JANGAN sebut atau deskripsikan bentuk wajah, warna kulit, atau postur tubuh karakter! Gunakan referensi visual yang dilampirkan.
 3. JANGAN sebut nama karakter di dalam prompt visual. Ganti dengan label dalam kurung siku seperti "[pria1]" atau "[wanita1]". Jika ada lebih dari satu, beri nomor (contoh: "[pria1]", "[wanita1]"). Tentukan HANYA 1 atau 2 tokoh sentral yang paling penting menghiasi sampul buku.
-4. JANGAN ubah model pakaian asli karakter secara drastis. HANYA boleh perubahan minor yang dramatis (misal: "jubah berlumur debu petualangan", "gaun anggun tersibak angin kencang", "pakaian zirah perang yang retak").
-5. Jelaskan secara sangat mendalam: KOMPOSISI SAMPUL VERTIKAL, POSE UTAMA, EKSPRESI EMOSI, ELEMEN SIMBOLIS / LATAR IKONIK DUNIA CERITA, PENCAHAYAAN (lighting dramatis, volumetric, chiaroscuro, rim light), dan ATMOSFER sinematik.
-6. Format teknis prompt: "Vertical book cover format (9:16), typography-ready negative space at top/bottom, 8k masterpiece, photorealistic cinematic concept art, [deskripsi pose, ekspresi, interaksi, pakaian minor change, latar, lighting] --ar 9:16".
+4. DILARANG KERAS mendeskripsikan pakaian, busana, atau aksesori karakter (referensi gambar sudah memuatnya). Deskripsikan HANYA: POSE tubuh, EKSPRESI wajah/emosi, dan AKTIVITAS yang sedang dilakukan.
+5. SESUAIKAN GAYA SECARA CERDAS dengan tone & vibe cerita (baca genre, sinopsis, dan konteks bab): tentukan sendiri genre-mood (misal romantis hangat, horor mencekam, thriller dingin, fantasi epik, drama melankolis), lalu pilih palet warna, pencahayaan, atmosfer, komposisi, dan color grading yang cocok. Semuanya WAJIB HYPER REALISTIC (photorealistic, real photography look, natural skin texture, bukan ilustrasi/anime/lukisan).
+6. DESAIN HARUS BENAR-BENAR SEPERTI COVER BUKU / POSTER NOVEL YANG DICETAK, dengan JUDUL BUKU tertanam sebagai tipografi di dalam gambar: judul \"${params.bookTitle}\" berukuran BESAR, tebal, dominan, ditempatkan di area yang seimbang dengan subjek (atas atau bawah), ejaan persis sama. Pilih gaya font (serif elegan / sans modern / handwritten / distressed / emboss metalik) yang selaras dengan vibe. Tambahkan layout khas cover buku (ruang kosong terkomposisi, hirarki visual, tagline kecil opsional). Format prompt: \"Professional printed book cover design (9:16), hyper realistic photorealistic, large bold title text '${params.bookTitle}' [posisi & gaya font], [pose, ekspresi, aktivitas], [latar simbolis, lighting, mood sesuai vibe], text integrated with the artwork, --ar 9:16\".
 7. WAJIB DAFTARKAN "characterReferences" HANYA tokoh yang benar-benar muncul dalam prompt di atas. SATU BARIS PER TOKOH, HANYA FORMAT: "Nama Karakter [label]". DILARANG KERAS MENAMBAHKAN DESKRIPSI, KOMA, ATAU KATA SIFAT SETELAH LABEL!
 8. WAJIB BERIKAN "explanation": Penjelasan konsep sampul dalam Bahasa Indonesia yang mengalir rapi, elegan, dan deskriptif.
 
 FORMAT KELUARAN (PENTING: Pisahkan prompt, penjelasan, dan karakter menggunakan blok tag):
 <<<PROMPT>>>
-Vertical book cover format (9:16), typography-ready negative space at top/bottom, 8k masterpiece, photorealistic cinematic concept art, [pria1] standing atop a crumbling cliff... --ar 9:16
+Professional printed book cover design (9:16), hyper realistic photorealistic, large bold title text '${params.bookTitle}' at the bottom third in elegant serif font, [pria1] standing still facing the horizon with a quiet resolute expression... text integrated with the artwork, --ar 9:16
 <<<END_PROMPT>>>
 
 <<<EXPLANATION>>>
@@ -1537,15 +1537,15 @@ ATURAN WAJIB & SANGAT KETAT:
 1. User selalu melampirkan gambar referensi karakter di generator gambar AI.
 2. JANGAN sebut atau deskripsikan bentuk wajah, warna kulit, atau postur tubuh karakter! Gunakan referensi visual yang dilampirkan.
 3. JANGAN sebut nama karakter di dalam prompt. Ganti dengan label dalam kurung siku seperti "[pria1]" atau "[wanita1]". Jika ada lebih dari satu, beri nomor (contoh: "[pria1]", "[wanita1]"). Batasi HANYA 1 atau 2 tokoh yang benar-benar ada dalam adegan bab ini.
-4. JANGAN ubah pakaian asli secara drastis. HANYA boleh perubahan minor realistis sesuai momen bab (misal: "baju robek di siku", "basah kuyup kena hujan", "jubah tersampir santai").
-5. Jelaskan secara sangat mendalam: FOKUS ADEGAN UTAMA BAB, POSE KARAKTER, EKSPRESI EMOSI, LATAR LINGKUNGAN, PENCAHAYAAN (lighting dramatis), dan ATMOSFER cerita bab ini.
-6. Format teknis prompt: "Vertical chapter cover (9:16), 8k hyper realistic, photorealistic cinematic concept art, [deskripsi pose, emosi, interaksi tokoh, latar bab, lighting dramatis] --ar 9:16".
+4. DILARANG KERAS mendeskripsikan pakaian, busana, atau aksesori karakter (referensi gambar sudah memuatnya). Deskripsikan HANYA: POSE tubuh, EKSPRESI wajah/emosi, dan AKTIVITAS yang sedang dilakukan.
+5. SESUAIKAN GAYA SECARA CERDAS dengan tone & vibe bab ini (baca premis/naskah): tentukan sendiri genre-mood (misal romantis hangat, horor mencekam, thriller dingin, fantasi epik, drama melankolis), lalu pilih palet warna, pencahayaan, atmosfer, depth of field, dan color grading yang cocok. Semuanya WAJIB HYPER REALISTIC (photorealistic, real photography look, natural skin texture, bukan ilustrasi/anime/lukisan).
+6. TIPOGRAFI SAMPUL BAB (WAJIB tertulis di dalam prompt): desain seperti poster/cover chapter profesional dengan teks tertanam pada gambar: judul buku \"${params.bookTitle}\" berukuran KECIL di bagian atas (small elegant text), dan judul bab \"${params.chapterTitle}\" berukuran BESAR, tebal, dominan sebagai focal typography (bold large chapter title). Pilih gaya font (serif/sans/handwritten/distressed) yang selaras dengan vibe cerita, ejaan teks harus persis sama dengan judul. Format prompt: \"Vertical chapter cover poster (9:16), hyper realistic photorealistic, small book title text '${params.bookTitle}' at the top, huge bold chapter title text '${params.chapterTitle}' [posisi], [pose, ekspresi, aktivitas], [latar, lighting, mood sesuai vibe], text integrated with the artwork, --ar 9:16\".
 7. WAJIB DAFTARKAN "characterReferences" HANYA tokoh yang benar-benar ada dalam adegan prompt di atas. SATU BARIS PER TOKOH, HANYA FORMAT: "Nama Tokoh [label]". DILARANG KERAS MENAMBAHKAN DESKRIPSI, KOMA, ATAU KATA SIFAT SETELAH LABEL!
 8. WAJIB BERIKAN "explanation": Penjelasan isi sampul bab dalam Bahasa Indonesia yang santai, jelas, dan mengalir elegan.
 
 FORMAT KELUARAN (PENTING: Pisahkan prompt, penjelasan, dan karakter menggunakan blok tag):
 <<<PROMPT>>>
-Vertical chapter cover (9:16), 8k hyper realistic, photorealistic cinematic concept art, [pria1]... --ar 9:16
+Vertical chapter cover poster (9:16), hyper realistic photorealistic, small book title text '${params.bookTitle}' at the top, huge bold chapter title text '${params.chapterTitle}' across the lower half, [pria1] gripping the railing with a tense, sleepless expression... text integrated with the artwork, --ar 9:16
 <<<END_PROMPT>>>
 
 <<<EXPLANATION>>>
