@@ -134,7 +134,8 @@ html:not(.dark) footer.sticky {
 /* Modal Backdrops in light mode */
 html:not(.dark) .fixed.inset-0.bg-black\/80,
 html:not(.dark) .fixed.inset-0.bg-black\/85,
-html:not(.dark) [class*="bg-black\/"] {
+html:not(.dark) .fixed.inset-0.bg-black\/60,
+html:not(.dark) .fixed.inset-0[class*="bg-black/"] {
   background-color: rgba(15, 23, 42, 0.45) !important;
   backdrop-filter: blur(8px) !important;
   -webkit-backdrop-filter: blur(8px) !important;

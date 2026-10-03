@@ -165,6 +165,24 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
     };
   }, []);
 
+  // Synchronized Local Entities State (Immediately reflects new relationships & scans)
+  const [localEntities, setLocalEntities] = useState<WorldEntity[]>(entities);
+
+  useEffect(() => {
+    setLocalEntities(entities);
+  }, [entities]);
+
+  const refreshEntitiesFromDb = async () => {
+    try {
+      const refreshed = await db.worldEntities.where('bookId').equals(chapter.bookId).toArray();
+      if (refreshed && refreshed.length > 0) {
+        setLocalEntities(refreshed);
+      }
+    } catch (err) {
+      console.warn('Gagal memuat ulang entitas:', err);
+    }
+  };
+
   // AI & Processing States
   const [isAnalyzingScenes, setIsAnalyzingScenes] = useState(false);
   const [isDetectingEntities, setIsDetectingEntities] = useState(false);
@@ -239,14 +257,14 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
 
   // Check which entities are mentioned in this chapter's text
   const lowerContent = contentText.toLowerCase();
-  const relevantEntities = entities.filter((ent) => {
+  const relevantEntities = localEntities.filter((ent) => {
     if (lowerContent.includes(ent.name.toLowerCase())) return true;
     if (ent.aliases && ent.aliases.some((a) => lowerContent.includes(a.toLowerCase()))) return true;
     return false;
   });
 
   // Filtered & Sorted Entities List for Unified "Entitas" Tab
-  const displayEntities = entities
+  const displayEntities = localEntities
     .filter((ent) => {
       // 1. Category / Relevant filter
       if (entityCategoryFilter === 'relevant') {
@@ -363,7 +381,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
       const detected = await detectWorldEntitiesInChapter(
         textToAnalyze,
         bookTitle,
-        entities.map((e) => ({
+        (localEntities.length > 0 ? localEntities : entities).map((e) => ({
           id: e.id,
           name: e.name,
           category: e.category,
@@ -387,11 +405,12 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
 
       // 2. LANGKAH 2/3: Pindai Auto Scene (adegan & visual prompt ilustrasi)
       setAiProcessStatus('Langkah 2/3: Menganalisis pembagian adegan & prompt visual (Auto Scene)...');
+      const currentEntitiesList = localEntities.length > 0 ? localEntities : entities;
       const generatedScenes = await generateChapterAutoScenes(
         chapter.title,
         bookTitle,
         textToAnalyze,
-        entities.map((e) => ({ id: e.id, name: e.name, category: e.category }))
+        currentEntitiesList.map((e) => ({ id: e.id, name: e.name, category: e.category }))
       );
 
       if (generatedScenes && generatedScenes.length > 0) {
@@ -399,12 +418,12 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
       }
 
       // 3. LANGKAH 3/3: Pindai Relasi Peta & Faksi (Auto-Map)
-      if (entities.length > 0) {
+      if (currentEntitiesList.length > 0) {
         setAiProcessStatus('Langkah 3/3: Memetakan relasi antar entitas, faksi & tata letak peta (Auto-Map)...');
         const storyContext = `Bab Ini: "${chapter.title}"\nPremis: ${chapter.premise || ''}\nNaskah Cerita Bab:\n${textToAnalyze.slice(0, 10000)}`;
         const autoMapRes = await autoMapWorldEntities(
           bookTitle,
-          entities,
+          currentEntitiesList,
           storyContext,
           (event) => {
             setActiveAiAttempt(event);
@@ -428,9 +447,9 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
           });
 
           for (const mapped of autoMapRes.mappedEntities) {
-            const ent = entities.find((e) => e.id === mapped.id || e.name.toLowerCase() === mapped.name.toLowerCase());
+            const ent = currentEntitiesList.find((e) => e.id === mapped.id || e.name.toLowerCase() === mapped.name.toLowerCase());
             if (ent) {
-              const updatedRels = mapped.relationships || ent.relationships;
+              const updatedRels = mapped.relationships && mapped.relationships.length > 0 ? mapped.relationships : ent.relationships;
               await db.worldEntities.update(ent.id, {
                 relationships: updatedRels,
                 faction: mapped.faction || ent.faction,
@@ -443,6 +462,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
           }
 
           onUpdateChapter({ chapterEntityStates: nextChapterEntityStates });
+          await refreshEntitiesFromDb();
         }
       }
 
@@ -558,6 +578,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
         updatedAt: Date.now(),
       };
       await db.worldEntities.add(newEntity);
+      await refreshEntitiesFromDb();
       setRegisteredEntityIds((prev) => ({ ...prev, [candidate.id]: true }));
 
       // Automatically prune added candidate so it disappears from the candidate list
@@ -617,6 +638,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
         }
 
         await db.worldEntities.update(target.id, updatedFields);
+        await refreshEntitiesFromDb();
         setUpdatedEntityIds((prev) => ({ ...prev, [candidate.id]: true }));
 
         // Record in chapterEntityStates for this chapter
@@ -710,6 +732,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
         chapterEntityStates: nextStates,
         aiDetectedEntities: detectedEntities.filter((c) => c.suggestedAction !== 'update_existing'),
       });
+      await refreshEntitiesFromDb();
       showToast(`Berhasil memperbarui ${updatedCount} entitas di Glosarium!`);
     } catch (err: any) {
       console.error('Gagal batch update entitas:', err);
@@ -803,6 +826,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
       }));
 
       await db.worldEntities.bulkAdd(newEntities);
+      await refreshEntitiesFromDb();
 
       // Prune all registered candidates so they don't remain in candidate list
       const remaining = detectedEntities.filter((c) => c.suggestedAction !== 'register_new');
@@ -828,6 +852,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
     if (!window.confirm(`Hapus "${entName}" dari Glosarium Dunia?`)) return;
     try {
       await db.worldEntities.delete(entId);
+      await refreshEntitiesFromDb();
       showToast(`Entitas "${entName}" berhasil dihapus.`);
     } catch (err) {
       alert('Gagal menghapus entitas.');
@@ -1856,11 +1881,12 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
           <WorldAutoMapView
             bookId={chapter.bookId}
             bookTitle={bookTitle}
-            entities={entities}
+            entities={localEntities}
             chapter={chapter}
             onUpdateChapter={onUpdateChapter}
             onClose={() => setActiveSubTab('entities')}
-            onRefresh={() => {
+            onRefresh={async () => {
+              await refreshEntitiesFromDb();
               if (onUpdateChapter) onUpdateChapter({});
             }}
           />

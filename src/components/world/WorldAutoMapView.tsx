@@ -233,7 +233,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
   // ---------------------------------------------------------------------------
   // Structured Clustered Faction Layout Engine (Mencegah Tumpang Tindih)
   // ---------------------------------------------------------------------------
-  const arrangeNeatFactionLayout = () => {
+  const arrangeNeatFactionLayout = (force = false) => {
     if (entities.length === 0) return;
 
     // Group entities by faction
@@ -301,7 +301,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
     });
 
     setNodePositions((prev) => {
-      const merged = { ...newPositions, ...prev };
+      const merged = force ? newPositions : { ...newPositions, ...prev };
       try {
         localStorage.setItem(MAP_POSITIONS_STORAGE_KEY, JSON.stringify(merged));
       } catch (_) {}
@@ -511,6 +511,21 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
           updatedAt: Date.now(),
         });
 
+        // Also update db.worldEntities so baseline relationships and factions are preserved
+        for (const item of aiPreviewData.mappedEntities) {
+          const matched = entityById.get(item.id) || entityByName.get(item.name.toLowerCase().trim());
+          if (matched) {
+            await db.worldEntities.update(matched.id, {
+              faction: item.faction || matched.faction,
+              factionColor: item.factionColor || factionColorMap[item.faction] || matched.factionColor || '#ec4899',
+              condition: item.condition || matched.condition || 'aktif',
+              conditionDetails: item.conditionDetails || matched.conditionDetails || '',
+              relationships: item.relationships && item.relationships.length > 0 ? item.relationships : matched.relationships,
+              updatedAt: Date.now(),
+            });
+          }
+        }
+
         if (onUpdateChapter) {
           onUpdateChapter({ chapterEntityStates: nextChapterEntityStates });
         }
@@ -532,7 +547,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
       }
 
       setAiPreviewData(null);
-      arrangeNeatFactionLayout();
+      arrangeNeatFactionLayout(true);
       onRefresh();
     } catch (err) {
       console.error('Gagal menerapkan hasil auto-map:', err);

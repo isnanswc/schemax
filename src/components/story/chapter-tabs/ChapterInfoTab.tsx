@@ -18,17 +18,19 @@ import {
   Maximize2,
   HardDrive
 } from 'lucide-react';
-import { StoryChapter, ChapterStatus, MediaItem } from '../../../types';
+import { StoryChapter, ChapterStatus, MediaItem, WorldEntity } from '../../../types';
 import { db, saveMediaItem } from '../../../db';
 import { generateRefinedPremise } from '../../../services/aiService';
 import { usePrivacy } from '../../../contexts/PrivacyContext';
 import { ImageViewerModal } from '../../common/ImageViewerModal';
 import { GDriveMediaPickerModal } from '../../media/GDriveMediaPickerModal';
+import { CoverPromptModal } from '../../media/CoverPromptModal';
 
 interface ChapterInfoTabProps {
   chapter: StoryChapter;
   bookTitle: string;
   contentText: string;
+  entities?: WorldEntity[];
   onOpenGDriveSettings?: () => void;
   onUpdateChapter: (fields: Partial<StoryChapter>) => void;
   onNavigateToManuscript: () => void;
@@ -38,6 +40,7 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
   chapter,
   bookTitle,
   contentText,
+  entities = [],
   onOpenGDriveSettings,
   onUpdateChapter,
   onNavigateToManuscript,
@@ -51,6 +54,7 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
   const [isGeneratingPremise, setIsGeneratingPremise] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
+  const [isCoverPromptModalOpen, setIsCoverPromptModalOpen] = useState(false);
 
   // Synchronize all fields when switching chapters
   useEffect(() => {
@@ -305,6 +309,15 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
             <div className="flex items-center gap-1.5 flex-shrink-0 pointer-events-auto">
               <button
                 type="button"
+                onClick={() => setIsCoverPromptModalOpen(true)}
+                className="py-1 px-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-amber-500 hover:from-pink-600 hover:to-amber-600 text-slate-950 text-xs font-bold transition shadow-sm active:scale-95 flex items-center gap-1"
+                title="Rancang Prompt Sampul Bab AI (9:16)"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-slate-950" />
+                <span>Prompt AI</span>
+              </button>
+              <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   loadMediaItems();
@@ -326,7 +339,7 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
                 <Trash2 className="w-4 h-4" />
               </button>
               <div
-                className="p-1.5 rounded-xl bg-black/40 hover:bg-black/60 backdrop-blur-md text-white/90 transition shadow-sm"
+                className="p-1.5 rounded-xl bg-black/40 hover:bg-black/60 backdrop-blur-md text-white/90 transition shadow-sm cursor-pointer"
                 title="Lihat Gambar Penuh"
               >
                 <Maximize2 className="w-4 h-4" />
@@ -351,29 +364,26 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
           <div className="flex items-center gap-2">
             {!coverUrl && (
               <div className="flex items-center gap-1.5 flex-wrap">
-                <label className="py-1 px-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-400 text-xs font-bold transition flex items-center gap-1 cursor-pointer border border-amber-200/60 dark:border-amber-800/60 active:scale-95 shadow-xs">
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>Galeri HP</span>
-                  <input type="file" accept="image/*" onChange={handleUploadCoverFile} className="hidden" />
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setIsGDrivePickerOpen(true)}
-                  className="py-1 px-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400 text-xs font-bold transition flex items-center gap-1 border border-blue-200/60 dark:border-blue-800/60 active:scale-95 shadow-xs"
-                >
-                  <HardDrive className="w-3.5 h-3.5" />
-                  <span>GDrive</span>
-                </button>
                 <button
                   type="button"
                   onClick={() => {
                     loadMediaItems();
                     setIsMediaPickerOpen(true);
                   }}
-                  className="py-1 px-2.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/50 text-purple-600 dark:text-purple-400 text-xs font-bold transition flex items-center gap-1 border border-purple-200/60 dark:border-purple-800/60 active:scale-95 shadow-xs"
+                  className="py-1 px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition flex items-center gap-1 border border-slate-200 dark:border-slate-700 active:scale-95 shadow-xs"
+                  title="Pilih atau unggah sampul bab"
                 >
-                  <ImageIcon className="w-3.5 h-3.5" />
-                  <span>Galeri</span>
+                  <ImageIcon className="w-3.5 h-3.5 text-amber-500" />
+                  <span>+ Sampul</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsCoverPromptModalOpen(true)}
+                  className="py-1 px-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-amber-500 hover:from-pink-600 hover:to-amber-600 text-slate-950 text-xs font-bold transition flex items-center gap-1 active:scale-95 shadow-xs"
+                  title="Rancang Prompt Sampul Bab AI (9:16)"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-slate-950" />
+                  <span>Prompt AI</span>
                 </button>
               </div>
             )}
@@ -588,8 +598,8 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
               </button>
             </div>
 
-            {/* Options: Upload File & Google Drive */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {/* Options: Upload File, Google Drive, Prompt AI */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {/* Upload New Button */}
               <div className="flex items-center justify-between p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-500/20">
                 <div className="text-xs">
@@ -606,8 +616,8 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
               {/* Google Drive Option */}
               <div className="flex items-center justify-between p-3 rounded-2xl bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-500/20">
                 <div className="text-xs">
-                  <p className="font-bold text-indigo-900 dark:text-indigo-200">Dari Google Drive</p>
-                  <p className="text-[10px] text-indigo-700 dark:text-indigo-300">Folder sinkronisasi</p>
+                  <p className="font-bold text-indigo-900 dark:text-indigo-200">Google Drive</p>
+                  <p className="text-[10px] text-indigo-700 dark:text-indigo-300">Folder cloud</p>
                 </div>
                 <button
                   type="button"
@@ -615,7 +625,26 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
                   className="py-1.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95 transition"
                 >
                   <HardDrive className="w-3.5 h-3.5" />
-                  <span>Buka Drive</span>
+                  <span>Drive</span>
+                </button>
+              </div>
+
+              {/* Prompt AI Option */}
+              <div className="flex items-center justify-between p-3 rounded-2xl bg-gradient-to-tr from-pink-500/10 to-amber-500/10 border border-pink-300/40 dark:border-pink-800/40">
+                <div className="text-xs">
+                  <p className="font-bold text-slate-900 dark:text-white">Prompt AI</p>
+                  <p className="text-[10px] text-slate-400">Rancang ide (9:16)</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMediaPickerOpen(false);
+                    setIsCoverPromptModalOpen(true);
+                  }}
+                  className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-pink-500 to-amber-500 hover:from-pink-600 text-slate-950 font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95 transition"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Prompt</span>
                 </button>
               </div>
             </div>
@@ -655,7 +684,7 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
               <button
                 type="button"
                 onClick={() => setIsMediaPickerOpen(false)}
-                className="w-full py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs"
+                className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-200 dark:hover:bg-slate-700 transition"
               >
                 Tutup
               </button>
@@ -685,6 +714,27 @@ export const ChapterInfoTab: React.FC<ChapterInfoTabProps> = ({
         category="cover_chapter"
         title={`Pilih Sampul Bab ${chapter.order} dari Google Drive`}
         onOpenSettings={onOpenGDriveSettings}
+      />
+
+      {/* AI Chapter Cover Prompt Modal */}
+      <CoverPromptModal
+        isOpen={isCoverPromptModalOpen}
+        onClose={() => setIsCoverPromptModalOpen(false)}
+        type="chapter"
+        bookTitle={bookTitle}
+        chapterTitle={chapter.title}
+        chapterOrder={chapter.order}
+        premise={premise}
+        contentText={contentText}
+        entities={entities}
+        onOpenLocalUpload={() => {
+          setIsCoverPromptModalOpen(false);
+          setIsMediaPickerOpen(true);
+        }}
+        onOpenGDrive={() => {
+          setIsCoverPromptModalOpen(false);
+          setIsGDrivePickerOpen(true);
+        }}
       />
     </div>
   );

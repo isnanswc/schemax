@@ -413,6 +413,8 @@ export const ChapterReaderView: React.FC<ChapterReaderViewProps> = ({
 
                 const isDarkTheme = settings.theme === 'dark' || settings.theme === 'black';
 
+                const showTopBar = isTTSCurrent || (settings.showEmotionCues && emotionTag && emotionAcoustics);
+
                 return (
                   <div
                     key={idx}
@@ -420,116 +422,62 @@ export const ChapterReaderView: React.FC<ChapterReaderViewProps> = ({
                     className={`group/para relative transition-all duration-300 rounded-2xl ${
                       isTTSCurrent
                         ? isDarkTheme
-                          ? 'p-3.5 sm:p-4 bg-amber-500/20 ring-2 ring-amber-400/60 shadow-lg shadow-amber-500/10'
+                          ? 'p-3 sm:p-4 bg-amber-500/15 ring-2 ring-amber-400/50 shadow-lg shadow-amber-500/10'
                           : settings.theme === 'sepia'
-                          ? 'p-3.5 sm:p-4 bg-amber-700/15 ring-2 ring-amber-800/40 shadow-sm'
-                          : 'p-3.5 sm:p-4 bg-amber-500/15 ring-2 ring-amber-500/60 shadow-md shadow-amber-500/10'
-                        : 'p-1 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
+                          ? 'p-3 sm:p-4 bg-amber-700/10 ring-2 ring-amber-800/30 shadow-xs'
+                          : 'p-3 sm:p-4 bg-amber-500/10 ring-2 ring-amber-500/40 shadow-xs'
+                        : 'py-1 px-0.5'
                     }`}
                   >
-                    {/* Top Metadata Bar: Live Karaoke Tracker + Actor Cue + Cache Status */}
-                    <div className="flex items-center justify-between gap-2 mb-2 flex-wrap text-[11px]">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {/* Live Sound Wave Badge when this paragraph is currently spoken */}
-                        {isTTSCurrent && (
-                          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] shadow-sm animate-pulse">
-                            <span className="flex items-center gap-0.5 h-3">
-                              <span className="w-0.5 h-2.5 bg-slate-950 rounded-full animate-bounce [animation-delay:-0.3s]" />
-                              <span className="w-0.5 h-3.5 bg-slate-950 rounded-full animate-bounce [animation-delay:-0.15s]" />
-                              <span className="w-0.5 h-2 bg-slate-950 rounded-full animate-bounce" />
-                            </span>
-                            <span>Sedang Dibacakan</span>
-                          </div>
-                        )}
+                    {/* Top Metadata Bar: Only shown when currently spoken or when emotion cues enabled */}
+                    {showTopBar && (
+                      <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap text-[11px]">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {/* Live Sound Wave Badge when this paragraph is currently spoken */}
+                          {isTTSCurrent && (
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] shadow-sm animate-pulse">
+                              <span className="flex items-center gap-0.5 h-3">
+                                <span className="w-0.5 h-2.5 bg-slate-950 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                                <span className="w-0.5 h-3.5 bg-slate-950 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                                <span className="w-0.5 h-2 bg-slate-950 rounded-full animate-bounce" />
+                              </span>
+                              <span>Sedang Dibacakan</span>
+                            </div>
+                          )}
 
-                        {/* Optional Drama & Emotion Actor Cue Badge */}
-                        {settings.showEmotionCues && emotionTag && emotionAcoustics && (
-                          <span
-                            className={`font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 text-[10px] ${emotionAcoustics.color}`}
-                            title={`[Petunjuk Akting]: ${emotionTag.actingNotes}`}
-                          >
-                            <span>{emotionAcoustics.icon}</span>
-                            <span>{emotionTag.speaker}</span>
-                            <span className="opacity-40">•</span>
-                            <span className="font-normal">{emotionTag.emotionLabel}</span>
-                          </span>
-                        )}
-
-                        {/* Offline Persistent Audio Cache Badge */}
-                        {cacheStatus?.hasCache && !cacheStatus?.isStale && (
-                          <span
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
-                            title={`Audio tersimpan di perangkat via engine ${cacheStatus.engine || 'AI'} (0 token / hemat kuota)`}
-                          >
-                            <HardDrive className="w-2.5 h-2.5" />
-                            <span>Audio Tersimpan (0 Token)</span>
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Stale Text Warning & Regenerate Button */}
-                      <div className="flex items-center gap-1.5">
-                        {cacheStatus?.isStale && (
-                          <div className="inline-flex items-center gap-1.5 bg-rose-500/10 dark:bg-rose-500/20 border border-rose-500/30 px-2 py-0.5 rounded-full">
-                            <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400">
-                              ⚠️ Teks berubah
-                            </span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRegenerateParagraphAudio(idx);
-                              }}
-                              disabled={isRegenerating}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white font-black text-[9px] transition active:scale-95 shadow-xs disabled:opacity-50"
-                              title="Teks diubah sejak audio dibuat. Klik untuk men-generate ulang audio khusus paragraf ini."
+                          {/* Optional Drama & Emotion Actor Cue Badge */}
+                          {settings.showEmotionCues && emotionTag && emotionAcoustics && (
+                            <span
+                              className={`font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 text-[10px] ${emotionAcoustics.color}`}
+                              title={`[Petunjuk Akting]: ${emotionTag.actingNotes}`}
                             >
-                              <RotateCcw className={`w-2.5 h-2.5 ${isRegenerating ? 'animate-spin' : ''}`} />
-                              <span>Generate Ulang</span>
-                            </button>
-                          </div>
-                        )}
-
-                        {/* Quick Play from this paragraph (Visible with soft opacity on mobile touchscreen) */}
-                        {!isTTSCurrent && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveTTSParagraph(idx);
-                              setIsTTSActive(true);
-                            }}
-                            className="opacity-70 sm:opacity-0 group-hover/para:opacity-100 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500 hover:text-slate-950 transition active:scale-95"
-                            title="Dengarkan mulai dari paragraf ini"
-                          >
-                            <Play className="w-2.5 h-2.5 fill-current" />
-                            <span>Putar</span>
-                          </button>
-                        )}
+                              <span>{emotionAcoustics.icon}</span>
+                              <span>{emotionTag.speaker}</span>
+                              <span className="opacity-40">•</span>
+                              <span className="font-normal">{emotionTag.emotionLabel}</span>
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     <p
                       onClick={() => {
-                        if (isTTSActive) {
-                          setActiveTTSParagraph(idx);
-                        } else {
-                          setActiveTTSParagraph(idx);
-                          setIsTTSActive(true);
-                        }
+                        setActiveTTSParagraph(idx);
+                        setIsTTSActive(true);
                       }}
-                      className={`transition-all duration-200 cursor-pointer ${
+                      className={`transition-colors duration-200 cursor-pointer ${
                         isTTSCurrent
                           ? isDarkTheme
-                            ? 'text-amber-200 font-semibold leading-relaxed drop-shadow-xs'
+                            ? 'text-amber-200 font-semibold'
                             : settings.theme === 'sepia'
-                            ? 'text-[#2b1805] font-semibold leading-relaxed'
-                            : 'text-slate-950 font-semibold leading-relaxed'
-                          : 'hover:opacity-90'
+                            ? 'text-[#2b1805] font-semibold'
+                            : 'text-slate-950 font-semibold'
+                          : ''
                       } ${getBlurTextClass()}`}
                       style={{
-                        borderLeft: tensionColor ? `4px solid ${tensionColor.hex}` : undefined,
-                        paddingLeft: tensionColor ? '12px' : undefined,
+                        borderLeft: tensionColor ? `3px solid ${tensionColor.hex}` : undefined,
+                        paddingLeft: tensionColor ? '10px' : undefined,
                       }}
                       title={
                         emotionTag

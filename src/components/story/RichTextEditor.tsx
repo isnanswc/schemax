@@ -893,6 +893,7 @@ ${afterHtml}
             chapter={currentChapter}
             bookTitle={bookTitle}
             contentText={contentText}
+            entities={entities}
             onOpenGDriveSettings={onOpenGDriveSettings}
             onUpdateChapter={handleUpdateChapterFields}
             onNavigateToManuscript={() => handleTabChange('manuscript')}

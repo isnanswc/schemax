@@ -1175,6 +1175,136 @@ Keluarkan HANYA JSON object valid:
   };
 }
 
+export interface CoverPromptResult {
+  prompt: string;
+  explanation: string;
+  characterReferences: string[];
+}
+
+// 3b. AI Book Cover Visual Concept Prompt Engine
+export async function generateBookCoverPrompt(
+  params: {
+    bookTitle: string;
+    genre?: string;
+    synopsis?: string;
+    entities?: Array<{ name: string; category?: string; shortDescription?: string; initialTraits?: string }>;
+  },
+  onEvent?: (event: AIGenerationEvent) => void
+): Promise<CoverPromptResult> {
+  const charactersList = (params.entities || [])
+    .filter((e) => !e.category || e.category === 'character')
+    .slice(0, 10)
+    .map((e) => `- ${e.name}: ${e.shortDescription || e.initialTraits || 'Tokoh cerita'}`)
+    .join('\n');
+
+  const prompt = `Anda adalah seorang visual director, concept artist, dan art designer spesialis sampul novel / buku terkemuka.
+Tugas Anda adalah merancang PROMPT VISUAL UNTUK SAMPUL BUKU (BOOK COVER) yang memukau, bernilai seni tinggi, dan berorientasi vertikal.
+
+Informasi Buku:
+- Judul Buku: "${params.bookTitle}"
+- Genre: ${params.genre || 'Fiksi Fantasi / Drama'}
+- Sinopsis / Garis Besar Cerita:
+${params.synopsis ? wrapPromptSandbox(params.synopsis.slice(0, 3000), 'SINOPSIS') : 'Cerita fiksi mendalam'}
+
+Daftar Tokoh yang Ada dalam Cerita:
+${charactersList || 'Belum ada tokoh spesifik tercatat'}
+
+ATURAN WAJIB & SANGAT KETAT:
+1. User selalu melampirkan gambar referensi karakter di sebelah prompt.
+2. JANGAN sebut atau deskripsikan bentuk wajah, warna kulit, atau postur tubuh karakter! Gunakan referensi visual yang dilampirkan.
+3. JANGAN sebut nama karakter di dalam prompt. Ganti dengan label dalam kurung siku seperti "[pria1]" atau "[wanita1]". Jika ada lebih dari satu, beri nomor (contoh: "[pria1]", "[wanita1]", "[pria2]"). Tentukan siapa tokoh utama yang paling tepat menghiasi sampul buku.
+4. JANGAN ubah model pakaian asli karakter secara drastis. HANYA boleh perubahan minor atau elemen khas sampul novel (misal: "jubah berlumur debu petualangan", "gaun anggun tersibak angin", "pakaian formal kusut karena pertempuran").
+5. Jelaskan secara sangat mendalam: KOMPOSISI SAMPUL VERTIKAL, POSE UTAMA, EKSPRESI EMOSI, ELEMEN SIMBOLIS / LATAR IKONIK DUNIA CERITA, PENCAHAYAAN (lighting dramatis, volumetric, chiaroscuro, rim light), dan ATMOSFER sinematik.
+6. Format teknis: "Vertical book cover format (9:16), typography-ready negative space at top/bottom, 8k masterpiece, photorealistic cinematic concept art, [deskripsi pose, ekspresi, interaksi, pakaian minor change, latar, lighting] --ar 9:16".
+7. Berikan daftar "characterReferences": Nama-nama karakter asli yang gambarnya harus dilampirkan oleh user (misal: ["Agung", "Santi"]).
+8. Berikan "explanation": Penjelasan isi sampul dalam Bahasa Indonesia yang santai, jelas, dan sebutkan nama karakter yang dimaksud beserta label bracketnya, misal: Agung [pria1] berdiri membelakangi badai, sementara Santi [wanita1] menggenggam liontin bercahaya.
+
+Keluarkan HANYA JSON object valid:
+{
+  "characterReferences": ["Nama Karakter 1", "Nama Karakter 2"],
+  "prompt": "Vertical book cover format 9:16, typography-ready negative space at top/bottom, 8k masterpiece, photorealistic cinematic concept art, [pria1] standing atop a crumbling cliff...",
+  "explanation": "Desain sampul buku menampilkan Agung [pria1] yang menatap ke arah reruntuhan kota..."
+}`;
+
+  const systemPrompt =
+    'Anda adalah visual director dan art designer profesional spesialis sampul buku. Keluarkan HANYA JSON object valid.';
+  const res = await generateWithSmartFallback(prompt, systemPrompt, onEvent);
+  const parsed = resilientParseJsonObject(res.text);
+
+  return {
+    prompt: parsed.prompt || res.text.replace(/^```json|```$/g, '').trim(),
+    explanation: parsed.explanation || '',
+    characterReferences: Array.isArray(parsed.characterReferences)
+      ? parsed.characterReferences
+      : [],
+  };
+}
+
+// 3c. AI Chapter Cover Visual Concept Prompt Engine
+export async function generateChapterCoverPrompt(
+  params: {
+    bookTitle: string;
+    chapterTitle: string;
+    chapterOrder?: number;
+    premise?: string;
+    contentText?: string;
+    entities?: Array<{ name: string; category?: string; shortDescription?: string; initialTraits?: string }>;
+  },
+  onEvent?: (event: AIGenerationEvent) => void
+): Promise<CoverPromptResult> {
+  const charactersList = (params.entities || [])
+    .filter((e) => !e.category || e.category === 'character')
+    .slice(0, 10)
+    .map((e) => `- ${e.name}: ${e.shortDescription || e.initialTraits || 'Tokoh cerita'}`)
+    .join('\n');
+
+  const contentSnippet = (params.contentText || '')
+    .slice(0, 4000)
+    .trim();
+
+  const prompt = `Anda adalah visual director dan concept artist profesional spesialis sampul bab / chapter cover & web novel banner.
+Tugas Anda adalah merancang PROMPT VISUAL UNTUK SAMPUL BAB (CHAPTER COVER) yang menangkap momen klimaks, ketegangan, atau suasana paling emosional dari bab ini.
+
+Informasi Bab:
+- Judul Buku: "${params.bookTitle}"
+- Bab: ${params.chapterOrder ? `Bab ${params.chapterOrder}: ` : ''}"${params.chapterTitle}"
+- Premis Bab: ${params.premise || 'Momen penting dalam cerita'}
+${contentSnippet ? `- Cuplikan Naskah Bab:\n${wrapPromptSandbox(contentSnippet, 'CUPLIKAN_NASKAH')}` : ''}
+
+Daftar Tokoh yang Berpotensi Hadir:
+${charactersList || 'Tokoh cerita'}
+
+ATURAN WAJIB & SANGAT KETAT:
+1. User selalu melampirkan gambar referensi karakter di sebelah prompt.
+2. JANGAN sebut atau deskripsikan bentuk wajah, warna kulit, atau postur tubuh karakter! Gunakan referensi visual yang dilampirkan.
+3. JANGAN sebut nama karakter di dalam prompt. Ganti dengan label dalam kurung siku seperti "[pria1]" atau "[wanita1]". Jika ada lebih dari satu, beri nomor (contoh: "[pria1]", "[wanita1]", "[pria2]").
+4. JANGAN ubah pakaian asli secara drastis. HANYA boleh perubahan minor realistis sesuai momen bab (misal: "baju robek di siku", "basah kuyup kena hujan", "jubah tersampir santai").
+5. Jelaskan secara sangat mendalam: FOKUS ADEGAN UTAMA BAB, POSE KARAKTER, EKSPRESI EMOSI, LATAR LINGKUNGAN, PENCAHAYAAN (lighting dramatis), dan ATMOSFER cerita bab ini.
+6. Format teknis: "Vertical chapter cover (9:16), 8k hyper realistic, photorealistic cinematic concept art, [deskripsi pose, emosi, interaksi tokoh, latar bab, lighting dramatis] --ar 9:16".
+7. Berikan daftar "characterReferences": Nama-nama karakter asli yang gambarnya harus dilampirkan oleh user (misal: ["Budi", "Rina"]).
+8. Berikan "explanation": Penjelasan isi sampul bab dalam Bahasa Indonesia yang santai, jelas, dan sebutkan nama karakter yang dimaksud beserta label bracketnya, misal: Budi [pria1] berhadapan sengit dengan musuh di tengah lorong gelap.
+
+Keluarkan HANYA JSON object valid:
+{
+  "characterReferences": ["Nama Karakter"],
+  "prompt": "Vertical chapter cover 9:16, 8k hyper realistic, photorealistic cinematic concept art, [pria1]...",
+  "explanation": "Sampul bab memperlihatkan momen ketika Budi [pria1]..."
+}`;
+
+  const systemPrompt =
+    'Anda adalah visual director dan concept artist profesional spesialis chapter cover. Keluarkan HANYA JSON object valid.';
+  const res = await generateWithSmartFallback(prompt, systemPrompt, onEvent);
+  const parsed = resilientParseJsonObject(res.text);
+
+  return {
+    prompt: parsed.prompt || res.text.replace(/^```json|```$/g, '').trim(),
+    explanation: parsed.explanation || '',
+    characterReferences: Array.isArray(parsed.characterReferences)
+      ? parsed.characterReferences
+      : [],
+  };
+}
+
 // 4. Polish Raw Draft to Prose Engine
 export async function enhanceRawToProse(
   rawText: string,

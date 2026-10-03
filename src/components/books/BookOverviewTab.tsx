@@ -29,6 +29,7 @@ import { usePrivacy } from '../../contexts/PrivacyContext';
 import { ImageViewerModal } from '../common/ImageViewerModal';
 import { BookBackupModal } from './BookBackupModal';
 import { GDriveMediaPickerModal } from '../media/GDriveMediaPickerModal';
+import { CoverPromptModal } from '../media/CoverPromptModal';
 
 interface BookOverviewTabProps {
   book: Book;
@@ -57,6 +58,7 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
   const [targetWordCount, setTargetWordCount] = useState(book.wordCountTarget || 50000);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSelectCoverModalOpen, setIsSelectCoverModalOpen] = useState(false);
+  const [isCoverPromptModalOpen, setIsCoverPromptModalOpen] = useState(false);
   const [isPdfExportModalOpen, setIsPdfExportModalOpen] = useState(false);
   const [isCoverFullscreenOpen, setIsCoverFullscreenOpen] = useState(false);
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
@@ -169,27 +171,24 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
               )}
             </div>
 
-            <div className="flex items-center flex-wrap justify-center gap-1.5 pt-1">
-              <label className="px-2 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 cursor-pointer flex items-center gap-1 text-[11px] font-semibold transition active:scale-95 shadow-xs border border-amber-200/50 dark:border-amber-800/50">
-                <Upload className="w-3 h-3" />
-                <span>Galeri HP</span>
-                <input type="file" accept="image/*" onChange={handleCoverUpload} className="hidden" />
-              </label>
-              <button
-                type="button"
-                onClick={() => setIsGDrivePickerOpen(true)}
-                className="px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 flex items-center gap-1 text-[11px] font-semibold transition active:scale-95 shadow-xs border border-blue-200/50 dark:border-blue-800/50"
-              >
-                <HardDrive className="w-3 h-3" />
-                <span>GDrive</span>
-              </button>
+            <div className="flex items-center gap-1.5 pt-1 w-full justify-center">
               <button
                 type="button"
                 onClick={() => setIsSelectCoverModalOpen(true)}
-                className="px-2 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/50 flex items-center gap-1 text-[11px] font-semibold transition active:scale-95 shadow-xs border border-purple-200/50 dark:border-purple-800/50"
+                className="flex-1 py-1.5 px-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center justify-center gap-1 text-[11px] font-bold transition active:scale-95 border border-slate-200 dark:border-slate-700 shadow-xs"
+                title="Ganti atau pilih sampul buku"
               >
-                <ImageIcon className="w-3 h-3" />
-                <span>Buku ({mediaList.length})</span>
+                <ImageIcon className="w-3.5 h-3.5 text-amber-500" />
+                <span>Sampul</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsCoverPromptModalOpen(true)}
+                className="flex-1 py-1.5 px-2 rounded-xl bg-gradient-to-r from-pink-500 to-amber-500 hover:from-pink-600 hover:to-amber-600 text-slate-950 flex items-center justify-center gap-1 text-[11px] font-bold transition active:scale-95 shadow-xs"
+                title="Rancang Prompt Cover Buku AI (9:16)"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-slate-950" />
+                <span>Prompt AI</span>
               </button>
             </div>
           </div>
@@ -480,68 +479,89 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
               </button>
             </div>
 
-            {mediaList.length === 0 ? (
-              <div className="text-center py-8 px-4 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl space-y-3">
-                <p className="text-xs text-slate-400">
-                  Belum ada gambar yang diunggah di buku ini.
-                </p>
-                <div className="flex items-center justify-center gap-2">
-                  <label className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs cursor-pointer flex items-center gap-1.5 transition shadow-sm">
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>Galeri HP / File</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={async (e) => {
-                        await handleCoverUpload(e);
-                        setIsSelectCoverModalOpen(false);
-                      }}
-                      className="hidden"
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsSelectCoverModalOpen(false);
-                      setIsGDrivePickerOpen(true);
-                    }}
-                    className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm"
-                  >
-                    <HardDrive className="w-3.5 h-3.5" />
-                    <span>Google Drive</span>
-                  </button>
+            {/* Quick Action Tiles: Galeri HP, Google Drive, Prompt AI */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <label className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/40 hover:bg-amber-100 dark:hover:bg-amber-900/30 cursor-pointer flex flex-col items-center justify-center text-center gap-1 transition active:scale-95 shadow-xs">
+                <Upload className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Galeri HP / File</span>
+                <span className="text-[10px] text-slate-400">Unggah JPG, PNG, WebP</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    await handleCoverUpload(e);
+                    setIsSelectCoverModalOpen(false);
+                  }}
+                  className="hidden"
+                />
+              </label>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSelectCoverModalOpen(false);
+                  setIsGDrivePickerOpen(true);
+                }}
+                className="p-3 rounded-2xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-800/40 hover:bg-blue-100 dark:hover:bg-blue-900/30 flex flex-col items-center justify-center text-center gap-1 transition active:scale-95 shadow-xs"
+              >
+                <HardDrive className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Google Drive</span>
+                <span className="text-[10px] text-slate-400">Pilih dari Cloud</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSelectCoverModalOpen(false);
+                  setIsCoverPromptModalOpen(true);
+                }}
+                className="p-3 rounded-2xl bg-gradient-to-tr from-pink-500/10 to-amber-500/10 border border-pink-300/40 dark:border-pink-800/40 hover:from-pink-500/20 hover:to-amber-500/20 flex flex-col items-center justify-center text-center gap-1 transition active:scale-95 shadow-xs"
+              >
+                <Sparkles className="w-5 h-5 text-pink-500" />
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Prompt AI (9:16)</span>
+                <span className="text-[10px] text-slate-400">Rancang ide visual</span>
+              </button>
+            </div>
+
+            {/* Media Library in Book */}
+            {mediaList.length > 0 && (
+              <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Atau Pilih dari Media Buku ({mediaList.length}):
+                  </span>
                 </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 gap-2.5 p-1 max-h-72 overflow-y-auto">
-                {mediaList.map((m) => {
-                  const url = URL.createObjectURL(m.blob);
-                  const isCurrent = book.coverMediaId === m.id;
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => handleSelectCover(m.id)}
-                      className={`relative rounded-2xl overflow-hidden border-2 transition active:scale-95 group ${
-                        isCurrent
-                          ? 'border-amber-500 ring-2 ring-amber-500/30'
-                          : 'border-slate-200 dark:border-slate-700 hover:border-amber-400'
-                      }`}
-                    >
-                      <img src={url} alt={m.name} className="w-full h-28 object-cover" />
-                      {isCurrent && (
-                        <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-amber-500 text-slate-950 font-bold text-[9px]">
-                          Aktif
-                        </span>
-                      )}
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                        <span className="text-[10px] font-bold text-white bg-black/60 px-2 py-0.5 rounded-full">
-                          Pilih Ini
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
+
+                <div className="grid grid-cols-3 gap-2.5 p-1 max-h-60 overflow-y-auto">
+                  {mediaList.map((m) => {
+                    const url = URL.createObjectURL(m.blob);
+                    const isCurrent = book.coverMediaId === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => handleSelectCover(m.id)}
+                        className={`relative rounded-2xl overflow-hidden border-2 transition active:scale-95 group ${
+                          isCurrent
+                            ? 'border-amber-500 ring-2 ring-amber-500/30'
+                            : 'border-slate-200 dark:border-slate-700 hover:border-amber-400'
+                        }`}
+                      >
+                        <img src={url} alt={m.name} className="w-full h-28 object-cover" />
+                        {isCurrent && (
+                          <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-amber-500 text-slate-950 font-bold text-[9px]">
+                            Aktif
+                          </span>
+                        )}
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                          <span className="text-[10px] font-bold text-white bg-black/60 px-2 py-0.5 rounded-full">
+                            Pilih Ini
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
@@ -549,7 +569,7 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
               <button
                 type="button"
                 onClick={() => setIsSelectCoverModalOpen(false)}
-                className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs"
+                className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-200 dark:hover:bg-slate-700 transition"
               >
                 Tutup
               </button>
@@ -557,6 +577,25 @@ export const BookOverviewTab: React.FC<BookOverviewTabProps> = ({
           </div>
         </div>
       )}
+
+      {/* AI Cover Prompt Modal */}
+      <CoverPromptModal
+        isOpen={isCoverPromptModalOpen}
+        onClose={() => setIsCoverPromptModalOpen(false)}
+        type="book"
+        bookTitle={book.title}
+        genre={book.genre}
+        synopsis={book.synopsis}
+        entities={entities}
+        onOpenLocalUpload={() => {
+          setIsCoverPromptModalOpen(false);
+          setIsSelectCoverModalOpen(true);
+        }}
+        onOpenGDrive={() => {
+          setIsCoverPromptModalOpen(false);
+          setIsGDrivePickerOpen(true);
+        }}
+      />
 
       {/* Book PDF Export & Print Modal */}
       <BookPdfExportModal
