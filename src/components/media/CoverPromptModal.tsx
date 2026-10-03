@@ -193,6 +193,99 @@ export const CoverPromptModal: React.FC<CoverPromptModalProps> = ({
     });
   };
 
+  // Helper to render explanation cleanly without raw markdown artifacts
+  const FormattedExplanation: React.FC<{ text: string }> = ({ text }) => {
+    const cleanText = text
+      .replace(/^```[a-z]*\s*/i, '')
+      .replace(/\s*```$/g, '')
+      .replace(/\\"/g, '"')
+      .replace(/^["']|["']$/g, '')
+      .trim();
+
+    const rawLines = cleanText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+
+    const renderInline = (str: string) => {
+      const tokens = str.split(/(\[(?:pria|wanita)\d*\]|\*\*[^*]+\*\*|\*[^*]+\*|_[^_]+_)/gi);
+      return tokens.map((token, i) => {
+        const lower = token.toLowerCase();
+        if (lower.startsWith('[pria')) {
+          return (
+            <span
+              key={i}
+              className="px-1.5 py-0.5 mx-0.5 rounded-md bg-sky-500/20 text-sky-400 font-mono font-bold text-[11px] border border-sky-500/30 inline-block align-middle"
+            >
+              {token}
+            </span>
+          );
+        }
+        if (lower.startsWith('[wanita')) {
+          return (
+            <span
+              key={i}
+              className="px-1.5 py-0.5 mx-0.5 rounded-md bg-rose-500/20 text-rose-400 font-mono font-bold text-[11px] border border-rose-500/30 inline-block align-middle"
+            >
+              {token}
+            </span>
+          );
+        }
+        if (token.startsWith('**') && token.endsWith('**') && token.length > 4) {
+          return (
+            <strong key={i} className="font-bold text-slate-900 dark:text-slate-100">
+              {token.slice(2, -2)}
+            </strong>
+          );
+        }
+        if (
+          (token.startsWith('*') && token.endsWith('*') && token.length > 2) ||
+          (token.startsWith('_') && token.endsWith('_') && token.length > 2)
+        ) {
+          return (
+            <em key={i} className="italic text-slate-700 dark:text-slate-300">
+              {token.slice(1, -1)}
+            </em>
+          );
+        }
+        return token;
+      });
+    };
+
+    return (
+      <div className="space-y-2 text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-sans">
+        {rawLines.map((line, idx) => {
+          const headingMatch = line.match(/^#{1,4}\s*(.*)$/);
+          if (headingMatch) {
+            const headingText = headingMatch[1].replace(/[:\-–]+$/, '').trim();
+            return (
+              <div
+                key={idx}
+                className="text-[11px] font-black uppercase tracking-wider text-slate-800 dark:text-slate-200 mt-2.5 pt-1 flex items-center gap-1.5 border-b border-slate-200/60 dark:border-slate-800/60 pb-1"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 flex-shrink-0" />
+                <span>{renderInline(headingText)}</span>
+              </div>
+            );
+          }
+
+          const bulletMatch = line.match(/^[-*•]\s+(.*)$/) || line.match(/^\d+\.\s+(.*)$/);
+          if (bulletMatch) {
+            return (
+              <div key={idx} className="flex items-start gap-2 pl-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-500/70 mt-1.5 flex-shrink-0" />
+                <div className="flex-1 leading-relaxed">{renderInline(bulletMatch[1])}</div>
+              </div>
+            );
+          }
+
+          return (
+            <p key={idx} className="leading-relaxed">
+              {renderInline(line)}
+            </p>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
       <div className="w-full max-w-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
@@ -347,9 +440,9 @@ export const CoverPromptModal: React.FC<CoverPromptModalProps> = ({
                     <Info className="w-3.5 h-3.5 text-cyan-500" />
                     <span>Penjelasan Konsep &amp; Mapping Karakter:</span>
                   </div>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                    {result.explanation}
-                  </p>
+                  <div className="pt-1">
+                    <FormattedExplanation text={result.explanation} />
+                  </div>
                 </div>
               )}
             </>

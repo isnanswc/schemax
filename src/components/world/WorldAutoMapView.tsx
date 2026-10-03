@@ -138,12 +138,16 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
 
   // Storage key for persisting layout positions per book
   const MAP_POSITIONS_STORAGE_KEY = `schemax_map_positions_${bookId}`;
+  const MAP_VERSION_STORAGE_KEY = `schemax_map_v2_${bookId}`;
 
   // Node Positions Map { [entityId]: { x, y } }
   const [nodePositions, setNodePositions] = useState<Record<string, NodePosition>>(() => {
     try {
-      const saved = localStorage.getItem(`schemax_map_positions_${bookId}`);
-      if (saved) return JSON.parse(saved);
+      const version = localStorage.getItem(`schemax_map_v2_${bookId}`);
+      if (version === 'v2') {
+        const saved = localStorage.getItem(`schemax_map_positions_${bookId}`);
+        if (saved) return JSON.parse(saved);
+      }
     } catch (_) {}
     return {};
   });
@@ -231,21 +235,23 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
   }, [entities]);
 
   // ---------------------------------------------------------------------------
-  // Structured Clustered Faction Layout Engine (Mencegah Tumpang Tindih)
-  // ---------------------------------------------------------------------------
-  // ---------------------------------------------------------------------------
-  // Structured Clustered Faction Layout Engine (Mencegah Tumpang Tindih & Rapi)
+  // Pristine Structured Faction Island Colony Layout Engine (Zero Collisions)
   // ---------------------------------------------------------------------------
   const arrangeNeatFactionLayout = (force = true) => {
     if (entities.length === 0) return;
 
-    // Separate entities into Named Factions and Neutral / Unassigned
+    // 1. Group entities by Faction
     const factionGroups: Record<string, WorldEntity[]> = {};
     const neutralMembers: WorldEntity[] = [];
 
     entities.forEach((e) => {
       const fac = entityEffectiveData[e.id]?.faction?.trim() || e.faction?.trim();
-      if (!fac || fac.toLowerCase() === 'independen / netral' || fac.toLowerCase() === 'netral' || fac.toLowerCase() === 'independen') {
+      if (
+        !fac ||
+        fac.toLowerCase() === 'independen / netral' ||
+        fac.toLowerCase() === 'netral' ||
+        fac.toLowerCase() === 'independen'
+      ) {
         neutralMembers.push(e);
       } else {
         if (!factionGroups[fac]) factionGroups[fac] = [];
@@ -254,146 +260,129 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
     });
 
     const namedFactions = Object.keys(factionGroups);
-    const newPositions: Record<string, NodePosition> = {};
 
-    const canvasCenterX = 650;
-    const canvasCenterY = 550;
-
-    // Case 1: No named factions at all (all entities are neutral)
-    if (namedFactions.length === 0) {
-      const count = neutralMembers.length;
-      if (count <= 4) {
-        const startX = canvasCenterX - ((count - 1) * 160) / 2;
-        neutralMembers.forEach((m, idx) => {
-          newPositions[m.id] = { x: startX + idx * 160, y: canvasCenterY };
-        });
-      } else if (count <= 9) {
-        const cols = Math.ceil(Math.sqrt(count * 1.3));
-        const spacingX = 175;
-        const spacingY = 145;
-        neutralMembers.forEach((m, idx) => {
-          const col = idx % cols;
-          const row = Math.floor(idx / cols);
-          const totalRows = Math.ceil(count / cols);
-          const startX = canvasCenterX - ((cols - 1) * spacingX) / 2;
-          const startY = canvasCenterY - ((totalRows - 1) * spacingY) / 2;
-          newPositions[m.id] = { x: startX + col * spacingX, y: startY + row * spacingY };
-        });
-      } else {
-        neutralMembers.forEach((m, idx) => {
-          const radius = Math.sqrt(idx + 1) * 90 + 45;
-          const angle = idx * 2.399963229728653; // Golden angle
-          newPositions[m.id] = {
-            x: canvasCenterX + Math.cos(angle) * radius,
-            y: canvasCenterY + Math.sin(angle) * radius,
-          };
-        });
-      }
-    } else {
-      // Case 2: Named factions exist!
-      const clusterRadii = namedFactions.map((f) => {
-        const memCount = factionGroups[f].length;
-        return Math.max(140, 90 + Math.sqrt(memCount) * 60);
-      });
-
-      const maxClusterR = Math.max(...clusterRadii);
-      const factionOrbitRadius = Math.max(
-        maxClusterR * 1.65,
-        220 + namedFactions.length * 80
-      );
-
-      namedFactions.forEach((fac, fIdx) => {
-        const members = factionGroups[fac];
-        const angle = (2 * Math.PI * fIdx) / namedFactions.length - Math.PI / 2;
-
-        const facCenterX =
-          namedFactions.length === 1
-            ? canvasCenterX
-            : canvasCenterX + Math.cos(angle) * factionOrbitRadius;
-        const facCenterY =
-          namedFactions.length === 1
-            ? canvasCenterY
-            : canvasCenterY + Math.sin(angle) * factionOrbitRadius;
-
-        if (members.length === 1) {
-          newPositions[members[0].id] = { x: facCenterX, y: facCenterY };
-        } else if (members.length === 2) {
-          newPositions[members[0].id] = { x: facCenterX - 80, y: facCenterY };
-          newPositions[members[1].id] = { x: facCenterX + 80, y: facCenterY };
-        } else if (members.length <= 5) {
-          const r = Math.max(105, members.length * 30);
-          members.forEach((m, mIdx) => {
-            const mAngle = (2 * Math.PI * mIdx) / members.length;
-            newPositions[m.id] = {
-              x: facCenterX + Math.cos(mAngle) * r,
-              y: facCenterY + Math.sin(mAngle) * r,
-            };
-          });
-        } else {
-          const innerCount = Math.min(4, Math.floor(members.length / 2.2));
-          const outerCount = members.length - innerCount;
-
-          members.slice(0, innerCount).forEach((m, mIdx) => {
-            const mAngle = (2 * Math.PI * mIdx) / innerCount;
-            newPositions[m.id] = {
-              x: facCenterX + Math.cos(mAngle) * 95,
-              y: facCenterY + Math.sin(mAngle) * 95,
-            };
-          });
-
-          members.slice(innerCount).forEach((m, mIdx) => {
-            const mAngle = (2 * Math.PI * mIdx) / outerCount;
-            newPositions[m.id] = {
-              x: facCenterX + Math.cos(mAngle) * 195,
-              y: facCenterY + Math.sin(mAngle) * 195,
-            };
-          });
-        }
-      });
-
-      // Distribute neutral / unassigned members along a spacious outer perimeter
-      if (neutralMembers.length > 0) {
-        const neutralRadius = factionOrbitRadius + maxClusterR + 140;
-        neutralMembers.forEach((m, mIdx) => {
-          const nAngle = (2 * Math.PI * mIdx) / neutralMembers.length;
-          newPositions[m.id] = {
-            x: canvasCenterX + Math.cos(nAngle) * neutralRadius,
-            y: canvasCenterY + Math.sin(nAngle) * neutralRadius,
-          };
-        });
-      }
+    interface ClusterInfo {
+      name: string;
+      color: string;
+      members: WorldEntity[];
+      cols: number;
+      rows: number;
+      width: number;
+      height: number;
     }
 
-    // Pass 3: Physics Force Relaxation Simulation (Guarantees zero node overlap)
-    const allIds = Object.keys(newPositions);
-    const minSafeDist = 135;
+    const clusters: ClusterInfo[] = [];
 
-    for (let iter = 0; iter < 30; iter++) {
-      for (let i = 0; i < allIds.length; i++) {
-        for (let j = i + 1; j < allIds.length; j++) {
-          const id1 = allIds[i], id2 = allIds[j];
-          const p1 = newPositions[id1], p2 = newPositions[id2];
-          const dx = p2.x - p1.x;
-          const dy = p2.y - p1.y;
-          const dist = Math.hypot(dx, dy) || 1;
+    const colSpacing = 220; // Generous horizontal spacing between nodes
+    const rowSpacing = 160; // Generous vertical spacing between nodes
+    const padX = 75;
+    const padTop = 85;
+    const padBottom = 45;
 
-          if (dist < minSafeDist) {
-            const overlap = (minSafeDist - dist) * 0.5;
-            const nx = dx / dist;
-            const ny = dy / dist;
-            p1.x -= nx * overlap;
-            p1.y -= ny * overlap;
-            p2.x += nx * overlap;
-            p2.y += ny * overlap;
-          }
+    // Add named factions
+    namedFactions.forEach((fac) => {
+      const members = factionGroups[fac];
+      const effColor = entityEffectiveData[members[0].id]?.factionColor || '#ec4899';
+      const mCount = members.length;
+      const cols = mCount <= 1 ? 1 : mCount <= 4 ? 2 : 3;
+      const rows = Math.ceil(mCount / cols);
+      const width = Math.max(260, (cols - 1) * colSpacing + padX * 2);
+      const height = Math.max(200, (rows - 1) * rowSpacing + padTop + padBottom);
+
+      clusters.push({
+        name: fac,
+        color: effColor,
+        members,
+        cols,
+        rows,
+        width,
+        height,
+      });
+    });
+
+    // Add neutral cluster if there are neutral members
+    if (neutralMembers.length > 0) {
+      const mCount = neutralMembers.length;
+      const cols = mCount <= 1 ? 1 : mCount <= 4 ? 2 : mCount <= 9 ? 3 : 4;
+      const rows = Math.ceil(mCount / cols);
+      const width = Math.max(260, (cols - 1) * colSpacing + padX * 2);
+      const height = Math.max(200, (rows - 1) * rowSpacing + padTop + padBottom);
+
+      clusters.push({
+        name: 'Independen / Netral',
+        color: '#64748b',
+        members: neutralMembers,
+        cols,
+        rows,
+        width,
+        height,
+      });
+    }
+
+    const newPositions: Record<string, NodePosition> = {};
+    const islandGapX = 240; // Generous gulf between faction islands
+    const islandGapY = 180;
+
+    if (clusters.length === 1) {
+      const c = clusters[0];
+      const startX = 120;
+      const startY = 100;
+      c.members.forEach((m, idx) => {
+        const col = idx % c.cols;
+        const row = Math.floor(idx / c.cols);
+        newPositions[m.id] = {
+          x: startX + padX + col * colSpacing,
+          y: startY + padTop + row * rowSpacing,
+        };
+      });
+    } else if (clusters.length === 2) {
+      const startY = 100;
+      let curX = 100;
+      clusters.forEach((c) => {
+        c.members.forEach((m, idx) => {
+          const col = idx % c.cols;
+          const row = Math.floor(idx / c.cols);
+          newPositions[m.id] = {
+            x: curX + padX + col * colSpacing,
+            y: startY + padTop + row * rowSpacing,
+          };
+        });
+        curX += c.width + islandGapX;
+      });
+    } else {
+      const colsInClusterGrid = clusters.length <= 4 ? 2 : 3;
+      let curX = 100;
+      let curY = 100;
+      let maxRowH = 0;
+
+      clusters.forEach((c, cIdx) => {
+        const gridCol = cIdx % colsInClusterGrid;
+
+        if (gridCol === 0 && cIdx > 0) {
+          curX = 100;
+          curY += maxRowH + islandGapY;
+          maxRowH = 0;
         }
-      }
+
+        c.members.forEach((m, idx) => {
+          const col = idx % c.cols;
+          const row = Math.floor(idx / c.cols);
+          newPositions[m.id] = {
+            x: curX + padX + col * colSpacing,
+            y: curY + padTop + row * rowSpacing,
+          };
+        });
+
+        maxRowH = Math.max(maxRowH, c.height);
+        curX += c.width + islandGapX;
+      });
     }
 
     setNodePositions((prev) => {
       const merged = force ? newPositions : { ...newPositions, ...prev };
       try {
         localStorage.setItem(MAP_POSITIONS_STORAGE_KEY, JSON.stringify(merged));
+        localStorage.setItem(MAP_VERSION_STORAGE_KEY, 'v2');
       } catch (_) {}
       return merged;
     });
@@ -528,6 +517,52 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
 
     return Object.values(map);
   }, [filteredEntities, entityEffectiveData]);
+
+  // Tactical Faction Islands with bounding cards for Map View
+  const computedFactionIslands = useMemo(() => {
+    return factionClusters
+      .map((cluster) => {
+        const memberPositions = cluster.members
+          .map((m) => nodePositions[m.id])
+          .filter((p): p is NodePosition => !!p);
+
+        if (memberPositions.length === 0) return null;
+
+        let minX = Infinity,
+          maxX = -Infinity,
+          minY = Infinity,
+          maxY = -Infinity;
+        memberPositions.forEach((p) => {
+          minX = Math.min(minX, p.x);
+          maxX = Math.max(maxX, p.x);
+          minY = Math.min(minY, p.y);
+          maxY = Math.max(maxY, p.y);
+        });
+
+        const padX = 70;
+        const padTop = 75;
+        const padBottom = 40;
+
+        return {
+          name: cluster.name,
+          color: cluster.color,
+          x: minX - padX,
+          y: minY - padTop,
+          width: Math.max(220, maxX - minX + padX * 2),
+          height: Math.max(160, maxY - minY + padTop + padBottom),
+          members: cluster.members,
+        };
+      })
+      .filter(Boolean) as Array<{
+        name: string;
+        color: string;
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        members: WorldEntity[];
+      }>;
+  }, [factionClusters, nodePositions]);
 
   // Execute Auto-Map AI with Chapter-Specific or Book-Wide context
   const handleTriggerAutoMap = async () => {
@@ -1105,50 +1140,50 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
 
             {/* Transform Group for Pan and Zoom */}
             <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
-              {/* Faction Visual Halos (Himpunan Boundary Background Circles) */}
-              {factionClusters.map((cluster, cIdx) => {
-                if (cluster.members.length === 0) return null;
-                const memberPositions = cluster.members
-                  .map((m) => nodePositions[m.id])
-                  .filter((p): p is NodePosition => !!p);
-
-                if (memberPositions.length === 0) return null;
-
-                const avgX = memberPositions.reduce((sum, p) => sum + p.x, 0) / memberPositions.length;
-                const avgY = memberPositions.reduce((sum, p) => sum + p.y, 0) / memberPositions.length;
-
-                const maxDist = Math.max(
-                  110,
-                  ...memberPositions.map((p) => Math.sqrt((p.x - avgX) ** 2 + (p.y - avgY) ** 2) + 65)
-                );
-
-                return (
-                  <g key={`halo_${cluster.name}_${cIdx}`}>
-                    <circle
-                      cx={avgX}
-                      cy={avgY}
-                      r={maxDist}
-                      fill={cluster.color}
-                      fillOpacity="0.05"
-                      stroke={cluster.color}
-                      strokeWidth="1.5"
-                      strokeDasharray="6,4"
-                      strokeOpacity="0.35"
+              {/* Tactical Faction Island Cards (Colonies) */}
+              {computedFactionIslands.map((island, cIdx) => (
+                <g key={`island_${island.name}_${cIdx}`}>
+                  {/* Island Card Background */}
+                  <rect
+                    x={island.x}
+                    y={island.y}
+                    width={island.width}
+                    height={island.height}
+                    rx="28"
+                    fill={island.color}
+                    fillOpacity="0.04"
+                    stroke={island.color}
+                    strokeWidth="1.8"
+                    strokeDasharray="8,5"
+                    strokeOpacity="0.4"
+                  />
+                  {/* Faction Header Badge Pill */}
+                  <g transform={`translate(${island.x + 18}, ${island.y + 16})`}>
+                    <rect
+                      x="0"
+                      y="0"
+                      width={Math.max(120, island.name.length * 7.5 + 46)}
+                      height="26"
+                      rx="13"
+                      fill="#020617"
+                      stroke={island.color}
+                      strokeWidth="1.2"
+                      strokeOpacity="0.9"
                     />
+                    <circle cx="14" cy="13" r="4.5" fill={island.color} />
                     <text
-                      x={avgX}
-                      y={avgY - maxDist + 18}
-                      fill={cluster.color}
-                      fontSize="11"
+                      x="26"
+                      y="17"
+                      fill="#ffffff"
+                      fontSize="10"
                       fontWeight="bold"
-                      textAnchor="middle"
-                      className="select-none font-sans uppercase tracking-wider opacity-60"
+                      className="select-none font-sans uppercase tracking-wider"
                     >
-                      {cluster.name}
+                      {island.name} ({island.members.length})
                     </text>
                   </g>
-                );
-              })}
+                </g>
+              ))}
 
               {/* Relationship Connecting Lines with Curved Bézier arcs */}
               {allRelationshipLinks.map((link, idx) => {

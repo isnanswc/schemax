@@ -1192,7 +1192,7 @@ export function parseCoverPromptResult(
 
   let prompt = '';
   let explanation = '';
-  let characterReferences: string[] = [];
+  let rawCharCandidates: string[] = [];
 
   // 1. Try resilient JSON parse
   try {
@@ -1205,7 +1205,7 @@ export function parseCoverPromptResult(
         explanation = parsed.explanation.trim();
       }
       if (Array.isArray(parsed.characterReferences)) {
-        characterReferences = parsed.characterReferences
+        rawCharCandidates = parsed.characterReferences
           .map((c) => String(c).trim())
           .filter(Boolean);
       }
@@ -1221,13 +1221,23 @@ export function parseCoverPromptResult(
     const expTagMatch = rawText.match(/<<<EXPLANATION>>>([\s\S]*?)<<<END_EXPLANATION>>>/i);
     if (expTagMatch) explanation = expTagMatch[1].trim();
   }
-  if (characterReferences.length === 0) {
+  if (rawCharCandidates.length === 0) {
     const charTagMatch = rawText.match(/<<<CHARACTERS>>>([\s\S]*?)<<<END_CHARACTERS>>>/i);
     if (charTagMatch) {
-      characterReferences = charTagMatch[1]
-        .split(/[,;\n]+/)
-        .map((s) => s.replace(/^[-*•\d.\s]+/, '').trim())
+      // Split primarily by newlines or semicolons, avoid split by comma within clauses
+      rawCharCandidates = charTagMatch[1]
+        .split(/\r?\n|;/)
+        .map((s) => s.trim())
         .filter(Boolean);
+
+      // If everything was on a single comma-separated line e.g. "Agung [pria1], Santi [wanita1]"
+      if (rawCharCandidates.length === 1 && rawCharCandidates[0].includes(',')) {
+        // Only split on comma if followed by a capitalized name or tag
+        const commaTokens = rawCharCandidates[0].split(/,\s*(?=[A-Z\u00C0-\u017F\[])/);
+        if (commaTokens.length > 1) {
+          rawCharCandidates = commaTokens.map((t) => t.trim()).filter(Boolean);
+        }
+      }
     }
   }
 
@@ -1245,7 +1255,7 @@ export function parseCoverPromptResult(
     }
   }
 
-  // 4. Section headers (PROMPT:, PENJELASAN:)
+  // 4. Section headers fallback (PROMPT:, PENJELASAN:)
   if (!prompt || !explanation) {
     const promptSection = rawText.match(/(?:^|\n)(?:###?\s*)?(?:PROMPT|VISUAL PROMPT|PROMPT VISUAL)\s*:\s*([\s\S]*?)(?=(?:^|\n)(?:###?\s*)?(?:EXPLANATION|PENJELASAN|DESKRIPSI|CHARACTERS|KARAKTER)|$)/i);
     if (promptSection && promptSection[1]) {
@@ -1264,7 +1274,6 @@ export function parseCoverPromptResult(
     prompt = cleanRaw;
   }
 
-  // If prompt has an Indonesian explanation appended at the end (e.g. "Desain sampul: ..." or "Penjelasan: ...")
   const splitKeywords = [
     '\nDesain sampul',
     '\nSampul bab',
@@ -1284,14 +1293,20 @@ export function parseCoverPromptResult(
     }
   }
 
-  // Clean prompt quotes or formatting remnants
+  // Clean prompt quotes, codeblocks, or headers
   prompt = prompt
+    .replace(/^```[a-z]*\s*/i, '')
+    .replace(/\s*```$/g, '')
     .replace(/^["']|["']$/g, '')
     .replace(/^PROMPT:\s*/i, '')
     .trim();
 
+  // Clean explanation: strip raw markdown header marks if redundant, quotes & escaped characters
   if (explanation) {
     explanation = explanation
+      .replace(/^```[a-z]*\s*/i, '')
+      .replace(/\s*```$/g, '')
+      .replace(/\\"/g, '"')
       .replace(/^["']|["']$/g, '')
       .replace(/^(?:PENJELASAN|EXPLANATION|DESKRIPSI):\s*/i, '')
       .trim();
@@ -1302,44 +1317,106 @@ export function parseCoverPromptResult(
     prompt += ' --ar 9:16';
   }
 
-  // 6. Character References Detection (Auto-detect if AI didn't return array)
-  if (characterReferences.length === 0) {
-    const foundNames = new Set<string>();
+  // 6. Strict Character Extraction: Eliminates phantom 3rd characters and continuation descriptions
+  // Identify tags that actually appear inside the prompt (e.g. [pria1], [wanita1])
+  const tagsInPrompt = Array.from(new Set(
+    (prompt.match(/\[(?:pria|wanita)\d*\]/gi) || []).map((t) => t.toLowerCase())
+  ));
 
-    // A. Match "Nama [pria1]" or "Nama [wanita1]" anywhere in explanation or prompt
-    const fullText = `${explanation} ${prompt}`;
-    const tagMatches = fullText.matchAll(/([A-Z][a-zA-Z0-9\s]{1,25})\s*(\[(?:pria|wanita)\d*\])/gi);
-    for (const m of tagMatches) {
-      const candidateName = m[1].replace(/\b(dan|atau|serta|dengan|pada|saat|ketika|foto|gambar|desain|karakter|tokoh|pria|wanita)\b/gi, '').trim();
-      if (candidateName.length >= 2) {
-        foundNames.add(`${candidateName} ${m[2]}`);
+  const tagToCharacterMap = new Map<string, string>();
+  const recognizedCharacters: string[] = [];
+  const fullContextText = `${explanation} ${rawText}`;
+
+  // Helper to sanitize candidate name: remove bullets, numbers, prefixes, and conjunctions
+  const cleanNameToken = (nameStr: string): string => {
+    return nameStr
+      .replace(/^[-*•\d.\s]+/, '')
+      .replace(/^(?:tokoh|karakter|nama|peran)\s*[:\-–]?\s*/i, '')
+      .replace(/^(?:sang|si|dan|atau|serta|dengan|pada|saat|ketika)\s+/i, '')
+      .replace(/\s*(?:yang|dengan|sedang|memakai|mengenakan|membawa|terluka|adalah).*$/i, '')
+      .trim();
+  };
+
+  // Helper to extract Name + Tag pair strictly
+  const processCandidateString = (rawStr: string) => {
+    if (!rawStr || !rawStr.trim()) return;
+
+    // Pattern A: "Agung [pria1]" (stops before any trailing descriptions)
+    const matchA = rawStr.match(/([A-Z\u00C0-\u017F][A-Za-z0-9\s'.-]{1,30}?)\s*(\[(?:pria|wanita)\d*\])/i);
+    if (matchA) {
+      const cleanName = cleanNameToken(matchA[1]);
+      const tag = matchA[2].toLowerCase();
+      if (cleanName.length >= 2) {
+        tagToCharacterMap.set(tag, `${cleanName} ${matchA[2]}`);
+        return;
       }
     }
 
-    // B. Match known entities against text
-    knownEntities.forEach((entName) => {
-      const clean = entName.trim();
-      if (clean.length >= 2 && fullText.toLowerCase().includes(clean.toLowerCase())) {
-        const regex = new RegExp(`${clean}\\s*(\\[(?:pria|wanita)\\d*\\])`, 'i');
-        const tagMatch = fullText.match(regex);
-        if (tagMatch) {
-          foundNames.add(`${clean} ${tagMatch[1]}`);
-        } else {
-          foundNames.add(clean);
+    // Pattern B: "[pria1] Agung" or "[pria1]: Agung"
+    const matchB = rawStr.match(/(\[(?:pria|wanita)\d*\])\s*[:\-–]?\s*([A-Z\u00C0-\u017F][A-Za-z0-9\s'.-]{1,30})/i);
+    if (matchB) {
+      const tag = matchB[1].toLowerCase();
+      const cleanName = cleanNameToken(matchB[2]);
+      if (cleanName.length >= 2) {
+        tagToCharacterMap.set(tag, `${cleanName} ${matchB[1]}`);
+        return;
+      }
+    }
+
+    // Pattern C: No tag, but matches knownEntities exactly
+    const cleanRaw = cleanNameToken(rawStr);
+    const matchedKnown = knownEntities.find((k) => k.toLowerCase().trim() === cleanRaw.toLowerCase());
+    if (matchedKnown) {
+      // Find if this known entity is tagged in explanation
+      const tagInContext = fullContextText.match(new RegExp(`${matchedKnown}\\s*(\\[(?:pria|wanita)\\d*\\])`, 'i'));
+      if (tagInContext) {
+        const tag = tagInContext[1].toLowerCase();
+        tagToCharacterMap.set(tag, `${matchedKnown} ${tagInContext[1]}`);
+      } else {
+        recognizedCharacters.push(matchedKnown);
+      }
+    }
+  };
+
+  // Process raw candidates collected from AI
+  rawCharCandidates.forEach(processCandidateString);
+
+  // If map is still missing tags that appear in the prompt, scan explanation & prompt
+  tagsInPrompt.forEach((tag) => {
+    if (!tagToCharacterMap.has(tag)) {
+      const escapedTag = tag.replace(/\[/g, '\\[').replace(/\]/g, '\\]');
+      const scanMatch = fullContextText.match(new RegExp(`([A-Z\\u00C0-\\u017F][A-Za-z0-9\\s'.-]{1,30}?)\\s*${escapedTag}`, 'i'));
+      if (scanMatch) {
+        const cleanName = cleanNameToken(scanMatch[1]);
+        if (cleanName.length >= 2) {
+          tagToCharacterMap.set(tag, `${cleanName} ${tag}`);
         }
       }
-    });
-
-    // C. Fallback: extract any isolated brackets like [pria1], [wanita1]
-    if (foundNames.size === 0) {
-      const rawBrackets = prompt.match(/\[(?:pria|wanita)\d*\]/gi);
-      if (rawBrackets) {
-        rawBrackets.forEach((b) => foundNames.add(`Tokoh ${b}`));
-      }
     }
+  });
 
-    characterReferences = Array.from(foundNames);
+  // Assemble final clean character references
+  const finalSet = new Set<string>();
+
+  // If prompt explicitly uses tags (e.g. [pria1], [wanita1]), strictly provide ONLY references for those tags
+  if (tagsInPrompt.length > 0) {
+    tagsInPrompt.forEach((tag) => {
+      const found = tagToCharacterMap.get(tag);
+      if (found) {
+        finalSet.add(found);
+      } else {
+        // Fallback with knownEntities or generic token
+        const fallbackName = knownEntities[finalSet.size] || `Tokoh ${tag}`;
+        finalSet.add(`${fallbackName} ${tag}`);
+      }
+    });
+  } else {
+    // If no tags in prompt, use whatever confirmed names were mapped
+    tagToCharacterMap.forEach((val) => finalSet.add(val));
+    recognizedCharacters.forEach((c) => finalSet.add(c));
   }
+
+  const characterReferences = Array.from(finalSet);
 
   return {
     prompt,
@@ -1385,16 +1462,16 @@ ${charactersList || '(Belum ada tokoh eksplisit di ensiklopedia. Kenali tokoh ut
 ATURAN WAJIB & SANGAT KETAT:
 1. User selalu melampirkan gambar referensi karakter di generator gambar AI.
 2. JANGAN sebut atau deskripsikan bentuk wajah, warna kulit, atau postur tubuh karakter! Gunakan referensi visual yang dilampirkan.
-3. JANGAN sebut nama karakter di dalam prompt visual. Ganti dengan label dalam kurung siku seperti "[pria1]" atau "[wanita1]". Jika ada lebih dari satu, beri nomor (contoh: "[pria1]", "[wanita1]", "[pria2]"). Tentukan siapa tokoh utama yang paling tepat menghiasi sampul buku.
+3. JANGAN sebut nama karakter di dalam prompt visual. Ganti dengan label dalam kurung siku seperti "[pria1]" atau "[wanita1]". Jika ada lebih dari satu, beri nomor (contoh: "[pria1]", "[wanita1]"). Tentukan HANYA 1 atau 2 tokoh sentral yang paling penting menghiasi sampul buku.
 4. JANGAN ubah model pakaian asli karakter secara drastis. HANYA boleh perubahan minor yang dramatis (misal: "jubah berlumur debu petualangan", "gaun anggun tersibak angin kencang", "pakaian zirah perang yang retak").
 5. Jelaskan secara sangat mendalam: KOMPOSISI SAMPUL VERTIKAL, POSE UTAMA, EKSPRESI EMOSI, ELEMEN SIMBOLIS / LATAR IKONIK DUNIA CERITA, PENCAHAYAAN (lighting dramatis, volumetric, chiaroscuro, rim light), dan ATMOSFER sinematik.
 6. Format teknis prompt: "Vertical book cover format (9:16), typography-ready negative space at top/bottom, 8k masterpiece, photorealistic cinematic concept art, [deskripsi pose, ekspresi, interaksi, pakaian minor change, latar, lighting] --ar 9:16".
-7. WAJIB DAFTARKAN "characterReferences": Nama-nama karakter asli yang gambarnya harus dilampirkan oleh user beserta labelnya, misal: ["Agung [pria1]", "Santi [wanita1]"]. JIKA daftar tokoh di ensiklopedia kosong, kenali dan tentukan nama tokoh protagonis utama dari sinopsis/bab!
-8. WAJIB BERIKAN "explanation": Penjelasan konsep sampul dalam Bahasa Indonesia yang santai, jelas, dan jelaskan siapa tokoh yang dimaksud (misal: "Sampul buku menampilkan Agung [pria1] yang menatap langit berbintang...").
+7. WAJIB DAFTARKAN "characterReferences" HANYA tokoh yang benar-benar muncul dalam prompt di atas. SATU BARIS PER TOKOH, HANYA FORMAT: "Nama Karakter [label]". DILARANG KERAS MENAMBAHKAN DESKRIPSI, KOMA, ATAU KATA SIFAT SETELAH LABEL!
+8. WAJIB BERIKAN "explanation": Penjelasan konsep sampul dalam Bahasa Indonesia yang mengalir rapi, elegan, dan deskriptif.
 
-FORMAT KELUARAN (PENTING: Pisahkan prompt dan penjelasan menggunakan blok tag atau JSON):
+FORMAT KELUARAN (PENTING: Pisahkan prompt, penjelasan, dan karakter menggunakan blok tag):
 <<<PROMPT>>>
-Vertical book cover format 9:16, typography-ready negative space at top/bottom, 8k masterpiece, photorealistic cinematic concept art, [pria1] standing atop a crumbling cliff... --ar 9:16
+Vertical book cover format (9:16), typography-ready negative space at top/bottom, 8k masterpiece, photorealistic cinematic concept art, [pria1] standing atop a crumbling cliff... --ar 9:16
 <<<END_PROMPT>>>
 
 <<<EXPLANATION>>>
@@ -1402,11 +1479,12 @@ Desain sampul buku menampilkan tokoh utama [pria1] dengan latar pemandangan epik
 <<<END_EXPLANATION>>>
 
 <<<CHARACTERS>>>
-Nama Tokoh [pria1], Tokoh Pendamping [wanita1]
+Nama Tokoh [pria1]
+Tokoh Pendamping [wanita1]
 <<<END_CHARACTERS>>>`;
 
   const systemPrompt =
-    'Anda adalah visual director dan art designer profesional spesialis sampul buku. Pisahkan prompt dan penjelasan dengan jelas.';
+    'Anda adalah visual director dan art designer profesional spesialis sampul buku. Pisahkan prompt dan penjelasan dengan jelas tanpa deskripsi tambahan di blok karakter.';
   const res = await generateWithSmartFallback(prompt, systemPrompt, onEvent);
   return parseCoverPromptResult(res.text, knownNames);
 }
@@ -1452,16 +1530,16 @@ ${charactersList || '(Belum ada tokoh spesifik di ensiklopedia. Kenali tokoh uta
 ATURAN WAJIB & SANGAT KETAT:
 1. User selalu melampirkan gambar referensi karakter di generator gambar AI.
 2. JANGAN sebut atau deskripsikan bentuk wajah, warna kulit, atau postur tubuh karakter! Gunakan referensi visual yang dilampirkan.
-3. JANGAN sebut nama karakter di dalam prompt. Ganti dengan label dalam kurung siku seperti "[pria1]" atau "[wanita1]". Jika ada lebih dari satu, beri nomor (contoh: "[pria1]", "[wanita1]", "[pria2]").
+3. JANGAN sebut nama karakter di dalam prompt. Ganti dengan label dalam kurung siku seperti "[pria1]" atau "[wanita1]". Jika ada lebih dari satu, beri nomor (contoh: "[pria1]", "[wanita1]"). Batasi HANYA 1 atau 2 tokoh yang benar-benar ada dalam adegan bab ini.
 4. JANGAN ubah pakaian asli secara drastis. HANYA boleh perubahan minor realistis sesuai momen bab (misal: "baju robek di siku", "basah kuyup kena hujan", "jubah tersampir santai").
 5. Jelaskan secara sangat mendalam: FOKUS ADEGAN UTAMA BAB, POSE KARAKTER, EKSPRESI EMOSI, LATAR LINGKUNGAN, PENCAHAYAAN (lighting dramatis), dan ATMOSFER cerita bab ini.
 6. Format teknis prompt: "Vertical chapter cover (9:16), 8k hyper realistic, photorealistic cinematic concept art, [deskripsi pose, emosi, interaksi tokoh, latar bab, lighting dramatis] --ar 9:16".
-7. WAJIB DAFTARKAN "characterReferences": Nama-nama karakter asli yang gambarnya harus dilampirkan oleh user beserta labelnya, misal: ["Budi [pria1]", "Rina [wanita1]"].
-8. WAJIB BERIKAN "explanation": Penjelasan isi sampul bab dalam Bahasa Indonesia yang santai, jelas, dan sebutkan siapa nama karakter yang dimaksud beserta label bracketnya.
+7. WAJIB DAFTARKAN "characterReferences" HANYA tokoh yang benar-benar ada dalam adegan prompt di atas. SATU BARIS PER TOKOH, HANYA FORMAT: "Nama Tokoh [label]". DILARANG KERAS MENAMBAHKAN DESKRIPSI, KOMA, ATAU KATA SIFAT SETELAH LABEL!
+8. WAJIB BERIKAN "explanation": Penjelasan isi sampul bab dalam Bahasa Indonesia yang santai, jelas, dan mengalir elegan.
 
-FORMAT KELUARAN (PENTING: Pisahkan prompt dan penjelasan menggunakan blok tag atau JSON):
+FORMAT KELUARAN (PENTING: Pisahkan prompt, penjelasan, dan karakter menggunakan blok tag):
 <<<PROMPT>>>
-Vertical chapter cover 9:16, 8k hyper realistic, photorealistic cinematic concept art, [pria1]... --ar 9:16
+Vertical chapter cover (9:16), 8k hyper realistic, photorealistic cinematic concept art, [pria1]... --ar 9:16
 <<<END_PROMPT>>>
 
 <<<EXPLANATION>>>
@@ -1469,11 +1547,12 @@ Sampul bab memperlihatkan momen ketika [pria1]...
 <<<END_EXPLANATION>>>
 
 <<<CHARACTERS>>>
-Nama Tokoh [pria1], Nama Tokoh [wanita1]
+Nama Tokoh [pria1]
+Tokoh Pendamping [wanita1]
 <<<END_CHARACTERS>>>`;
 
   const systemPrompt =
-    'Anda adalah visual director dan concept artist profesional spesialis chapter cover. Pisahkan prompt dan penjelasan dengan jelas.';
+    'Anda adalah visual director dan concept artist profesional spesialis chapter cover. Pisahkan prompt dan penjelasan dengan jelas tanpa deskripsi tambahan di blok karakter.';
   const res = await generateWithSmartFallback(prompt, systemPrompt, onEvent);
   return parseCoverPromptResult(res.text, knownNames);
 }
