@@ -128,8 +128,12 @@ function doGet(e) {
 
     // 2. Daftar File Cadangan (.schemax atau .json)
     if (action === "listBackups") {
-      while (files.hasNext()) {
-        var f = files.next();
+      var backupFolders = folder.getFoldersByName("backup");
+      var targetFolder = backupFolders.hasNext() ? backupFolders.next() : folder;
+      var filesIterator = targetFolder.getFiles();
+
+      while (filesIterator.hasNext()) {
+        var f = filesIterator.next();
         var name = f.getName();
         if (name.indexOf(".json") !== -1 || name.indexOf(".schemax") !== -1) {
           result.push({
@@ -140,8 +144,26 @@ function doGet(e) {
           });
         }
       }
+
+      // Sertakan cadangan dari root folder jika ada (kompatibilitas mundur)
+      if (targetFolder.getId() !== folder.getId()) {
+        var rootFiles = folder.getFiles();
+        while (rootFiles.hasNext()) {
+          var rf = rootFiles.next();
+          var rname = rf.getName();
+          if ((rname.indexOf(".json") !== -1 || rname.indexOf(".schemax") !== -1) && !result.some(function(it){ return it.id === rf.getId(); })) {
+            result.push({
+              id: rf.getId(),
+              name: rname,
+              size: rf.getSize(),
+              updatedAt: rf.getLastUpdated().toISOString()
+            });
+          }
+        }
+      }
+
       return ContentService.createTextOutput(JSON.stringify({
-        folderName: folder.getName(),
+        folderName: targetFolder.getName(),
         files: result
       })).setMimeType(ContentService.MimeType.JSON);
     }
@@ -187,24 +209,34 @@ function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
     if (data.action === "uploadBackup") {
-      var folder = DriveApp.getFolderById(data.folderId);
+      var rootFolder = DriveApp.getFolderById(data.folderId);
       var fileName = data.fileName || "schemax_backup.json";
       var content = data.content;
 
-      // Cek apakah file sudah ada, jika ada timpa, jika tidak buat baru
-      var existing = folder.getFilesByName(fileName);
+      // 📁 Pastikan ada subfolder "backup", jika belum ada maka otomatis buat baru
+      var backupFolders = rootFolder.getFoldersByName("backup");
+      var targetFolder;
+      if (backupFolders.hasNext()) {
+        targetFolder = backupFolders.next();
+      } else {
+        targetFolder = rootFolder.createFolder("backup");
+      }
+
+      // Cek apakah file sudah ada di subfolder backup, jika ada timpa, jika tidak buat baru
+      var existing = targetFolder.getFilesByName(fileName);
       var file;
       if (existing.hasNext()) {
         file = existing.next();
         file.setContent(content);
       } else {
-        file = folder.createFile(fileName, content, "application/json");
+        file = targetFolder.createFile(fileName, content, "application/json");
       }
 
       return ContentService.createTextOutput(JSON.stringify({
         success: true,
         fileId: file.getId(),
-        name: file.getName()
+        name: file.getName(),
+        folderName: targetFolder.getName()
       })).setMimeType(ContentService.MimeType.JSON);
     }
   } catch(err) {

@@ -126,6 +126,25 @@ export const AppLockScreen: React.FC = () => {
     setErrorMessage(null);
   };
 
+  // Physical keyboard typing support (strictly 0-9 & Backspace)
+  useEffect(() => {
+    if (!isLocked) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isUnlockedSuccess) return;
+      if (/^[0-9]$/.test(e.key)) {
+        e.preventDefault();
+        handleKeyPress(e.key);
+      } else if (e.key === 'Backspace' || e.key === 'Delete') {
+        e.preventDefault();
+        handleDelete();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isLocked, pinInput, isUnlockedSuccess]);
+
   const validatePin = async (codeToTest: string) => {
     const success = await unlockAppWithPin(codeToTest);
     if (success) {

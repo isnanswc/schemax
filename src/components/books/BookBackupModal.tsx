@@ -40,10 +40,11 @@ import {
 
 interface BookBackupModalProps {
   isOpen: boolean;
-  book: Book;
+  book?: Book | null;
   onClose: () => void;
   onRestoreComplete?: (bookId: string) => void;
   onOpenGDriveSettings?: () => void;
+  initialTab?: 'backup' | 'restore';
 }
 
 export const BookBackupModal: React.FC<BookBackupModalProps> = ({
@@ -52,8 +53,11 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
   onClose,
   onRestoreComplete,
   onOpenGDriveSettings,
+  initialTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<'backup' | 'restore'>('backup');
+  const [activeTab, setActiveTab] = useState<'backup' | 'restore'>(
+    initialTab || (book ? 'backup' : 'restore')
+  );
 
   // Stats Buku Saat Ini untuk Tab Backup
   const [bookStats, setBookStats] = useState<{
@@ -98,7 +102,12 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
 
   // Muat statistik data buku saat modal dibuka
   useEffect(() => {
-    if (isOpen && book?.id) {
+    if (isOpen) {
+      if (!book || initialTab === 'restore') {
+        setActiveTab('restore');
+      } else {
+        setActiveTab('backup');
+      }
       setBackupSuccessMsg(null);
       setBackupErrorMsg(null);
       setRestoreSuccessMsg(null);
@@ -106,8 +115,9 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
       setSelectedBundle(null);
       setPreviewStats(null);
 
-      const loadStats = async () => {
-        const chapters = await db.chapters.where('bookId').equals(book.id).toArray();
+      if (book?.id) {
+        const loadStats = async () => {
+          const chapters = await db.chapters.where('bookId').equals(book.id).toArray();
         const words = chapters.reduce((sum, c) => sum + (c.wordCount || 0), 0);
         const entities = await db.worldEntities.where('bookId').equals(book.id).toArray();
         const media = await db.media.where('bookId').equals(book.id).toArray();
@@ -128,7 +138,8 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
 
       loadStats();
     }
-  }, [isOpen, book?.id]);
+  }
+}, [isOpen, book?.id]);
 
   if (!isOpen) return null;
 
@@ -136,6 +147,7 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
   // AKSI BACKUP: UNDUH LOKAL
   // ══════════════════════════════════════════════════════════════
   const handleDownloadLocalBackup = async () => {
+    if (!book) return;
     setIsBackingUp(true);
     setBackupSuccessMsg(null);
     setBackupErrorMsg(null);
@@ -158,6 +170,7 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
   // AKSI BACKUP: SIMPAN KE GOOGLE DRIVE
   // ══════════════════════════════════════════════════════════════
   const handleUploadGDriveBackup = async () => {
+    if (!book) return;
     if (!isGDriveConfigured || !gdriveConfig.folderId) {
       onOpenGDriveSettings?.();
       return;
@@ -184,7 +197,7 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
       );
 
       setBackupSuccessMsg(
-        `Sukses! Berkas cadangan "${result.name || fileName}" berhasil disimpan ke Google Drive Anda.`
+        `Sukses! Berkas cadangan "${result.name || fileName}" berhasil disimpan ke folder "${result.folderName || 'backup'}" di Google Drive Anda.`
       );
     } catch (err: any) {
       console.error('Gagal simpan ke GDrive:', err);
@@ -301,10 +314,14 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
             </span>
             <div className="min-w-0">
               <h3 className="font-extrabold text-base text-slate-900 dark:text-white truncate">
-                Pusat Cadangkan & Pulihkan (Backup & Restore)
+                {book ? `Cadangan & Pulihkan: ${book.title}` : 'Pulihkan Buku dari Cadangan (Restore)'}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                Buku Aktif: <span className="font-bold text-slate-800 dark:text-slate-200">{book.title}</span>
+                {book ? (
+                  <>Buku Aktif: <span className="font-bold text-slate-800 dark:text-slate-200">{book.title}</span></>
+                ) : (
+                  'Pilih berkas cadangan dari Komputer atau Google Drive'
+                )}
               </p>
             </div>
           </div>
@@ -317,34 +334,36 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
           </button>
         </div>
 
-        {/* Tab Selector */}
-        <div className="flex border-b border-slate-200 dark:border-slate-800 px-3 sm:px-5 pt-2 bg-slate-50/30 dark:bg-slate-950/20">
-          <button
-            type="button"
-            onClick={() => setActiveTab('backup')}
-            className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-3 px-2 sm:px-4 font-bold text-xs sm:text-sm border-b-2 transition min-w-0 ${
-              activeTab === 'backup'
-                ? 'border-amber-500 text-amber-600 dark:text-amber-400'
-                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            <Download className="w-4 h-4 flex-shrink-0" />
-            <span className="truncate">Cadangkan <span className="hidden sm:inline">Buku (Backup)</span></span>
-          </button>
+        {/* Tab Selector (Hanya muncul jika ada buku aktif untuk dicadangkan) */}
+        {book && (
+          <div className="flex border-b border-slate-200 dark:border-slate-800 px-3 sm:px-5 pt-2 bg-slate-50/30 dark:bg-slate-950/20">
+            <button
+              type="button"
+              onClick={() => setActiveTab('backup')}
+              className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-3 px-2 sm:px-4 font-bold text-xs sm:text-sm border-b-2 transition min-w-0 ${
+                activeTab === 'backup'
+                  ? 'border-amber-500 text-amber-600 dark:text-amber-400'
+                  : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              <Download className="w-4 h-4 flex-shrink-0" />
+              <span className="truncate">Cadangkan <span className="hidden sm:inline">Buku (Backup)</span></span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('restore')}
-            className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-3 px-2 sm:px-4 font-bold text-xs sm:text-sm border-b-2 transition min-w-0 ${
-              activeTab === 'restore'
-                ? 'border-amber-500 text-amber-600 dark:text-amber-400'
-                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            <Upload className="w-4 h-4 flex-shrink-0" />
-            <span className="truncate">Pulihkan <span className="hidden sm:inline">Buku (Restore)</span></span>
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('restore')}
+              className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-3 px-2 sm:px-4 font-bold text-xs sm:text-sm border-b-2 transition min-w-0 ${
+                activeTab === 'restore'
+                  ? 'border-amber-500 text-amber-600 dark:text-amber-400'
+                  : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              <Upload className="w-4 h-4 flex-shrink-0" />
+              <span className="truncate">Pulihkan <span className="hidden sm:inline">Buku (Restore)</span></span>
+            </button>
+          </div>
+        )}
 
         {/* Modal Body */}
         <div className="p-5 overflow-y-auto space-y-5 flex-1">

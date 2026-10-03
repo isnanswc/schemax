@@ -17,7 +17,8 @@ import {
   Bookmark,
   Scroll,
   Lock,
-  KeyRound
+  KeyRound,
+  Upload
 } from 'lucide-react';
 import { usePrivacy } from '../../contexts/PrivacyContext';
 import { useSecurity } from '../../contexts/SecurityContext';
@@ -31,6 +32,7 @@ interface AppCornerMenuModalProps {
   onOpenPinSetup: () => void;
   onOpenGDriveSettings: () => void;
   onOpenStoryArchitect?: () => void;
+  onOpenRestoreModal?: () => void;
 }
 
 export const AppCornerMenuModal: React.FC<AppCornerMenuModalProps> = ({
@@ -41,6 +43,7 @@ export const AppCornerMenuModal: React.FC<AppCornerMenuModalProps> = ({
   onOpenPinSetup,
   onOpenGDriveSettings,
   onOpenStoryArchitect,
+  onOpenRestoreModal,
 }) => {
   const { settings, updateSettings, togglePrivacyMode } = usePrivacy();
   const { settings: secSettings, lockApp } = useSecurity();
@@ -359,6 +362,26 @@ export const AppCornerMenuModal: React.FC<AppCornerMenuModalProps> = ({
               Folder Publik
             </span>
           </button>
+
+          {/* Restore Book Backup Button */}
+          {onOpenRestoreModal && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onOpenRestoreModal();
+              }}
+              className="w-full py-2 px-3 rounded-2xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-500/10 dark:hover:bg-indigo-500/20 border border-indigo-200 dark:border-indigo-500/30 text-indigo-900 dark:text-indigo-300 text-xs font-bold transition flex items-center justify-between active:scale-98 shadow-xs"
+            >
+              <span className="flex items-center gap-2">
+                <Upload className="w-4 h-4 text-indigo-500" />
+                <span>Pulihkan Cadangan Buku</span>
+              </span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 font-mono">
+                Restore
+              </span>
+            </button>
+          )}
 
           {/* Sync / IndexedDB Button */}
           <button

@@ -59,6 +59,22 @@ export const PinSetupModal: React.FC<PinSetupModalProps> = ({ isOpen, onClose })
     }
   };
 
+  const handleNumericKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (
+      e.key === 'Backspace' ||
+      e.key === 'Delete' ||
+      e.key === 'ArrowLeft' ||
+      e.key === 'ArrowRight' ||
+      e.key === 'Tab' ||
+      e.key === 'Enter'
+    ) {
+      return;
+    }
+    if (!/^\d$/.test(e.key)) {
+      e.preventDefault();
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-in fade-in"
@@ -197,9 +213,16 @@ export const PinSetupModal: React.FC<PinSetupModalProps> = ({ isOpen, onClose })
 
             <input
               type="password"
+              inputMode="numeric"
+              pattern="[0-9]*"
               maxLength={6}
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              autoComplete="one-time-code"
+              onKeyDown={handleNumericKeyDown}
               value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
               placeholder="••••••"
               className="w-full py-3 px-3 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-center text-2xl tracking-[0.5em] font-mono text-slate-900 dark:text-white focus:outline-none focus:border-amber-500 shadow-inner"
             />
@@ -235,9 +258,16 @@ export const PinSetupModal: React.FC<PinSetupModalProps> = ({ isOpen, onClose })
 
             <input
               type="password"
+              inputMode="numeric"
+              pattern="[0-9]*"
               maxLength={6}
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              autoComplete="one-time-code"
+              onKeyDown={handleNumericKeyDown}
               value={confirmPin}
-              onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
+              onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
               placeholder="••••••"
               className="w-full py-3 px-3 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-center text-2xl tracking-[0.5em] font-mono text-slate-900 dark:text-white focus:outline-none focus:border-amber-500 shadow-inner"
             />

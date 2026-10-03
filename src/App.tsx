@@ -16,6 +16,7 @@ import { WorldBuildingView } from './components/world/WorldBuildingView';
 import { MediaGalleryView } from './components/media/MediaGalleryView';
 import { CharacterChatView } from './components/story/chat/CharacterChatView';
 import { CreateBookModal } from './components/books/CreateBookModal';
+import { BookBackupModal } from './components/books/BookBackupModal';
 import { SyncStatusModal } from './components/sync/SyncStatusModal';
 import { AISettingsModal } from './components/settings/AISettingsModal';
 import { GDriveSettingsModal } from './components/settings/GDriveSettingsModal';
@@ -48,6 +49,7 @@ export function App() {
   const [isArchitectModalOpen, setIsArchitectModalOpen] = useState(false);
   const [isCornerMenuOpen, setIsCornerMenuOpen] = useState(false);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
   const [selectedChatEntityId, setSelectedChatEntityId] = useState<string | undefined>(undefined);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -271,6 +273,16 @@ export function App() {
     setIsPinModalOpen(false);
   };
 
+  const handleOpenRestoreModal = () => {
+    navStack.push('modal-global-restore', () => setIsRestoreModalOpen(false));
+    setIsRestoreModalOpen(true);
+  };
+
+  const handleCloseRestoreModal = () => {
+    navStack.pop('modal-global-restore');
+    setIsRestoreModalOpen(false);
+  };
+
   const triggerRefresh = () => {
     setRefreshTrigger((prev) => prev + 1);
   };
@@ -356,6 +368,7 @@ export function App() {
                     onReadBook={handleReadBook}
                     onOpenCreateModal={handleOpenCreateModal}
                     onOpenStoryArchitect={handleOpenArchitect}
+                    onOpenRestoreModal={handleOpenRestoreModal}
                   />
                 ) : (
                   <InspirationChatView
@@ -514,6 +527,7 @@ export function App() {
             onOpenPinSetup={handleOpenPinSetup}
             onOpenGDriveSettings={handleOpenGDriveSettings}
             onOpenStoryArchitect={handleOpenArchitect}
+            onOpenRestoreModal={handleOpenRestoreModal}
           />
 
           {/* 10. Google Drive Shared Folder Settings Modal */}
@@ -526,6 +540,22 @@ export function App() {
           <PinSetupModal
             isOpen={isPinModalOpen}
             onClose={handleClosePinSetup}
+          />
+
+          {/* 12. Global Book Restore Modal (Local & Cloud Google Drive) */}
+          <BookBackupModal
+            isOpen={isRestoreModalOpen}
+            initialTab="restore"
+            onClose={handleCloseRestoreModal}
+            onRestoreComplete={async (restoredBookId) => {
+              triggerRefresh();
+              const restored = await db.books.get(restoredBookId);
+              if (restored) {
+                handleSelectBook(restored);
+              }
+              handleCloseRestoreModal();
+            }}
+            onOpenGDriveSettings={handleOpenGDriveSettings}
           />
         </>
       )}

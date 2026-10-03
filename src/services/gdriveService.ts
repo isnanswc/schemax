@@ -331,7 +331,7 @@ export async function uploadBackupToGDrive(
   fileName: string,
   backupJsonString: string,
   credentialInput?: string
-): Promise<{ success: boolean; fileId?: string; name?: string }> {
+): Promise<{ success: boolean; fileId?: string; name?: string; folderName?: string }> {
   const credential = (credentialInput || '').trim() || getEffectiveGoogleApiKey();
   if (!credential) {
     throw new Error('Google Apps Script URL belum diatur di Pengaturan Google Drive.');
@@ -376,6 +376,7 @@ export async function uploadBackupToGDrive(
         success: true,
         fileId: data.fileId,
         name: data.name || fileName,
+        folderName: data.folderName || 'backup',
       };
     } catch (err: any) {
       if (err?.message?.includes('Failed to fetch') || err?.name === 'TypeError') {
