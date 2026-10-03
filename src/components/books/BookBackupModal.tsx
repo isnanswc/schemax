@@ -431,9 +431,39 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
                 </div>
               )}
               {backupErrorMsg && (
-                <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/40 text-xs text-rose-800 dark:text-rose-300 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-rose-500 flex-shrink-0" />
-                  <span>{backupErrorMsg}</span>
+                <div className="p-3.5 sm:p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/40 text-xs text-rose-800 dark:text-rose-300 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5" />
+                    <span className="font-semibold leading-relaxed flex-1">{backupErrorMsg}</span>
+                  </div>
+                  {(backupErrorMsg.includes('tidak memiliki izin') ||
+                    backupErrorMsg.includes('createFile') ||
+                    backupErrorMsg.includes('auth/drive') ||
+                    backupErrorMsg.includes('testAuthorize')) && (
+                    <div className="pt-2 border-t border-rose-200/60 dark:border-rose-800/40 text-[11px] text-slate-700 dark:text-slate-300 space-y-1.5">
+                      <p className="font-bold text-amber-700 dark:text-amber-400">
+                        💡 Cara Mengaktifkan Izin Google Drive (Hanya 1 Menit):
+                      </p>
+                      <ol className="list-decimal list-inside space-y-1 text-slate-600 dark:text-slate-300 text-[10.5px]">
+                        <li>Buka editor script Anda di <a href="https://script.google.com" target="_blank" rel="noreferrer" className="underline font-bold text-blue-600 dark:text-blue-400">script.google.com</a>.</li>
+                        <li>Pastikan kode script sudah memuat fungsi <code>testAuthorize</code> (bisa disalin dari Pengaturan Google Drive).</li>
+                        <li>Di bilah atas editor, pilih <strong>testAuthorize</strong> lalu klik tombol <strong>Run (Jalankan)</strong>.</li>
+                        <li>Setujui izin akses: <strong>Review Permissions &rarr; Advanced &rarr; Allow</strong>.</li>
+                        <li>Klik <strong>Deploy &rarr; Manage Deployments &rarr; Edit (ikon pensil) &rarr; Version: New version &rarr; Deploy</strong>.</li>
+                      </ol>
+                      {onOpenGDriveSettings && (
+                        <div className="pt-1">
+                          <button
+                            type="button"
+                            onClick={onOpenGDriveSettings}
+                            className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] transition"
+                          >
+                            Buka Pengaturan &amp; Salin Kode Script Terbaru
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 

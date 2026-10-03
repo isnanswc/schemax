@@ -360,6 +360,15 @@ export async function uploadBackupToGDrive(
 
       const data = await response.json();
       if (data.error) {
+        if (
+          data.error.includes('createFile') ||
+          data.error.includes('auth/drive') ||
+          data.error.includes('tidak memiliki izin')
+        ) {
+          throw new Error(
+            'Google Apps Script belum memiliki izin untuk membuat file di Google Drive (DriveApp.Folder.createFile). Buka script.google.com, jalankan fungsi "testAuthorize" sekali dan setujui izinnya, lalu Deploy ulang (Manage Deployments -> Edit -> Version: New version -> Deploy).'
+          );
+        }
         throw new Error(data.error);
       }
 

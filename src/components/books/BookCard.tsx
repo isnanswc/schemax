@@ -4,9 +4,21 @@ import { BookCoverImage } from './BookCoverImage';
 import { EditBookModal } from './EditBookModal';
 import { useLongPress } from '../../hooks/useLongPress';
 import { navStack } from '../../services/backNavigationService';
+import {
+  FileText,
+  ArrowRight,
+  MoreVertical,
+  Trash2,
+  CheckCircle2,
+  Edit3,
+  X,
+  BookOpen,
+  Database,
+} from 'lucide-react';
 import { db, deleteBookCascade } from '../../db';
 import { usePrivacy } from '../../contexts/PrivacyContext';
 import { BookBackupModal } from './BookBackupModal';
+import { GDriveSettingsModal } from '../settings/GDriveSettingsModal';
 
 interface BookCardProps {
   book: Book;
@@ -28,6 +40,7 @@ export const BookCard: React.FC<BookCardProps> = ({
   const [isPressing, setIsPressing] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
+  const [isGDriveSettingsOpen, setIsGDriveSettingsOpen] = useState(false);
 
   const handleOpenMenu = (e?: React.SyntheticEvent) => {
     if (e) {
@@ -371,12 +384,19 @@ export const BookCard: React.FC<BookCardProps> = ({
         isOpen={isBackupModalOpen}
         book={book}
         onClose={() => setIsBackupModalOpen(false)}
+        onOpenGDriveSettings={() => setIsGDriveSettingsOpen(true)}
         onRestoreComplete={async (restoredId) => {
           const updated = await db.books.get(restoredId);
           if (updated) {
             onBookUpdated?.(updated);
           }
         }}
+      />
+
+      {/* ☁️ Google Drive Settings Modal */}
+      <GDriveSettingsModal
+        isOpen={isGDriveSettingsOpen}
+        onClose={() => setIsGDriveSettingsOpen(false)}
       />
     </>
   );

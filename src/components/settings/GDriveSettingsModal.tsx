@@ -89,7 +89,16 @@ export const GDriveSettingsModal: React.FC<GDriveSettingsModalProps> = ({
     onClose();
   };
 
-  const sampleAppsScriptCode = `function doGet(e) {
+  const sampleAppsScriptCode = `// 🌟 1. FUNGSI AKTIVASI IZIN (PENTING DILAKUKAN SEKALI):
+// Pilih 'testAuthorize' di bilah atas editor Apps Script lalu klik tombol 'Run' (Jalankan).
+// Google akan memunculkan jendela persetujuan: Review Permissions -> Advanced -> Allow.
+// Ini WAJIB dijalankan agar script diizinkan membuat & menyimpan berkas cadangan ke Google Drive Anda!
+function testAuthorize() {
+  DriveApp.getRootFolder().getName();
+  Logger.log("✅ Izin akses Google Drive berhasil diotorisasi!");
+}
+
+function doGet(e) {
   var action = e.parameter.action;
   var folderId = e.parameter.folderId;
   var fileId = e.parameter.fileId;
@@ -303,11 +312,11 @@ function doPost(e) {
                 </div>
 
                 <ol start={3} className="list-decimal list-inside space-y-1.5 text-slate-600 dark:text-slate-400">
-                  <li>Klik tombol biru <strong>Deploy &rarr; New deployment</strong> &rarr; pilih jenis <strong>Web app</strong> (atau Manage deployments jika perbarui).</li>
+                  <li><strong>Aktivasi Izin:</strong> Di bilah atas editor Apps Script, pilih fungsi <code>testAuthorize</code> lalu klik tombol <strong>Run (Jalankan)</strong>. Setujui izin (Review Permissions &rarr; Advanced &rarr; Allow) agar script boleh membuat berkas di Google Drive.</li>
+                  <li>Klik tombol biru <strong>Deploy &rarr; New deployment</strong> (atau <i>Manage deployments &rarr; Edit &rarr; New version</i> jika memperbarui).</li>
                   <li>Di bagian <i>Execute as</i>: pilih <strong>Me (email Anda)</strong>.</li>
-                  <li>Di bagian <i>Who has access</i>: <strong className="text-amber-600 dark:text-amber-400 underline">Wajib pilih "Anyone" (Siapa saja)</strong> agar bisa diakses browser.</li>
-                  <li>Klik <strong>Deploy</strong> &rarr; izinkan akses (Review Permissions &rarr; Advanced &rarr; Go to Untitled (unsafe) &rarr; Allow).</li>
-                  <li>Salin <strong>Web app URL</strong> yang berakhiran <code>/exec</code> lalu tempel ke kolom di bawah.</li>
+                  <li>Di bagian <i>Who has access</i>: <strong className="text-amber-600 dark:text-amber-400 underline">Wajib pilih "Anyone" (Siapa saja)</strong> agar bisa diakses aplikasi Schemax.</li>
+                  <li>Klik <strong>Deploy</strong> lalu salin <strong>Web app URL</strong> yang berakhiran <code>/exec</code> dan tempel ke kolom di bawah.</li>
                 </ol>
               </div>
             )}
