@@ -1396,6 +1396,24 @@ export function parseCoverPromptResult(
         if (cleanName.length >= 2) {
           tagToCharacterMap.set(tag, `${cleanName} ${tag}`);
         }
+      } else {
+        const reverseScanMatch = fullContextText.match(new RegExp(`${escapedTag}\\s*[:\\-–]?\\s*([A-Z\\u00C0-\\u017F][A-Za-z0-9\\s'.-]{1,30})`, 'i'));
+        if (reverseScanMatch) {
+          const cleanName = cleanNameToken(reverseScanMatch[1]);
+          if (cleanName.length >= 2) {
+            tagToCharacterMap.set(tag, `${cleanName} ${tag}`);
+          }
+        }
+      }
+
+      if (!tagToCharacterMap.has(tag)) {
+        const matchedKnown = knownEntities.find((k) => {
+          const reg = new RegExp(`${k}\\s*(?:adalah|merupakan|yakni|yaitu|sebagai)?\\s*${escapedTag}|${escapedTag}\\s*[:\\-–]?\\s*${k}`, 'i');
+          return reg.test(fullContextText);
+        });
+        if (matchedKnown) {
+          tagToCharacterMap.set(tag, `${matchedKnown} ${tag}`);
+        }
       }
     }
   });

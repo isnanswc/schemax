@@ -323,6 +323,13 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
     const islandGapX = 240; // Generous gulf between faction islands
     const islandGapY = 180;
 
+    const getNodeX = (c: ClusterInfo, startX: number, col: number) => {
+      if (c.cols <= 1) {
+        return startX + c.width / 2;
+      }
+      return startX + padX + col * colSpacing;
+    };
+
     if (clusters.length === 1) {
       const c = clusters[0];
       const startX = 120;
@@ -331,7 +338,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
         const col = idx % c.cols;
         const row = Math.floor(idx / c.cols);
         newPositions[m.id] = {
-          x: startX + padX + col * colSpacing,
+          x: getNodeX(c, startX, col),
           y: startY + padTop + row * rowSpacing,
         };
       });
@@ -343,7 +350,7 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
           const col = idx % c.cols;
           const row = Math.floor(idx / c.cols);
           newPositions[m.id] = {
-            x: curX + padX + col * colSpacing,
+            x: getNodeX(c, curX, col),
             y: startY + padTop + row * rowSpacing,
           };
         });
@@ -351,30 +358,43 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
       });
     } else {
       const colsInClusterGrid = clusters.length <= 4 ? 2 : 3;
-      let curX = 100;
-      let curY = 100;
-      let maxRowH = 0;
+      const colWidths: number[] = Array(colsInClusterGrid).fill(0);
+      clusters.forEach((c, cIdx) => {
+        const gridCol = cIdx % colsInClusterGrid;
+        colWidths[gridCol] = Math.max(colWidths[gridCol], c.width);
+      });
+
+      const colStartX: number[] = [100];
+      for (let i = 1; i < colsInClusterGrid; i++) {
+        colStartX[i] = colStartX[i - 1] + colWidths[i - 1] + islandGapX;
+      }
+
+      const totalRows = Math.ceil(clusters.length / colsInClusterGrid);
+      const rowHeights: number[] = Array(totalRows).fill(0);
+      clusters.forEach((c, cIdx) => {
+        const gridRow = Math.floor(cIdx / colsInClusterGrid);
+        rowHeights[gridRow] = Math.max(rowHeights[gridRow], c.height);
+      });
+
+      const rowStartY: number[] = [100];
+      for (let r = 1; r < totalRows; r++) {
+        rowStartY[r] = rowStartY[r - 1] + rowHeights[r - 1] + islandGapY;
+      }
 
       clusters.forEach((c, cIdx) => {
         const gridCol = cIdx % colsInClusterGrid;
-
-        if (gridCol === 0 && cIdx > 0) {
-          curX = 100;
-          curY += maxRowH + islandGapY;
-          maxRowH = 0;
-        }
+        const gridRow = Math.floor(cIdx / colsInClusterGrid);
+        const startX = colStartX[gridCol];
+        const startY = rowStartY[gridRow];
 
         c.members.forEach((m, idx) => {
           const col = idx % c.cols;
           const row = Math.floor(idx / c.cols);
           newPositions[m.id] = {
-            x: curX + padX + col * colSpacing,
-            y: curY + padTop + row * rowSpacing,
+            x: getNodeX(c, startX, col),
+            y: startY + padTop + row * rowSpacing,
           };
         });
-
-        maxRowH = Math.max(maxRowH, c.height);
-        curX += c.width + islandGapX;
       });
     }
 
@@ -539,17 +559,22 @@ export const WorldAutoMapView: React.FC<WorldAutoMapViewProps> = ({
           maxY = Math.max(maxY, p.y);
         });
 
-        const padX = 70;
-        const padTop = 75;
-        const padBottom = 40;
+        const padX = 75;
+        const padTop = 85;
+        const padBottom = 45;
+        const headerBadgeWidth = Math.max(140, cluster.name.length * 8 + 60);
+        const cardWidth = Math.max(260, maxX - minX + padX * 2, headerBadgeWidth + 36);
+        const cardHeight = Math.max(180, maxY - minY + padTop + padBottom);
+        const cardX = minX === maxX ? minX - cardWidth / 2 : minX - padX;
+        const cardY = minY - padTop;
 
         return {
           name: cluster.name,
           color: cluster.color,
-          x: minX - padX,
-          y: minY - padTop,
-          width: Math.max(220, maxX - minX + padX * 2),
-          height: Math.max(160, maxY - minY + padTop + padBottom),
+          x: cardX,
+          y: cardY,
+          width: cardWidth,
+          height: cardHeight,
           members: cluster.members,
         };
       })

@@ -127,6 +127,14 @@ export const CoverPromptModal: React.FC<CoverPromptModalProps> = ({
         );
         setResult(res);
         onSave?.(res);
+
+        const storageKey =
+          type === 'book'
+            ? `schemax_cover_prompt_book_${bookId}`
+            : `schemax_cover_prompt_chapter_${bookId}_${chapterOrder || chapterTitle}`;
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(res));
+        } catch (_) {}
       } else {
         const res = await generateChapterCoverPrompt(
           {
@@ -146,6 +154,14 @@ export const CoverPromptModal: React.FC<CoverPromptModalProps> = ({
         );
         setResult(res);
         onSave?.(res);
+
+        const storageKey =
+          type === 'book'
+            ? `schemax_cover_prompt_book_${bookId}`
+            : `schemax_cover_prompt_chapter_${bookId}_${chapterOrder || chapterTitle}`;
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(res));
+        } catch (_) {}
       }
     } catch (err: any) {
       console.error('Gagal generate prompt cover:', err);
@@ -156,15 +172,41 @@ export const CoverPromptModal: React.FC<CoverPromptModalProps> = ({
   };
 
   useEffect(() => {
-    if (!isOpen) return;
-    if (initialData && initialData.prompt) {
-      setResult(initialData);
+    if (!isOpen) {
+      setResult(null);
+      setError(null);
       return;
     }
-    if (!result && !isLoading) {
-      runGenerate();
+
+    if (initialData && initialData.prompt) {
+      setResult(initialData);
+      setError(null);
+      return;
     }
-  }, [isOpen]);
+
+    // LocalStorage fallback check before auto-generating
+    const storageKey =
+      type === 'book'
+        ? `schemax_cover_prompt_book_${bookId}`
+        : `schemax_cover_prompt_chapter_${bookId}_${chapterOrder || chapterTitle}`;
+    try {
+      const cached = localStorage.getItem(storageKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && parsed.prompt) {
+          setResult(parsed);
+          setError(null);
+          onSave?.(parsed);
+          return;
+        }
+      }
+    } catch (_) {}
+
+    // Clean previous result and generate fresh if no saved data exists
+    setResult(null);
+    setError(null);
+    runGenerate();
+  }, [isOpen, initialData, bookId, chapterTitle, chapterOrder]);
 
   if (!isOpen) return null;
 
@@ -243,7 +285,7 @@ export const CoverPromptModal: React.FC<CoverPromptModalProps> = ({
       .filter(Boolean)
       .flatMap((l) => (/^(#{1,4}\s|[-*•]\s|\d+\.\s|\*\*[^*]+:\*\*$)/.test(l) ? [l] : splitParagraph(l)));
 
-    const renderInline = (str: string) => {
+    const renderInline = (str: string): React.ReactNode => {
       const tokens = str.split(/(\[(?:pria|wanita)\d*\]|\*\*[^*]+\*\*|\*[^*]+\*|_[^_]+_)/gi);
       return tokens.map((token, i) => {
         const lower = token.toLowerCase();
@@ -268,9 +310,10 @@ export const CoverPromptModal: React.FC<CoverPromptModalProps> = ({
           );
         }
         if (token.startsWith('**') && token.endsWith('**') && token.length > 4) {
+          const inner = token.slice(2, -2);
           return (
             <strong key={i} className="font-bold text-slate-900 dark:text-slate-100">
-              {token.slice(2, -2)}
+              {renderInline(inner)}
             </strong>
           );
         }
@@ -284,7 +327,9 @@ export const CoverPromptModal: React.FC<CoverPromptModalProps> = ({
             </em>
           );
         }
-        return token;
+        // Clean away stray markdown markers
+        const cleaned = token.replace(/\*\*/g, '').replace(/#{2,}/g, '');
+        return cleaned;
       });
     };
 
@@ -414,14 +459,24 @@ export const CoverPromptModal: React.FC<CoverPromptModalProps> = ({
                       Tidak ada tokoh spesifik yang wajib dilampirkan (bisa langsung generate).
                     </span>
                   ) : (
-                    result.characterReferences.map((charName, idx) => (
-                      <span
-                        key={idx}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300/50 dark:border-emerald-800/50 text-xs font-bold shadow-xs"
-                      >
-                        <span>👤 {charName}</span>
-                      </span>
-                    ))
+                    result.characterReferences.map((charName, idx) => {
+                      const isWanita = /wanita/i.test(charName);
+                      const isPria = /pria/i.test(charName);
+                      const badgeClass = isWanita
+                        ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-300/50 dark:border-rose-800/50'
+                        : isPria
+                        ? 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-300/50 dark:border-sky-800/50'
+                        : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-300/50 dark:border-emerald-800/50';
+                      return (
+                        <span
+                          key={idx}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold border shadow-xs ${badgeClass}`}
+                        >
+                          <span>{isWanita ? '👩' : isPria ? '👨' : '👤'}</span>
+                          <span>{charName}</span>
+                        </span>
+                      );
+                    })
                   )}
                 </div>
 
