@@ -683,9 +683,21 @@ export const AIStoryArchitectModal: React.FC<AIStoryArchitectModalProps> = ({
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Ubah Ide Mentah</span>
               </button>
-              <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/30">
-                Blueprint Teranalisa ✨
-              </span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {attemptHistory.length > 0 && (() => {
+                  const lastSuccess = [...attemptHistory].reverse().find(a => a.status === 'success') || attemptHistory[attemptHistory.length - 1];
+                  if (!lastSuccess) return null;
+                  const provLabel = lastSuccess.provider === 'gemini' ? 'Gemini' : lastSuccess.provider === 'groq' ? 'Groq' : 'OpenRouter';
+                  return (
+                    <span className="text-[10px] font-mono font-medium text-amber-700 dark:text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/30">
+                      {provLabel} model {lastSuccess.model}
+                    </span>
+                  );
+                })()}
+                <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/30">
+                  Blueprint Teranalisa ✨
+                </span>
+              </div>
             </div>
 
             {/* 1. SELEKSI JUDUL BUKU & BAB PERTAMA */}

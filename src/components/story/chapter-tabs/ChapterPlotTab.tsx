@@ -478,9 +478,14 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div className="min-w-0 flex-1">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5 flex-wrap">
               <Zap className="w-4 h-4 text-indigo-500 flex-shrink-0" />
               <span>2. Analisis Penutup &amp; Kurva Dramatis Bab</span>
+              {plot?.aiModel && (
+                <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-700 dark:text-indigo-300">
+                  {plot.aiProvider === 'gemini' ? 'Gemini' : plot.aiProvider === 'groq' ? 'Groq' : 'OpenRouter'} model {plot.aiModel}
+                </span>
+              )}
             </h3>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
               Evaluasi alur naratif: Pembuka (Hook) ➔ Eskalasi Konflik ➔ Puncak Ketegangan ➔ Resolusi / Cliffhanger

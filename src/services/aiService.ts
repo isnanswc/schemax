@@ -941,7 +941,7 @@ export async function generateChapterAutoPlot(
   contentText: string,
   premise?: string,
   onAttempt?: (event: AIGenerationEvent) => void
-): Promise<{ hook: string; risingAction: string; climax: string; resolution: string }> {
+): Promise<ChapterPlotBreakdown> {
   const prompt = `Analisis atau petakan alur struktur plot untuk bab berikut ini menjadi 4 komponen dramatik:
 1. Hook (Pemicu / Awal bab yang memikat)
 2. Rising Action (Eskalasi masalah atau ketegangan)
@@ -973,6 +973,8 @@ Berikan output HANYA berupa JSON valid persis dengan struktur ini tanpa teks pem
       risingAction: parsed.risingAction || '',
       climax: parsed.climax || '',
       resolution: parsed.resolution || '',
+      aiProvider: res.provider,
+      aiModel: res.model,
     };
   }
 
@@ -982,6 +984,8 @@ Berikan output HANYA berupa JSON valid persis dengan struktur ini tanpa teks pem
     risingAction: extractSection(res.text, 'Rising Action') || extractSection(res.text, 'Eskalasi') || '',
     climax: extractSection(res.text, 'Climax') || extractSection(res.text, 'Puncak') || '',
     resolution: extractSection(res.text, 'Resolution') || extractSection(res.text, 'Penutup') || '',
+    aiProvider: res.provider,
+    aiModel: res.model,
   };
 }
 

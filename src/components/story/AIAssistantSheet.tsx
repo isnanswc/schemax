@@ -554,8 +554,8 @@ Lanjutkan cerita secara mulus menyambung dari kata terakhir di atas:`;
                 <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900 dark:text-white">
                   <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                   <span>Komparasi Before &amp; After</span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-800 dark:text-amber-300 font-mono font-normal">
-                    {result.provider.toUpperCase()} • {result.model}
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/15 text-amber-800 dark:text-amber-300 font-mono font-medium">
+                    {result.provider === 'gemini' ? 'Gemini' : result.provider === 'groq' ? 'Groq' : 'OpenRouter'} model {result.model}
                   </span>
                 </div>
 

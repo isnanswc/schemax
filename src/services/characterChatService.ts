@@ -16,6 +16,8 @@ export interface CharacterChatParams {
 export interface CharacterChatResponse {
   reply: string;
   detectedFacts: string[];
+  provider?: string;
+  model?: string;
 }
 
 /**
@@ -184,5 +186,7 @@ export async function sendCharacterChatMessage(
   return {
     reply: replyText,
     detectedFacts: newlyDetected,
+    provider: res.provider,
+    model: res.model,
   };
 }

@@ -266,6 +266,8 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
         sender: 'character',
         text: response.reply,
         timestamp: Date.now(),
+        provider: response.provider,
+        model: response.model,
       };
 
       const finalMessages = [...updatedMessages, charMsg];
@@ -702,9 +704,16 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
                   }`}
                 >
                   {!isUser && (
-                    <span className={`block text-[10px] font-bold text-amber-600 dark:text-amber-400 mb-1 ${getBlurTitleClass()}`}>
-                      {activeChar.name}
-                    </span>
+                    <div className="flex items-center justify-between gap-1.5 mb-1">
+                      <span className={`text-[10px] font-bold text-amber-600 dark:text-amber-400 truncate ${getBlurTitleClass()}`}>
+                        {activeChar.name}
+                      </span>
+                      {msg.model && (
+                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 flex-shrink-0">
+                          {msg.provider === 'gemini' ? 'Gemini' : msg.provider === 'groq' ? 'Groq' : 'OpenRouter'} model {msg.model}
+                        </span>
+                      )}
+                    </div>
                   )}
                   <p className={`whitespace-pre-wrap select-text break-words [overflow-wrap:anywhere] ${getBlurTextClass()}`}>{msg.text}</p>
                   <span

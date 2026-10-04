@@ -36,6 +36,8 @@ export interface ChapterPlotBreakdown {
   risingAction: string;
   climax: string;
   resolution: string;
+  aiProvider?: string;
+  aiModel?: string;
 }
 
 export interface SceneGlosariumItem {
@@ -306,6 +308,8 @@ export interface CharacterChatMessage {
   sender: 'user' | 'character';
   text: string;
   timestamp: number;
+  provider?: string;
+  model?: string;
 }
 
 export interface CharacterChatSession {
@@ -349,6 +353,8 @@ export interface InspirationChatMessage {
   content: string;
   timestamp: number;
   attachments?: InspirationChatMessageAttachment[];
+  aiProvider?: string;
+  aiModel?: string;
 }
 
 export interface InspirationChatSession {

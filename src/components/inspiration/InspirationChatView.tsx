@@ -396,6 +396,8 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
         role: 'assistant',
         content: aiResponse.text,
         timestamp: Date.now(),
+        aiProvider: aiResponse.provider,
+        aiModel: aiResponse.model,
       };
 
       const finalSession: InspirationChatSession = {
@@ -816,6 +818,15 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
                   {/* Message Header Badge */}
                   <div className="flex items-center gap-1.5 mb-1 px-1 text-[10px] font-mono text-slate-400">
                     <span>{isUser ? 'Penulis' : 'AI Inspiration'}</span>
+                    {!isUser && msg.aiModel && (
+                      <>
+                        <span>•</span>
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 font-semibold flex items-center gap-1">
+                          <Sparkles className="w-2.5 h-2.5 text-amber-500" />
+                          {msg.aiProvider === 'gemini' ? 'Gemini' : msg.aiProvider === 'groq' ? 'Groq' : msg.aiProvider === 'openrouter' ? 'OpenRouter' : 'AI'} model {msg.aiModel}
+                        </span>
+                      </>
+                    )}
                     <span>•</span>
                     <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
@@ -986,13 +997,21 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
                       </div>
                     )}
 
-                    {/* Assistant Copy Action */}
+                    {/* Assistant Copy Action & AI Model Info */}
                     {!isUser && !msg.id.startsWith('msg_err_') && (
-                      <div className={`flex items-center justify-end ${isBlueprint ? 'mt-1.5' : 'mt-2 pt-1.5 border-t border-slate-200/60 dark:border-slate-800/60'}`}>
+                      <div className={`flex items-center justify-between gap-2 ${isBlueprint ? 'mt-1.5' : 'mt-2 pt-1.5 border-t border-slate-200/60 dark:border-slate-800/60'}`}>
+                        {msg.aiModel ? (
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono flex items-center gap-1 truncate max-w-[70%]">
+                            <Sparkles className="w-3 h-3 text-amber-500/80 flex-shrink-0" />
+                            <span className="truncate">
+                              {msg.aiProvider === 'gemini' ? 'Gemini' : msg.aiProvider === 'groq' ? 'Groq' : msg.aiProvider === 'openrouter' ? 'OpenRouter' : 'AI'} model <strong className="font-semibold text-slate-600 dark:text-slate-400">{msg.aiModel}</strong>
+                            </span>
+                          </span>
+                        ) : <span />}
                         <button
                           type="button"
                           onClick={() => handleCopyMessage(msg.id, cleanContent)}
-                          className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition text-[11px] flex items-center gap-1"
+                          className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition text-[11px] flex items-center gap-1 flex-shrink-0"
                         >
                           {copiedMsgId === msg.id ? (
                             <>

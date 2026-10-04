@@ -170,8 +170,9 @@ Instruksi Penulisan:
 
       if (result && result.text) {
         setSynopsis(result.text.trim());
+        const providerLabel = result.provider === 'gemini' ? 'Gemini' : result.provider === 'groq' ? 'Groq' : 'OpenRouter';
         setAiSuccessMessage(
-          `✨ Sinopsis berhasil dirancang dari ${sourceChapters.length} bab via [${result.provider.toUpperCase()}] ${result.slotLabel} • ${result.model}!`
+          `✨ Sinopsis berhasil dirancang dari ${sourceChapters.length} bab via ${providerLabel} model ${result.model}!`
         );
       }
     } catch (err: any) {

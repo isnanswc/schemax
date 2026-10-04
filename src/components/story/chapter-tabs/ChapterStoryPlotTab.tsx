@@ -179,7 +179,7 @@ export const ChapterStoryPlotTab: React.FC<ChapterStoryPlotTabProps> = ({
   );
 
   const [isGeneratingInternal, setIsGeneratingInternal] = useState(false);
-  const [internalGenSuccess, setInternalGenSuccess] = useState<{ wordCount: number; sessionNum: number } | null>(null);
+  const [internalGenSuccess, setInternalGenSuccess] = useState<{ wordCount: number; sessionNum: number; provider?: string; model?: string } | null>(null);
   const [internalGenError, setInternalGenError] = useState<string | null>(null);
 
   // Toolsaday Bridge States
@@ -601,9 +601,10 @@ PETUNJUK PENULISAN:
         ' ' +
         now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
+      const providerLabel = res.provider === 'gemini' ? 'Gemini' : res.provider === 'groq' ? 'Groq' : 'OpenRouter';
       const sessionDividerHtml = `
 <div class="schemax-ai-session-divider" data-session="${nextSessionNumber}" contenteditable="false">
-  <span class="schemax-ai-session-tag">⚡ Sesi AI #${nextSessionNumber} • ${timeStr}</span>
+  <span class="schemax-ai-session-tag">⚡ Sesi AI #${nextSessionNumber} • ${timeStr} • ${providerLabel} model ${res.model}</span>
 </div>
 `;
 
@@ -622,7 +623,12 @@ PETUNJUK PENULISAN:
         updatedAt: Date.now(),
       });
 
-      setInternalGenSuccess({ wordCount: words, sessionNum: nextSessionNumber });
+      setInternalGenSuccess({
+        wordCount: words,
+        sessionNum: nextSessionNumber,
+        provider: res.provider,
+        model: res.model,
+      });
     } catch (err: any) {
       console.error('Gagal generate naskah internal:', err);
       setInternalGenError(err?.message || 'Gagal menghasilkan naskah.');
@@ -1252,8 +1258,13 @@ ${chapterPlotText.trim() || 'Kembangkan bab ini dengan pembuka yang memikat, kon
                     <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                     <span>Naskah berhasil dibuat &amp; dimasukkan ke Naskah Utama!</span>
                   </div>
-                  <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
-                    Sesi #{internalGenSuccess.sessionNum} • {internalGenSuccess.wordCount} Total Kata
+                  <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-right">
+                    Sesi #{internalGenSuccess.sessionNum} • {internalGenSuccess.wordCount} Kata
+                    {internalGenSuccess.model && (
+                      <span className="block text-[10px] font-normal text-emerald-700/80 dark:text-emerald-300/80">
+                        {internalGenSuccess.provider === 'gemini' ? 'Gemini' : internalGenSuccess.provider === 'groq' ? 'Groq' : 'OpenRouter'} model {internalGenSuccess.model}
+                      </span>
+                    )}
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-600 dark:text-slate-400">
