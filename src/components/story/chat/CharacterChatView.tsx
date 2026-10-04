@@ -14,7 +14,10 @@ import {
   Compass,
   Film,
   Users,
-  ArrowLeft
+  ArrowLeft,
+  BookOpen,
+  Check,
+  Zap
 } from 'lucide-react';
 import { usePrivacy } from '../../../contexts/PrivacyContext';
 import { Book, WorldEntity, StoryChapter, MediaItem, CharacterChatMessage, CharacterChatSession } from '../../../types';
@@ -34,6 +37,7 @@ interface CharacterChatViewProps {
   media: MediaItem[];
   initialEntityId?: string;
   onOpenWorldbuilding?: () => void;
+  onRefresh?: () => void;
 }
 
 // Avatar subcomponent for individual character card
@@ -108,11 +112,11 @@ const CharacterGridCard: React.FC<{
         </h4>
         <div className="mt-1 flex items-center gap-1">
           <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 truncate max-w-[130px] ${getBlurTextClass()}`}>
-            {entity.role || 'Karakter'}
+            {(entity as any).role || entity.category || 'Karakter'}
           </span>
         </div>
         <p className={`mt-1.5 text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed ${getBlurTextClass()}`}>
-          {entity.shortDescription || entity.description || 'Karakter dalam naskah cerita.'}
+          {entity.shortDescription || (entity as any).description || 'Karakter dalam naskah cerita.'}
         </p>
       </div>
 
@@ -333,6 +337,86 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
       session.authorKnownFacts = updatedFacts;
       session.updatedAt = Date.now();
       await db.characterChats.put(session);
+    }
+  };
+
+  // Fact Vault Codex Sync State
+  const [syncedFactIndices, setSyncedFactIndices] = useState<Set<number>>(new Set());
+  const [syncToastMessage, setSyncToastMessage] = useState<string | null>(null);
+
+  const showSyncToast = (msg: string) => {
+    setSyncToastMessage(msg);
+    setTimeout(() => setSyncToastMessage(null), 2500);
+  };
+
+  // Sync a single fact to the character's WorldEntity in Codex
+  const handleSyncFactToCodex = async (fact: string, idx: number) => {
+    if (!activeChar) return;
+    try {
+      const ent = await db.worldEntities.get(activeChar.id);
+      if (!ent) return;
+
+      const existingNotes = ent.detailedNotes || '';
+      if (existingNotes.includes(fact)) {
+        showSyncToast('Fakta ini sudah ada di profil Codex!');
+        setSyncedFactIndices((prev) => new Set(prev).add(idx));
+        return;
+      }
+
+      const factLine = `• [Fakta Obrolan]: ${fact}`;
+      const updatedNotes = existingNotes.trim()
+        ? `${existingNotes.trim()}\n${factLine}`
+        : factLine;
+
+      await db.worldEntities.update(activeChar.id, {
+        detailedNotes: updatedNotes,
+        updatedAt: Date.now(),
+      });
+
+      setSyncedFactIndices((prev) => new Set(prev).add(idx));
+      onRefresh?.();
+      showSyncToast(`Tersimpan ke profil Codex "${activeChar.name}"!`);
+    } catch (err) {
+      console.error('Gagal sinkron fakta ke Codex:', err);
+      alert('Gagal menyinkronkan ke Codex.');
+    }
+  };
+
+  // Sync ALL facts to the character's WorldEntity in Codex
+  const handleSyncAllFactsToCodex = async () => {
+    if (!activeChar || authorKnownFacts.length === 0) return;
+    try {
+      const ent = await db.worldEntities.get(activeChar.id);
+      if (!ent) return;
+
+      const existingNotes = ent.detailedNotes || '';
+      const newFacts = authorKnownFacts.filter((f) => !existingNotes.includes(f));
+
+      if (newFacts.length === 0) {
+        showSyncToast('Semua fakta sudah tersimpan di profil Codex!');
+        const allIndices = new Set(authorKnownFacts.map((_, i) => i));
+        setSyncedFactIndices(allIndices);
+        return;
+      }
+
+      const sectionHeader = existingNotes.includes('--- Fakta Hasil Obrolan ---')
+        ? ''
+        : '\n\n--- Fakta Hasil Obrolan ---\n';
+      const formattedLines = newFacts.map((f) => `• ${f}`).join('\n');
+      const updatedNotes = `${existingNotes.trim()}${sectionHeader}${formattedLines}`;
+
+      await db.worldEntities.update(activeChar.id, {
+        detailedNotes: updatedNotes,
+        updatedAt: Date.now(),
+      });
+
+      const allIndices = new Set(authorKnownFacts.map((_, i) => i));
+      setSyncedFactIndices(allIndices);
+      onRefresh?.();
+      showSyncToast(`Berhasil menyimpan ${newFacts.length} fakta ke profil "${activeChar.name}" di Codex!`);
+    } catch (err) {
+      console.error('Gagal sinkron semua fakta ke Codex:', err);
+      alert('Gagal menyinkronkan fakta ke Codex.');
     }
   };
 
@@ -760,6 +844,32 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
               </button>
             </div>
 
+            {/* Sync Feedback Toast */}
+            {syncToastMessage && (
+              <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-bold flex items-center gap-1.5 animate-in fade-in">
+                <Check className="w-4 h-4 flex-shrink-0" />
+                <span>{syncToastMessage}</span>
+              </div>
+            )}
+
+            {/* Batch Sync to Codex Button */}
+            {authorKnownFacts.length > 0 && (
+              <div className="flex items-center justify-between gap-2 pt-1 pb-1">
+                <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                  {authorKnownFacts.length} Fakta Tersimpan
+                </span>
+                <button
+                  type="button"
+                  onClick={handleSyncAllFactsToCodex}
+                  className="px-2.5 py-1 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[11px] flex items-center gap-1.5 transition shadow-xs active:scale-95"
+                  title="Simpan seluruh fakta hasil obrolan ke catatan karakter di Codex Dunia"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>Kirim Semua ke Codex</span>
+                </button>
+              </div>
+            )}
+
             {/* Facts list */}
             <div className="space-y-1.5 max-h-56 overflow-y-auto p-1">
               {authorKnownFacts.length === 0 ? (
@@ -767,22 +877,43 @@ export const CharacterChatView: React.FC<CharacterChatViewProps> = ({
                   Belum ada fakta yang tercatat. Ceritakan hobi, kesukaan, atau rahasiamu saat mengobrol, dan {activeChar.name} akan mencatatnya di sini secara otomatis!
                 </p>
               ) : (
-                authorKnownFacts.map((fact, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-xs text-slate-800 dark:text-slate-200"
-                  >
-                    <span className={getBlurTextClass()}>🧠 {fact}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteFact(idx)}
-                      className="text-slate-400 hover:text-rose-500 p-1 transition"
-                      title="Lupakan fakta ini"
+                authorKnownFacts.map((fact, idx) => {
+                  const isSynced = syncedFactIndices.has(idx);
+                  return (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-xs text-slate-800 dark:text-slate-200"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))
+                      <span className={`flex-1 min-w-0 ${getBlurTextClass()}`}>🧠 {fact}</span>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {isSynced ? (
+                          <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1">
+                            <Check className="w-3 h-3" />
+                            <span>Codex</span>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleSyncFactToCodex(fact, idx)}
+                            className="px-2 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900 text-indigo-600 dark:text-indigo-400 font-bold text-[10px] flex items-center gap-1 transition"
+                            title="Simpan fakta ini ke catatan karakter di Codex"
+                          >
+                            <BookOpen className="w-3 h-3" />
+                            <span>Ke Codex</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteFact(idx)}
+                          className="text-slate-400 hover:text-rose-500 p-1 transition"
+                          title="Lupakan fakta ini"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
 

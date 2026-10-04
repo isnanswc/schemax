@@ -18,10 +18,8 @@ import {
   Users,
   ShieldAlert,
   SlidersHorizontal,
-  Bookmark,
   AlertCircle,
-  FileEdit,
-  Check
+  FileEdit
 } from 'lucide-react';
 import { StoryChapter, ChapterPlotBreakdown } from '../../../types';
 import {

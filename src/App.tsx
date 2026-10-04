@@ -435,14 +435,22 @@ export function App() {
                     media={bookMedia}
                     initialEntityId={selectedChatEntityId}
                     onOpenWorldbuilding={() => setActiveTab('world')}
+                    onRefresh={triggerRefresh}
                   />
                 )}
 
                 {activeTab === 'gallery' && (
                   <MediaGalleryView
                     bookId={currentBook.id}
+                    book={currentBook}
+                    chapters={bookChapters}
+                    entities={bookEntities}
                     mediaList={bookMedia}
                     onRefresh={triggerRefresh}
+                    onBookUpdated={(updated) => {
+                      setCurrentBook(updated);
+                      triggerRefresh();
+                    }}
                     onOpenGDriveSettings={handleOpenGDriveSettings}
                   />
                 )}

@@ -16,8 +16,8 @@ import {
   CoverPromptResult,
   generateBookCoverPrompt,
   generateChapterCoverPrompt,
-  AIGenerationEvent,
 } from '../../services/aiService';
+import { AIGenerationEvent } from '../../types/ai';
 import { WorldEntity } from '../../types';
 import { db } from '../../db';
 
@@ -155,10 +155,7 @@ export const CoverPromptModal: React.FC<CoverPromptModalProps> = ({
         setResult(res);
         onSave?.(res);
 
-        const storageKey =
-          type === 'book'
-            ? `schemax_cover_prompt_book_${bookId}`
-            : `schemax_cover_prompt_chapter_${bookId}_${chapterOrder || chapterTitle}`;
+        const storageKey = `schemax_cover_prompt_chapter_${bookId}_${chapterOrder || chapterTitle}`;
         try {
           localStorage.setItem(storageKey, JSON.stringify(res));
         } catch (_) {}
