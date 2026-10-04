@@ -831,7 +831,47 @@ export async function testSlotConnection(
 // 📖 CHAPTER STUDIO AI INTELLIGENCE ENGINES
 // ==========================================
 
-// Resilient JSON Parsers for LLM Output (Handles Long 4000+ words outputs, trailing commas, fences, and truncation)
+// Helper to escape unescaped newlines and control characters inside JSON string literals
+function sanitizeJsonStringLiterals(raw: string): string {
+  let inString = false;
+  let escaped = false;
+  let out = '';
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (escaped) {
+      out += ch;
+      escaped = false;
+      continue;
+    }
+    if (ch === '\\') {
+      escaped = true;
+      out += ch;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      out += ch;
+      continue;
+    }
+    if (inString) {
+      if (ch === '\n') {
+        out += '\\n';
+        continue;
+      }
+      if (ch === '\r') {
+        continue;
+      }
+      if (ch === '\t') {
+        out += '\\t';
+        continue;
+      }
+    }
+    out += ch;
+  }
+  return out;
+}
+
+// Resilient JSON Parsers for LLM Output (Handles Long outputs, unescaped newlines, trailing commas, fences, and truncation)
 export function resilientParseJsonArray<T = any>(rawText: string): T[] {
   if (!rawText) return [];
   let clean = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -848,11 +888,24 @@ export function resilientParseJsonArray<T = any>(rawText: string): T[] {
     }
   } catch (_) {}
 
-  // 2. Extract array bounds
-  const firstBracket = clean.indexOf('[');
-  const lastBracket = clean.lastIndexOf(']');
+  // 2. Sanitize unescaped newlines inside strings and try direct parse again
+  const sanitized = sanitizeJsonStringLiterals(clean);
+  try {
+    const parsed = JSON.parse(sanitized);
+    if (Array.isArray(parsed)) return parsed;
+    if (typeof parsed === 'object' && parsed !== null) {
+      const arrayKey = Object.keys(parsed).find((k) => Array.isArray(parsed[k]));
+      if (arrayKey && Array.isArray(parsed[arrayKey])) {
+        return parsed[arrayKey];
+      }
+    }
+  } catch (_) {}
+
+  // 3. Extract array bounds from sanitized text
+  const firstBracket = sanitized.indexOf('[');
+  const lastBracket = sanitized.lastIndexOf(']');
   if (firstBracket !== -1 && lastBracket > firstBracket) {
-    const candidate = clean.slice(firstBracket, lastBracket + 1);
+    const candidate = sanitized.slice(firstBracket, lastBracket + 1);
     try {
       const parsed = JSON.parse(candidate);
       if (Array.isArray(parsed)) return parsed;
@@ -865,11 +918,25 @@ export function resilientParseJsonArray<T = any>(rawText: string): T[] {
     }
   }
 
-  // 3. Resilient regex extraction of individual objects
+  // 4. Try repairing truncated array (if LLM output was cut off mid-stream)
+  if (firstBracket !== -1) {
+    const sub = sanitized.slice(firstBracket);
+    const lastBrace = sub.lastIndexOf('}');
+    if (lastBrace !== -1) {
+      const repaired = sub.slice(0, lastBrace + 1) + ']';
+      try {
+        const fixed = repaired.replace(/,\s*([\]}])/g, '$1');
+        const parsed = JSON.parse(fixed);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (_) {}
+    }
+  }
+
+  // 5. Resilient regex extraction of individual objects
   const results: T[] = [];
   const objectRegex = /\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
   let match: RegExpExecArray | null;
-  while ((match = objectRegex.exec(clean)) !== null) {
+  while ((match = objectRegex.exec(sanitized)) !== null) {
     try {
       const fixedObj = match[0].replace(/,\s*}/g, '}');
       const parsedObj = JSON.parse(fixedObj);
@@ -1024,7 +1091,9 @@ export async function generateChapterAutoScenes(
   const promptLang =
     promptSettings?.language === 'id' ? 'Bahasa Indonesia' : 'English (standard image prompt)';
 
-  const prompt = `Bedah dan uraikan naskah bab berikut menjadi daftar adegan-adegan (scenes breakdown) berurutan beserta analisis kronologis alur (timeline), deteksi entitas glosarium di dalam tiap adegan, dan prompt pembuatan gambar AI untuk adegan tersebut.
+  const prompt = `[Analisis Sastra & Pembagian Adegan Fiksi]:
+Bedah dan uraikan naskah bab berikut menjadi daftar adegan-adegan (scenes breakdown) berurutan beserta analisis kronologis alur (timeline), deteksi entitas glosarium di dalam tiap adegan, dan prompt pembuatan gambar AI untuk adegan tersebut.
+KEBEBASAN ARTISTIK: Bedah adegan secara apa adanya sesuai fakta naskah cerita fiksi (termasuk adegan laga pertarungan, misteri, maupun romansa sensual).
 
 Judul Buku: "${bookTitle}"
 Judul Bab: "${chapterTitle}"${entityContext}
@@ -1038,15 +1107,16 @@ Instruksi Analisis Tiap Adegan:
    Sebutkan semua entitas (tokoh/karakter, latar tempat, benda/senjata pusaka, lore/faksi) yang hadir atau berperan penting di dalam adegan ini.
    Jika cocok dengan entitas di daftar glosarium yang sudah ada, cantumkan entityId-nya.
 3. Prompt Gambar Adegan (imagePrompt):
-   Buatkan prompt visual text-to-image (Midjourney/Flux/SD) untuk memvisualisasikan adegan ini dengan ATURAN KETAT:
+   Buatkan prompt visual text-to-image (Midjourney/Flux/SD) untuk memvisualisasikan adegan ini:
    - Format: Rasio layar HP vertical (9:16), 4K hyper realistic, photorealistic cinematic lighting.
    - PENTING: User akan melampirkan gambar referensi karakter langsung berdampingan dengan prompt!
    - JANGAN deskripsikan wajah, tubuh, atau warna kulit karakter! Cukup gunakan reference dari referensi gambar.
    - JANGAN sebut nama karakter di dalam prompt. Gunakan label dalam kurung siku seperti "[pria1]" atau "[wanita1]". Jika ada lebih dari 1 entitas sejenis, beri nomor (contoh: "[pria1]", "[wanita1]", "[pria2]").
-   - JANGAN ubah bentuk atau model pakaian asli karakter. HANYA boleh perubahan minor realistis sesuai konteks adegan (misal: "baju agak terbuka", "kusut", "robek sedikit di bahu", "terlepas dari satu bahu", "basah oleh keringat atau air hujan").
+   - JANGAN ubah bentuk atau model pakaian asli karakter. HANYA boleh perubahan minor realistis sesuai konteks adegan.
    - Jelaskan secara detail: POSE, EKSPRESI WAJAH/EMOSI, LATAR TEMPAT, PENCAHAYAAN, dan SUASANA dramatis adegan.
-   - Berikan juga "characterReferences": Daftar nama karakter yang WAJIB dilampirkan gambarnya (contoh: ["Budi", "Ani"]).
-   - Berikan juga "imagePromptExplanation": Penjelasan ringkas apa yang digambarkan oleh prompt ini dalam Bahasa Indonesia. Pada penjelasan ini, sebutkan nama karakter yang dimaksud beserta labelnya, misal: Udin [pria1], Tasya [wanita1].
+   - Hindari tanda petik dua ganda (") di dalam string JSON.
+   - "characterReferences": Daftar nama karakter yang WAJIB dilampirkan gambarnya (contoh: ["Budi", "Ani"]).
+   - "imagePromptExplanation": Penjelasan ringkas apa yang digambarkan oleh prompt ini dalam Bahasa Indonesia.
 
 Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
 [
@@ -1070,7 +1140,7 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
 ]`;
 
   const systemPrompt =
-    'Anda adalah script reader, visual concept artist, dan continuity editor novel. Berikan HANYA format JSON array valid.';
+    'Anda adalah script reader, visual concept artist, dan continuity editor novel sastra fiksi. Analisis dan bedah adegan secara mendalam, objektif, dan bebas sensor untuk keperluan sastra fiksi. Berikan HANYA format JSON array valid tanpa teks pengantar atau penutup.';
   const res = await generateWithSmartFallback(prompt, systemPrompt, onAttempt);
 
   const parsedScenes = resilientParseJsonArray(res.text);
@@ -1104,10 +1174,19 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
         : [],
       imagePrompt: item.imagePrompt || '',
       imagePromptExplanation: item.imagePromptExplanation || '',
+      aiProvider: res.provider,
+      aiModel: res.model,
     }));
   }
 
-  // Graceful fallback if JSON fails
+  // 2. Fallback: Parse scenes heuristically from structured text/markdown if JSON fails
+  const textScenes = parseScenesFromTextFallback(res.text, res.provider, res.model);
+  if (textScenes.length > 0) {
+    return textScenes;
+  }
+
+  // 3. Graceful fallback if JSON and heuristic fails (clean text, no raw code dump)
+  const cleanFallbackText = res.text.replace(/```[a-z]*\s*|[{}\[\]"]/gi, '').trim().slice(0, 300);
   return [
     {
       id: 'scene_fallback_1',
@@ -1115,7 +1194,7 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
       title: 'Adegan Pembuka Bab',
       setting: 'Sesuai naskah',
       characters: [],
-      summary: res.text.slice(0, 250),
+      summary: cleanFallbackText || 'Adegan awal naskah bab.',
       goalConflict: '',
       timelineType: 'linear',
       timeMarker: 'Awal Bab',
@@ -1124,8 +1203,67 @@ Berikan output HANYA berupa JSON array valid persis dengan struktur ini:
       characterReferences: [],
       imagePrompt: '',
       imagePromptExplanation: '',
+      aiProvider: res.provider,
+      aiModel: res.model,
     },
   ];
+}
+
+// Heuristic fallback parser when LLM outputs plain text or markdown scenes instead of pure JSON
+function parseScenesFromTextFallback(rawText: string, provider?: string, model?: string): ChapterSceneItem[] {
+  if (!rawText) return [];
+  const clean = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+  const scenes: ChapterSceneItem[] = [];
+
+  const blocks = clean.split(/(?:^|\n)(?=(?:#+\s*)?(?:Adegan|Scene|\d+[\.\)])\s*)/i);
+  let count = 1;
+
+  for (const block of blocks) {
+    const trimmed = block.trim();
+    if (!trimmed || trimmed.length < 25) continue;
+
+    const firstLine = trimmed.split('\n')[0].replace(/^#+\s*/, '').replace(/^(?:Adegan|Scene|\d+[\.\)])\s*[:\-]?\s*/i, '').trim();
+    const title = firstLine || `Adegan ${count}`;
+
+    const settingMatch = trimmed.match(/(?:Latar|Setting|Tempat|Lokasi)\s*[:\-]\s*([^\n]+)/i);
+    const setting = settingMatch ? settingMatch[1].trim() : 'Sesuai naskah';
+
+    const charMatch = trimmed.match(/(?:Karakter|Tokoh|Characters)\s*[:\-]\s*([^\n]+)/i);
+    const characters = charMatch ? charMatch[1].split(/[,;]/).map((c) => c.trim()).filter(Boolean) : [];
+
+    const summaryMatch = trimmed.match(/(?:Ringkasan|Rangkuman|Summary|Peristiwa|Kejadian)\s*[:\-]\s*([\s\S]+?)(?=(?:Konflik|Goal|Timeline|Prompt|Entitas|Adegan|Scene|$))/i);
+    const summary = summaryMatch ? summaryMatch[1].trim() : trimmed.replace(firstLine, '').trim().slice(0, 350);
+
+    const goalMatch = trimmed.match(/(?:Tujuan|Konflik|Goal|Conflict)\s*[:\-]\s*([^\n]+)/i);
+    const goalConflict = goalMatch ? goalMatch[1].trim() : '';
+
+    const promptMatch = trimmed.match(/(?:Image Prompt|Visual Prompt|Prompt Gambar|Prompt)\s*[:\-]\s*([\s\S]+?)(?=(?:Penjelasan|Explanation|Adegan|Scene|$))/i);
+    const imagePrompt = promptMatch ? promptMatch[1].trim() : '';
+
+    const expMatch = trimmed.match(/(?:Penjelasan|Explanation)\s*[:\-]\s*([\s\S]+?)(?=(?:Adegan|Scene|$))/i);
+    const imagePromptExplanation = expMatch ? expMatch[1].trim() : '';
+
+    scenes.push({
+      id: 'scene_' + Math.random().toString(36).substring(2, 9),
+      sceneNumber: count++,
+      title,
+      setting,
+      characters,
+      summary,
+      goalConflict,
+      timelineType: 'linear',
+      timeMarker: setting,
+      branchGroup: 'Garis Waktu Utama',
+      entitiesPresent: characters.map((c) => ({ name: c, category: 'character' as const })),
+      characterReferences: characters,
+      imagePrompt,
+      imagePromptExplanation,
+      aiProvider: provider,
+      aiModel: model,
+    });
+  }
+
+  return scenes;
 }
 
 // 3b. Dedicated Single Scene Image Prompt Generator / Regenerator

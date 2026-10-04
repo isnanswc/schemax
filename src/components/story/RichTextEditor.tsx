@@ -827,7 +827,15 @@ ${afterHtml}
       const stripped = (tempDiv.textContent || tempDiv.innerText || '').trim();
       if (stripped) return stripped;
     }
-    // 3. Fallback to premise or notes so AI can still work even without full manuscript
+    // 3. Check rawDrafts (from Story Plot / Coretan Bab)
+    if (currentChapter.rawDrafts && currentChapter.rawDrafts.length > 0) {
+      const draftsText = currentChapter.rawDrafts
+        .map((d: any) => (typeof d === 'string' ? d : d.content || ''))
+        .filter((t: string) => t.trim().length > 0)
+        .join('\n\n');
+      if (draftsText.trim()) return draftsText.trim();
+    }
+    // 4. Fallback to premise or notes so AI can still work even without full manuscript
     return (currentChapter.premise || currentChapter.notes || '').trim();
   };
 

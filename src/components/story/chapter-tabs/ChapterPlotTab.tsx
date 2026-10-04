@@ -114,6 +114,13 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
       const stripped = (tempDiv.textContent || tempDiv.innerText || '').trim();
       if (stripped) return stripped;
     }
+    if (chapter.rawDrafts && chapter.rawDrafts.length > 0) {
+      const draftsText = chapter.rawDrafts
+        .map((d: any) => (typeof d === 'string' ? d : d.content || ''))
+        .filter((t: string) => t.trim().length > 0)
+        .join('\n\n');
+      if (draftsText.trim()) return draftsText.trim();
+    }
     return (chapter.premise || chapter.notes || '').trim();
   };
 

@@ -61,6 +61,8 @@ export interface ChapterSceneItem {
   imagePrompt?: string;
   imagePromptExplanation?: string;
   characterReferences?: string[];
+  aiProvider?: string;
+  aiModel?: string;
 }
 
 export interface ImagePromptSettings {

@@ -324,6 +324,8 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
     setTimeout(() => setCopiedPromptId(null), 2000);
   };
 
+  const [scenesSuccessMessage, setScenesSuccessMessage] = useState<string | null>(null);
+
   const getEffectiveText = (): string => {
     if (contentText && contentText.trim()) return contentText.trim();
     if (chapter.contentHtml && chapter.contentHtml.trim()) {
@@ -332,27 +334,43 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
       const stripped = (tempDiv.textContent || tempDiv.innerText || '').trim();
       if (stripped) return stripped;
     }
+    // Also inspect rawDrafts (from Story Plot / Coretan Bab)
+    if (chapter.rawDrafts && chapter.rawDrafts.length > 0) {
+      const draftsText = chapter.rawDrafts
+        .map((d: any) => (typeof d === 'string' ? d : d.content || ''))
+        .filter((t: string) => t.trim().length > 0)
+        .join('\n\n');
+      if (draftsText.trim()) return draftsText.trim();
+    }
     return (chapter.premise || chapter.notes || '').trim();
   };
 
   const handleAnalyzeScenes = async () => {
     const textToAnalyze = getEffectiveText();
     if (!textToAnalyze) {
-      alert('Tuliskan naskah bab atau premis terlebih dahulu agar AI dapat memetakan adegan.');
+      alert('Naskah bab, Story Plot, atau Premis masih kosong. Silakan tulis naskah di Naskah Utama, Story Plot, atau Premis Bab terlebih dahulu agar AI dapat membedah adegan.');
       return;
     }
 
     setIsAnalyzingScenes(true);
+    setScenesSuccessMessage(null);
     try {
+      const currentEntitiesList = localEntities.length > 0 ? localEntities : entities;
       const generatedScenes = await generateChapterAutoScenes(
         chapter.title,
         bookTitle,
         textToAnalyze,
-        entities.map((e) => ({ id: e.id, name: e.name, category: e.category }))
+        currentEntitiesList.map((e) => ({ id: e.id, name: e.name, category: e.category }))
       );
 
       if (generatedScenes && generatedScenes.length > 0) {
         onUpdateChapter({ aiScenes: generatedScenes });
+        const providerName = generatedScenes[0]?.aiProvider ? (generatedScenes[0].aiProvider === 'gemini' ? 'Gemini' : generatedScenes[0].aiProvider === 'groq' ? 'Groq' : 'OpenRouter') : 'AI';
+        const modelName = generatedScenes[0]?.aiModel ? ` model ${generatedScenes[0].aiModel}` : '';
+        setScenesSuccessMessage(`✨ Berhasil membedah ${generatedScenes.length} adegan bab via ${providerName}${modelName}!`);
+        setTimeout(() => setScenesSuccessMessage(null), 5000);
+      } else {
+        alert('AI tidak menemukan adegan yang dapat diurai. Pastikan teks naskah cukup jelas.');
       }
     } catch (err: any) {
       alert('Gagal memecah adegan: ' + (err.message || 'Periksa API Key di AI Config'));
@@ -2163,10 +2181,17 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
         <div className="space-y-3">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                <Film className="w-4 h-4 text-indigo-500" />
-                <span>Auto Scene Breakdown</span>
-              </h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <Film className="w-4 h-4 text-indigo-500" />
+                  <span>Auto Scene Breakdown</span>
+                </h3>
+                {scenes.length > 0 && scenes[0]?.aiModel && (
+                  <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-700 dark:text-indigo-300">
+                    {scenes[0].aiProvider === 'gemini' ? 'Gemini' : scenes[0].aiProvider === 'groq' ? 'Groq' : 'OpenRouter'} model {scenes[0].aiModel}
+                  </span>
+                )}
+              </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 Pecahan kronologis babak adegan di bab ini lengkap dengan latar dan konflik
               </p>
@@ -2175,7 +2200,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
             <button
               type="button"
               onClick={handleAnalyzeScenes}
-              disabled={isAnalyzingScenes || !getEffectiveText()}
+              disabled={isAnalyzingScenes}
               className="flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 text-white text-xs font-bold shadow-md shadow-indigo-500/20 active:scale-95 transition flex-shrink-0 disabled:opacity-50"
             >
               {isAnalyzingScenes ? (
@@ -2192,6 +2217,13 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
             </button>
           </div>
 
+          {scenesSuccessMessage && (
+            <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2 animate-in fade-in">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+              <span>{scenesSuccessMessage}</span>
+            </div>
+          )}
+
           {scenes.length === 0 ? (
             <div className="text-center py-10 px-4 bg-white dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800 rounded-3xl">
               <Film className="w-8 h-8 text-slate-400 mx-auto mb-2" />
@@ -2199,8 +2231,13 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
                 Belum Ada Pembagian Adegan
               </h4>
               <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-3">
-                Klik tombol "Pecah Adegan dari Naskah" agar AI otomatis membedah alur bab ini menjadi timeline visual berurutan.
+                Klik tombol &quot;Pecah Adegan dari Naskah&quot; agar AI otomatis membedah alur bab ini menjadi timeline visual berurutan.
               </p>
+              {!getEffectiveText() && (
+                <div className="p-2.5 mt-2 bg-amber-500/10 border border-amber-500/30 rounded-xl text-[11px] text-amber-700 dark:text-amber-300 max-w-sm mx-auto text-left">
+                  💡 <strong>Bahan cerita belum terisi:</strong> Tulis naskah di Naskah Utama, atau buat poin di Story Plot / Premis Bab agar AI dapat membedah adegannya.
+                </div>
+              )}
             </div>
           ) : (
             <VerticalSceneTimeline
@@ -2231,7 +2268,7 @@ export const ChapterGlossaryTab: React.FC<ChapterGlossaryTabProps> = ({
             <button
               type="button"
               onClick={handleAnalyzeScenes}
-              disabled={isAnalyzingScenes || !getEffectiveText()}
+              disabled={isAnalyzingScenes}
               className="flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-600 text-white text-xs font-bold shadow-md active:scale-95 transition flex-shrink-0 disabled:opacity-50"
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-300" />
