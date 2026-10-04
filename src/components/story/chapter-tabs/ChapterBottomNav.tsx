@@ -5,7 +5,8 @@ import {
   Feather,
   Compass,
   GitBranch,
-  Sparkles
+  Sparkles,
+  Lightbulb
 } from 'lucide-react';
 
 export type ChapterActiveTab = 'info' | 'raw' | 'manuscript' | 'glossary' | 'plot';
@@ -125,7 +126,7 @@ export const ChapterBottomNav: React.FC<ChapterBottomNavProps> = ({
           </span>
         </button>
 
-        {/* 5. Alur & Scene (Kanan 2) */}
+        {/* 5. Evaluasi & Ide (Kanan 2) */}
         <button
           type="button"
           onClick={() => onChangeTab('plot')}
@@ -134,10 +135,10 @@ export const ChapterBottomNav: React.FC<ChapterBottomNavProps> = ({
               ? 'text-amber-600 dark:text-amber-400 font-bold'
               : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
           }`}
-          title="Alur, Scene & Cabang Bab Selanjutnya"
+          title="Evaluasi Naskah & Ide Bab Berikutnya"
         >
           <div className="relative">
-            <GitBranch className={`w-5 h-5 ${activeTab === 'plot' ? 'stroke-[2.5]' : 'stroke-2'}`} />
+            <Lightbulb className={`w-5 h-5 ${activeTab === 'plot' ? 'stroke-[2.5]' : 'stroke-2'}`} />
             {hasAiPlot && (
               <span className="absolute -top-1 -right-2 w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             )}
@@ -145,8 +146,8 @@ export const ChapterBottomNav: React.FC<ChapterBottomNavProps> = ({
               <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-amber-500" />
             )}
           </div>
-          <span className="text-[9px] mt-1 tracking-tight truncate max-w-full">
-            Alur &amp; Scene
+          <span className="text-[9px] mt-1 tracking-tight truncate max-w-full font-bold">
+            Evaluasi &amp; Ide
           </span>
         </button>
       </div>

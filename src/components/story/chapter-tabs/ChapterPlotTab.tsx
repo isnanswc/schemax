@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   GitBranch,
   Sparkles,
@@ -19,7 +19,9 @@ import {
   ShieldAlert,
   SlidersHorizontal,
   AlertCircle,
-  FileEdit
+  FileEdit,
+  Lightbulb,
+  Bookmark
 } from 'lucide-react';
 import { StoryChapter, ChapterPlotBreakdown } from '../../../types';
 import {
@@ -114,6 +116,25 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
     }
     return (chapter.premise || chapter.notes || '').trim();
   };
+
+  // Extract closing sentences of the actual manuscript as narrative anchor
+  const closingSnippet = useMemo(() => {
+    const raw = (contentText && contentText.trim()) || '';
+    let text = raw;
+    if (!text && chapter.contentHtml) {
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = chapter.contentHtml;
+      text = (tempDiv.textContent || tempDiv.innerText || '').trim();
+    }
+    if (!text) return '';
+    const paragraphs = text
+      .split('\n')
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
+    if (paragraphs.length === 0) return '';
+    const lastP = paragraphs[paragraphs.length - 1];
+    return lastP.length > 280 ? '...' + lastP.slice(-280) : lastP;
+  }, [contentText, chapter.contentHtml]);
 
   const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -310,16 +331,21 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
       {/* 1. Header Card with Generate Semua */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="p-2 rounded-2xl bg-gradient-to-r from-amber-500/20 to-purple-500/20 text-amber-500 font-bold flex-shrink-0">
-              <GitBranch className="w-5 h-5" />
+          <div className="flex items-center gap-2.5">
+            <span className="p-2.5 rounded-2xl bg-gradient-to-tr from-amber-500/20 via-pink-500/20 to-purple-500/20 text-amber-500 font-bold flex-shrink-0 shadow-xs border border-amber-500/30">
+              <Lightbulb className="w-5 h-5 text-amber-500" />
             </span>
             <div>
-              <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
-                Ringkasan, Auto Plot &amp; Cabang Cerita
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
+                  Evaluasi Naskah &amp; Ide Bab Berikutnya
+                </h2>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                  Bab {chapter.order}
+                </span>
+              </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Analisis kontinuitas bab &amp; pemetaan arah bab berikutnya
+                Rangkuman naskah bab ini, evaluasi titik penutup naratif, serta peluncur ide cerdas untuk bab berikutnya
               </p>
             </div>
           </div>
@@ -329,38 +355,38 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
             onClick={handleGenerateAll}
             disabled={isGeneratingAll || !getEffectiveText()}
             className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-2xl bg-gradient-to-r from-amber-500 via-pink-500 to-purple-600 hover:opacity-95 text-white font-black text-xs shadow-md shadow-pink-500/20 active:scale-95 transition flex-shrink-0 disabled:opacity-50"
-            title="Jalankan otomatis Ringkasan Bab, Auto Plot 4-Babak, dan Rekomendasi 3 Cabang Alur dengan jeda kuota aman"
+            title="Jalankan otomatis Evaluasi Rangkuman Naskah, Kurva Plot 4-Babak, dan 3 Opsi Ide Bab Berikutnya"
           >
             {isGeneratingAll ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin text-amber-300" />
-                <span className="text-xs truncate max-w-[220px]">{generateAllStep || 'Menganalisis...'}</span>
+                <span className="text-xs truncate max-w-[220px]">{generateAllStep || 'Mengevaluasi...'}</span>
               </>
             ) : (
               <>
                 <Sparkles className="w-4 h-4 text-amber-300" />
-                <span>Generate Semua Analisis ✨</span>
+                <span>Evaluasi &amp; Rancang Semua Otomatis ✨</span>
               </>
             )}
           </button>
         </div>
       </div>
 
-      {/* 2. RINGKASAN BAB (AI SUMMARY = PREMIS & CERITA SINGKAT) */}
+      {/* 2. RANGKUMAN NASKAH & PENUTUP BAB */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 flex-wrap">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                 <FileText className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                <span>Ringkasan Isi Bab</span>
+                <span>1. Rangkuman &amp; Intisari Naskah Bab Ini</span>
               </h3>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
-                = Premis &amp; Cerita Singkat
+                Premis &amp; Fakta Naskah
               </span>
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-              Rangkuman padat isi bab yang terhubung langsung dengan Premis di Menu Chapter Info
+              Rangkuman padat hasil tulisan naskah bab ini yang otomatis terhubung dengan Premis di Menu Chapter Info
             </p>
           </div>
 
@@ -401,12 +427,28 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
               ) : (
                 <>
                   <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  <span>{summary ? 'Regenerate Ringkasan' : 'Buat Ringkasan'}</span>
+                  <span>{summary ? 'Perbarui Rangkuman' : 'Rangkum Naskah Asli'}</span>
                 </>
               )}
             </button>
           </div>
         </div>
+
+        {/* Narrative Anchor: Closing Snippet from Actual Manuscript */}
+        {closingSnippet && (
+          <div className="p-3.5 rounded-2xl bg-amber-500/10 dark:bg-amber-950/30 border border-amber-500/25 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                <span>Titik Akhir Naskah (Jangkar Cerita Bab Ini):</span>
+              </span>
+              <span className="text-[9px] text-slate-400">Paragraf Penutup</span>
+            </div>
+            <p className={`text-xs italic text-slate-800 dark:text-slate-200 leading-relaxed font-serif ${getBlurTextClass()}`}>
+              &quot;{closingSnippet}&quot;
+            </p>
+          </div>
+        )}
 
         {summary ? (
           <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed space-y-2">
@@ -426,7 +468,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
         ) : (
           <div className="text-center py-6 px-4 bg-slate-50 dark:bg-slate-950/60 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
             <p className="text-xs text-slate-400">
-              Belum ada ringkasan bab. Klik tombol di atas atau gunakan "Generate Semua Analisis" untuk merangkum naskah.
+              Belum ada ringkasan bab. Klik tombol di atas atau gunakan "Evaluasi &amp; Rancang Semua Otomatis" untuk merangkum naskah.
             </p>
           </div>
         )}
@@ -438,10 +480,10 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
               <Zap className="w-4 h-4 text-indigo-500 flex-shrink-0" />
-              <span>Auto Plot 4-Babak Dramatis</span>
+              <span>2. Analisis Penutup &amp; Kurva Dramatis Bab</span>
             </h3>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Pemetaan struktur Hook ➔ Rising Action ➔ Climax ➔ Resolution
+              Evaluasi alur naratif: Pembuka (Hook) ➔ Eskalasi Konflik ➔ Puncak Ketegangan ➔ Resolusi / Cliffhanger
             </p>
           </div>
 
@@ -455,12 +497,12 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
             {isGeneratingPlot ? (
               <>
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-500" />
-                <span>Memetakan...</span>
+                <span>Menganalisis...</span>
               </>
             ) : (
               <>
                 <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-                <span>{plot ? 'Petakan Ulang' : 'Petakan Plot AI'}</span>
+                <span>{plot ? 'Analisis Ulang Kurva' : 'Analisis Kurva Naratif'}</span>
               </>
             )}
           </button>
@@ -471,7 +513,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
             {/* 1. Hook */}
             <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-1">
               <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-extrabold text-xs">
-                <span>🎣 1. Hook (Pembuka)</span>
+                <span>🎣 1. Hook (Pembuka Cerita)</span>
               </div>
               <p className={`text-xs text-slate-700 dark:text-slate-300 leading-relaxed ${getBlurTextClass()}`}>
                 {plot.hook || 'Belum terpetakan'}
@@ -481,7 +523,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
             {/* 2. Rising Action */}
             <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-1">
               <div className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 font-extrabold text-xs">
-                <span>📈 2. Rising Action (Eskalasi)</span>
+                <span>📈 2. Rising Action (Eskalasi Masalah)</span>
               </div>
               <p className={`text-xs text-slate-700 dark:text-slate-300 leading-relaxed ${getBlurTextClass()}`}>
                 {plot.risingAction || 'Belum terpetakan'}
@@ -491,7 +533,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
             {/* 3. Climax */}
             <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-1">
               <div className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400 font-extrabold text-xs">
-                <span>⚡ 3. Climax (Titik Puncak)</span>
+                <span>⚡ 3. Climax (Puncak Ketegangan)</span>
               </div>
               <p className={`text-xs text-slate-700 dark:text-slate-300 leading-relaxed ${getBlurTextClass()}`}>
                 {plot.climax || 'Belum terpetakan'}
@@ -501,7 +543,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
             {/* 4. Resolution */}
             <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-1">
               <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-extrabold text-xs">
-                <span>🚪 4. Resolution / Cliffhanger</span>
+                <span>🚪 4. Resolution / Cliffhanger (Titik Penutup)</span>
               </div>
               <p className={`text-xs text-slate-700 dark:text-slate-300 leading-relaxed ${getBlurTextClass()}`}>
                 {plot.resolution || 'Belum terpetakan'}
@@ -511,7 +553,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
         ) : (
           <div className="text-center py-6 px-4 bg-slate-50 dark:bg-slate-950/60 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
             <p className="text-xs text-slate-400">
-              Struktur alur belum dipetakan. Tekan tombol "Petakan Plot AI" untuk membagi bab ini menjadi 4 babak.
+              Kurva alur belum dianalisis. Tekan tombol "Analisis Kurva Naratif" untuk membedah titik pembuka hingga penutup bab ini.
             </p>
           </div>
         )}
@@ -524,7 +566,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
             <div className="flex items-center gap-1.5">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                 <Compass className="w-4 h-4 text-purple-500" />
-                <span>Rencana Bab Selanjutnya</span>
+                <span>3. Peluncur Ide &amp; Rencana Bab Berikutnya</span>
               </h3>
               {!nextChapter ? (
                 <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-500 border border-amber-500/30">
@@ -537,7 +579,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
               )}
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-              Tulis draft kasar ide bab baru atau biarkan AI merancang 3 opsi kesinambungan alur berdasar bab sebelumnya
+              Tulis draft ide kasar atau biarkan AI merumuskan 3 opsi alur berkesinambungan yang berpijak tepat dari penutup bab ini
             </p>
           </div>
 
@@ -550,12 +592,12 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
             {isGeneratingBranches ? (
               <>
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>Menganalisa Kesinambungan...</span>
+                <span>Menganalisis Kesinambungan...</span>
               </>
             ) : (
               <>
                 <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                <span>Rancang Rencana Bab Selanjutnya ✨</span>
+                <span>Rancang 3 Opsi Ide Lanjutan ✨</span>
               </>
             )}
           </button>
@@ -772,7 +814,7 @@ export const ChapterPlotTab: React.FC<ChapterPlotTabProps> = ({
                     ) : (
                       <>
                         <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                        <span>Buat Bab Berikutnya dari Cabang Ini 🚀</span>
+                        <span>Buat Bab {chapter.order + 1} dari Ide Ini 🚀</span>
                       </>
                     )}
                   </button>
