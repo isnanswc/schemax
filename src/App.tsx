@@ -380,6 +380,10 @@ export function App() {
                       setIsArchitectModalOpen(true);
                     }}
                     onOpenAISettings={handleOpenAISettings}
+                    onOpenChapterStudio={(book, chapter, initialTab) => {
+                      handleSelectBook(book);
+                      handleOpenEditor(chapter, initialTab || 'plot');
+                    }}
                   />
                 )}
               </div>

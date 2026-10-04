@@ -33,9 +33,12 @@ import {
   buildInspirationSystemPrompt,
   buildInspirationPrompt,
   formulateIdeaForArchitect,
+  parseNextChapterPlan,
+  NextChapterInspirationPlan,
 } from '../../services/aiInspirationService';
 import { generateWithSmartFallback } from '../../services/aiService';
 import { parseStoryOptions, StoryOptionItem } from '../../utils/storyOptionsParser';
+import { ChapterActiveTab } from '../story/chapter-tabs/ChapterBottomNav';
 
 interface MarkdownRendererProps {
   content: string;
@@ -201,12 +204,14 @@ interface InspirationChatViewProps {
   books: Book[];
   onOpenArchitectWithIdea: (rawIdea: string, autoStart?: boolean) => void;
   onOpenAISettings: () => void;
+  onOpenChapterStudio?: (book: Book, chapter: StoryChapter, initialTab?: ChapterActiveTab) => void;
 }
 
 export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
   books,
   onOpenArchitectWithIdea,
   onOpenAISettings,
+  onOpenChapterStudio,
 }) => {
   const [sessions, setSessions] = useState<InspirationChatSession[]>([]);
   const [activeSession, setActiveSession] = useState<InspirationChatSession | null>(null);
@@ -226,6 +231,7 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
   const [isSending, setIsSending] = useState(false);
   const [isFetchingExternal, setIsFetchingExternal] = useState(false);
   const [isFormulating, setIsFormulating] = useState(false);
+  const [isCreatingNextChapter, setIsCreatingNextChapter] = useState(false);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -483,6 +489,81 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
     );
   };
 
+  // Handle direct creation of new chapter from Inspiration Story Plot Plan
+  const handleCreateChapterFromInspiration = async (plan: NextChapterInspirationPlan) => {
+    if (!pinnedBook || isCreatingNextChapter) return;
+    setIsCreatingNextChapter(true);
+
+    try {
+      const nextOrder = plan.chapterOrder || (pinnedBookChapters.length > 0 ? Math.max(...pinnedBookChapters.map(c => c.order)) + 1 : 1);
+      const newId = 'chap_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+
+      const notesParts: string[] = [];
+      if (plan.bookRecap) {
+        notesParts.push(`Rangkuman Titik Sambung:\n${plan.bookRecap}`);
+      }
+      if (plan.characterRoster) {
+        notesParts.push(`\nDetail Karakter Terlibat:\n${plan.characterRoster}`);
+      }
+      if (plan.worldLoreAndSetting) {
+        notesParts.push(`\nSetting, Lokasi & Lore:\n${plan.worldLoreAndSetting}`);
+      }
+      const combinedNotes = notesParts.join('\n\n');
+
+      const newChapter: StoryChapter = {
+        id: newId,
+        bookId: pinnedBook.id,
+        title: plan.chapterTitle || `Bab ${nextOrder}`,
+        order: nextOrder,
+        status: 'planned',
+        premise: plan.premise || '',
+        notes: combinedNotes,
+        rawDrafts: [
+          {
+            id: 'plot_' + newId,
+            title: 'Story Plot',
+            content: plan.storyPlot || plan.rawText,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          },
+        ],
+        wordCount: 0,
+        targetWordCount: 1500,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      await db.chapters.add(newChapter);
+      setPinnedBookChapters((prev) => [...prev, newChapter]);
+
+      if (onOpenChapterStudio) {
+        onOpenChapterStudio(pinnedBook, newChapter, 'plot');
+      } else {
+        alert(`Bab ${nextOrder}: "${plan.chapterTitle}" berhasil dibuat dan disimpan ke Story Studio!`);
+      }
+    } catch (err: any) {
+      console.error('Failed to create chapter from inspiration:', err);
+      alert('Gagal membuat bab baru: ' + (err.message || 'Error IndexedDB'));
+    } finally {
+      setIsCreatingNextChapter(false);
+    }
+  };
+
+  const handleRequestNextChapterPlan = (roughIdea?: string) => {
+    if (!pinnedBook) return;
+    const sorted = [...pinnedBookChapters].sort((a, b) => a.order - b.order);
+    const lastChapter = sorted.length > 0 ? sorted[sorted.length - 1] : null;
+    const nextOrder = lastChapter ? lastChapter.order + 1 : 1;
+
+    let prompt = '';
+    if (roughIdea && roughIdea.trim()) {
+      prompt = `Berikut adalah ide kasar saya untuk Bab ${nextOrder}:\n"${roughIdea.trim()}"\n\nTolong buatkan rancangan Story Plot lengkap untuk Bab ${nextOrder} ("${pinnedBook.title}") berdasarkan titik penutup Bab ${lastChapter ? lastChapter.order : 0} dan kondisi karakter terkini. Rincikan: rangkuman latar, premis bab, alur adegan (pembuka, eskalasi, puncak, penutup), karakter terlibat beserta status kondisi fisik/mentalnya, serta setting/lore dunia. Jangan lupa sertakan penanda [NEXT_CHAPTER_PLAN_READY] di bagian akhir.`;
+    } else {
+      prompt = `Tolong analisis titik penutup Bab ${lastChapter ? lastChapter.order : 0} dan kondisi karakter terkini dalam buku "${pinnedBook.title}". Rancang paket Story Plot lengkap untuk Bab ${nextOrder} berikutnya (premis, alur adegan pembuka hingga penutup, status kondisi karakter, dan setting dunia). Jangan lupa sertakan penanda [NEXT_CHAPTER_PLAN_READY] di bagian akhir!`;
+    }
+    handleSendMessage(prompt);
+  };
+
   return (
     <div className="relative flex h-full w-full min-h-0 overflow-hidden select-text bg-slate-50 dark:bg-slate-950">
       {/* 1. DESKTOP PERSISTENT SIDEBAR */}
@@ -633,8 +714,18 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
                 </span>
                 <span className="truncate">{activeSession?.title || 'AI Inspiration'}</span>
               </h2>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
-                {activeSession ? `${activeSession.messages.length} pesan dalam memori` : 'Brainstorming Ide Cerita'}
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate flex items-center gap-1.5">
+                {pinnedBook ? (
+                  <>
+                    <span className="font-bold text-amber-600 dark:text-amber-400 truncate">📖 {pinnedBook.title}</span>
+                    <span>•</span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                      Bab {pinnedBookChapters.length > 0 ? Math.max(...pinnedBookChapters.map(c => c.order)) : 0} tercatat (Target: Bab {pinnedBookChapters.length > 0 ? Math.max(...pinnedBookChapters.map(c => c.order)) + 1 : 1})
+                    </span>
+                  </>
+                ) : (
+                  <span>{activeSession ? `${activeSession.messages.length} pesan dalam memori` : 'Brainstorming Ide Cerita'}</span>
+                )}
               </p>
             </div>
           </div>
@@ -657,22 +748,37 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
               </select>
             </div>
 
-            {/* Formulate Button */}
-            <button
-              type="button"
-              onClick={handleFormulate}
-              disabled={isFormulating || !activeSession || activeSession.messages.length < 2}
-              className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs transition shadow-sm active:scale-95 disabled:opacity-40"
-              title="Formulasikan ide percakapan ini langsung ke AI Story Architect"
-            >
-              {isFormulating ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
+            {/* Mode A: Jika Buku Tertaut -> Tombol Rancang Bab Baru */}
+            {pinnedBook ? (
+              <button
+                type="button"
+                onClick={() => handleRequestNextChapterPlan()}
+                disabled={isSending || isFetchingExternal || isCreatingNextChapter}
+                className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-slate-950 font-black text-xs transition shadow-sm active:scale-95 disabled:opacity-40"
+                title={`Minta AI merancang Bab ${pinnedBookChapters.length > 0 ? Math.max(...pinnedBookChapters.map(c => c.order)) + 1 : 1} untuk buku ini`}
+              >
                 <Zap className="w-3.5 h-3.5 fill-current" />
-              )}
-              <span className="hidden sm:inline">Ke Architect</span>
-              <span className="sm:hidden text-[11px]">Rancang</span>
-            </button>
+                <span className="hidden sm:inline">Rancang Bab {pinnedBookChapters.length > 0 ? Math.max(...pinnedBookChapters.map(c => c.order)) + 1 : 1}</span>
+                <span className="sm:hidden text-[11px]">+Bab {pinnedBookChapters.length > 0 ? Math.max(...pinnedBookChapters.map(c => c.order)) + 1 : 1}</span>
+              </button>
+            ) : (
+              /* Mode B: Ide Bebas -> Formulate ke Story Architect */
+              <button
+                type="button"
+                onClick={handleFormulate}
+                disabled={isFormulating || !activeSession || activeSession.messages.length < 2}
+                className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs transition shadow-sm active:scale-95 disabled:opacity-40"
+                title="Formulasikan ide percakapan ini langsung ke AI Story Architect"
+              >
+                {isFormulating ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Zap className="w-3.5 h-3.5 fill-current" />
+                )}
+                <span className="hidden sm:inline">Ke Architect</span>
+                <span className="sm:hidden text-[11px]">Rancang</span>
+              </button>
+            )}
           </div>
         </header>
 
@@ -687,9 +793,18 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
               // Deteksi apakah pesan ini merupakan rancangan blueprint cerita TUNGGAL (bukan daftar opsi)
               const isBlueprint = !isUser && !hasMultipleOptions && (
                 msg.content.includes('[STORY_BLUEPRINT_READY]') ||
-                (/judul/i.test(msg.content) && /premis|logline/i.test(msg.content) && (/karakter|tokoh/i.test(msg.content) || /bab\s*1|daftar\s*bab/i.test(msg.content)))
+                (!pinnedBook && /judul/i.test(msg.content) && /premis|logline/i.test(msg.content) && (/karakter|tokoh/i.test(msg.content) || /bab\s*1|daftar\s*bab/i.test(msg.content)))
               );
-              const cleanContent = msg.content.replace(/\[STORY_BLUEPRINT_READY\]/g, '').trim();
+
+              // Deteksi apakah pesan ini merupakan rancangan paket Story Plot Bab Baru
+              const nextChapterPlan = (!isUser && pinnedBook)
+                ? parseNextChapterPlan(msg.content, (pinnedBookChapters.length > 0 ? Math.max(...pinnedBookChapters.map(c => c.order)) + 1 : 1))
+                : null;
+
+              const cleanContent = msg.content
+                .replace(/\[STORY_BLUEPRINT_READY\]/g, '')
+                .replace(/\[NEXT_CHAPTER_PLAN_READY\]/g, '')
+                .trim();
 
               return (
                 <div
@@ -809,6 +924,43 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
                       </div>
                     )}
 
+                    {/* HERO ACTION: Tampil jika AI telah menyusun Rancangan Story Plot Bab Baru */}
+                    {nextChapterPlan && pinnedBook && (
+                      <div className="mt-3 pt-2.5 border-t border-emerald-500/30 bg-emerald-500/10 dark:bg-emerald-500/15 -mx-1.5 -mb-1 p-2.5 sm:p-3 rounded-xl space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-black text-[11px]">
+                                Bab {nextChapterPlan.chapterOrder}
+                              </span>
+                              <p className="text-xs font-black text-slate-900 dark:text-white truncate">
+                                {nextChapterPlan.chapterTitle}
+                              </p>
+                            </div>
+                            <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5 line-clamp-1">
+                              {nextChapterPlan.premise || 'Rancangan paket alur bab baru Schemax siap diterapkan.'}
+                            </p>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleCreateChapterFromInspiration(nextChapterPlan)}
+                            disabled={isCreatingNextChapter}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-slate-950 text-xs font-black shadow-sm transition active:scale-95 flex-shrink-0 disabled:opacity-50"
+                            title="Buat Bab ini dan otomatis isi Story Plot &amp; konteksnya"
+                          >
+                            {isCreatingNextChapter ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Zap className="w-3.5 h-3.5 fill-current" />
+                            )}
+                            <span>⚡ Buat Bab &amp; Buka Plot</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Error Bubble Interactive Actions */}
                     {msg.id.startsWith('msg_err_') && (
                       <div className="mt-2.5 pt-2 border-t border-rose-200/80 dark:border-rose-900/60 flex items-center gap-2 flex-wrap">
@@ -877,19 +1029,32 @@ export const InspirationChatView: React.FC<InspirationChatViewProps> = ({
         {/* 3. QUICK INSPIRATION & BLUEPRINT CHIPS */}
         <div className="w-full max-w-full min-w-0 flex-shrink-0 px-2.5 sm:px-4 py-1.5 bg-slate-100/70 dark:bg-slate-900/70 border-t border-slate-200/70 dark:border-slate-800/70 flex items-center z-10">
           <div className="max-w-3xl lg:max-w-4xl mx-auto w-full flex items-center gap-1.5 overflow-x-auto scrollbar-none snap-x">
-            <button
-              type="button"
-              onClick={() =>
-                handleSendMessage(
-                  'Tolong rumuskan seluruh hasil diskusi kita sejauh ini menjadi Rancangan Blueprint Cerita lengkap dengan fokus mendalam pada BAB PERTAMA (jangan membuat 5 bab): rincikan nama & latar belakang karakter, ciri fisik & sifat, tempat, alat/relik, lore dunia, serta plot detail Bab 1 agar siap diwujudkan menjadi buku baru!'
-                )
-              }
-              disabled={isSending || isFetchingExternal}
-              className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-800 dark:text-amber-300 border border-amber-500/40 text-[11px] font-black transition active:scale-95 disabled:opacity-50 shadow-xs"
-            >
-              <Sparkles className="w-3 h-3 text-amber-500 fill-current" />
-              <span>📖 Rancang Blueprint Buku</span>
-            </button>
+            {/* Contextual Action Chip: If book pinned, offer quick Next Chapter generation */}
+            {pinnedBook ? (
+              <button
+                type="button"
+                onClick={() => handleRequestNextChapterPlan()}
+                disabled={isSending || isFetchingExternal || isCreatingNextChapter}
+                className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-800 dark:text-emerald-300 border border-emerald-500/40 text-[11px] font-black transition active:scale-95 disabled:opacity-50 shadow-xs"
+              >
+                <Sparkles className="w-3 h-3 text-emerald-500 fill-current" />
+                <span>📑 Rancang Bab {pinnedBookChapters.length > 0 ? Math.max(...pinnedBookChapters.map(c => c.order)) + 1 : 1} Lanjutan</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() =>
+                  handleSendMessage(
+                    'Tolong rumuskan seluruh hasil diskusi kita sejauh ini menjadi Rancangan Blueprint Cerita lengkap dengan fokus mendalam pada BAB PERTAMA (jangan membuat 5 bab): rincikan nama & latar belakang karakter, ciri fisik & sifat, tempat, alat/relik, lore dunia, serta plot detail Bab 1 agar siap diwujudkan menjadi buku baru!'
+                  )
+                }
+                disabled={isSending || isFetchingExternal}
+                className="flex-shrink-0 snap-start flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-800 dark:text-amber-300 border border-amber-500/40 text-[11px] font-black transition active:scale-95 disabled:opacity-50 shadow-xs"
+              >
+                <Sparkles className="w-3 h-3 text-amber-500 fill-current" />
+                <span>📖 Rancang Blueprint Buku</span>
+              </button>
+            )}
 
             <button
               type="button"

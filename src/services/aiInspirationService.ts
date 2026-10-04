@@ -1,7 +1,8 @@
 /**
  * AI Inspiration & Brainstorming Service
  * Coordinates conversation context, book awareness, external API injections,
- * long-context rolling memory, and formulation into AI Story Architect.
+ * long-context rolling memory, formulation into AI Story Architect,
+ * and next chapter story plot structuring.
  */
 
 import { Book, StoryChapter, WorldEntity, InspirationChatMessage, InspirationChatSession } from '../types';
@@ -16,6 +17,162 @@ export interface InspirationContextOptions {
     type: 'open5e' | 'tarot' | 'history' | 'fact';
     title: string;
     content: string;
+  };
+}
+
+// Helper to strip HTML tags to pure text while converting paragraphs to clean newlines
+export function stripHtmlToCleanText(html: string): string {
+  if (!html) return '';
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = html;
+  const sessionTags = tempDiv.querySelectorAll('.schemax-ai-session-tag, .schemax-ai-session-divider');
+  sessionTags.forEach((tag) => {
+    const text = tag.textContent?.trim() || 'Batas Sesi AI';
+    tag.replaceWith(document.createTextNode(`\n\n--- [${text}] ---\n\n`));
+  });
+  return (tempDiv.textContent || tempDiv.innerText || '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+// Helper to determine the condition and traits of an entity based strictly on previous chapter history
+export function getLatestEntityState(
+  entity: WorldEntity,
+  targetChapterOrder: number,
+  earlierChaptersDesc: StoryChapter[]
+): { condition: string; conditionDetails?: string; source: string; traits?: string; description?: string } {
+  // 1. Search earlier chapters in descending order (Bab n-1, Bab n-2, ... Bab 1)
+  for (const prev of earlierChaptersDesc) {
+    if (prev.chapterEntityStates?.[entity.id]?.condition) {
+      const s = prev.chapterEntityStates[entity.id];
+      return {
+        condition: s.condition || 'aktif',
+        conditionDetails: s.conditionDetails,
+        source: `Bab ${prev.order}`,
+        traits: entity.currentTraits || entity.initialTraits,
+        description: entity.currentDescription || entity.shortDescription,
+      };
+    }
+  }
+
+  // 2. Search entity chapterChronology records for chapters strictly before this target chapter
+  if (entity.chapterChronology) {
+    const records = Object.values(entity.chapterChronology)
+      .filter((r) => r.chapterOrder < targetChapterOrder)
+      .sort((a, b) => b.chapterOrder - a.chapterOrder);
+    if (records.length > 0 && records[0].condition) {
+      return {
+        condition: records[0].condition,
+        conditionDetails: records[0].conditionDetails,
+        source: `Bab ${records[0].chapterOrder}`,
+        traits: entity.currentTraits || entity.initialTraits,
+        description: entity.currentDescription || entity.shortDescription,
+      };
+    }
+  }
+
+  // 3. Fallback to Initial Entity State (never forward/future condition!)
+  return {
+    condition: (entity as any).initialCondition || entity.condition || 'aktif',
+    conditionDetails: (entity as any).initialConditionDetails || entity.conditionDetails,
+    source: 'Kondisi Awal Novel',
+    traits: entity.initialTraits || entity.currentTraits,
+    description: entity.initialDescription || entity.shortDescription || entity.currentDescription,
+  };
+}
+
+export interface NextChapterInspirationPlan {
+  chapterOrder: number;
+  bookRecap?: string;
+  chapterTitle: string;
+  premise: string;
+  storyPlot: string;
+  characterRoster?: string;
+  worldLoreAndSetting?: string;
+  rawText: string;
+}
+
+/**
+ * Parses structured [NEXT_CHAPTER_PLAN_READY] output from AI
+ */
+export function parseNextChapterPlan(text: string, defaultOrder: number = 1): NextChapterInspirationPlan | null {
+  if (!text || !text.includes('[NEXT_CHAPTER_PLAN_READY]')) {
+    return null;
+  }
+
+  const cleanText = text.replace(/\[NEXT_CHAPTER_PLAN_READY\]/g, '').trim();
+
+  // Extract Chapter Number / Order if present
+  let chapterOrder = defaultOrder;
+  const orderMatch = cleanText.match(/(?:Bab|Chapter)\s*(\d+)/i);
+  if (orderMatch && orderMatch[1]) {
+    const parsed = parseInt(orderMatch[1], 10);
+    if (!isNaN(parsed) && parsed > 0) {
+      chapterOrder = parsed;
+    }
+  }
+
+  // Extract Judul Bab
+  let chapterTitle = `Bab ${chapterOrder}`;
+  const titleMatch = cleanText.match(/(?:\*{1,2}|#{1,4})?\s*(?:Judul|Usulan Judul Bab|Judul Bab)\s*(?:\*{1,2}|:)?\s*[:\-]?\s*([^\n\r]+)/i);
+  if (titleMatch && titleMatch[1]) {
+    const rawT = titleMatch[1].replace(/^\*\*|\*\*$/g, '').replace(/^[":'\s]+|[":'\s]+$/g, '').trim();
+    if (rawT.length > 0 && !rawT.toLowerCase().startsWith('bab')) {
+      chapterTitle = rawT;
+    } else if (rawT.length > 0) {
+      chapterTitle = rawT;
+    }
+  }
+
+  // Extract Premis
+  let premise = '';
+  const premiseMatch = cleanText.match(/(?:^|\n)(?:\*{1,2}|#{1,4})?\s*(?:Premis|Premis Inti Bab|Premis Bab|Fokus Bab)\s*(?:\*{1,2}|:)?\s*[:\-]?\s*([\s\S]*?)(?=(?:\n(?:\*{1,2}|#{1,4})?\s*(?:Rencana Alur|Story Plot|Ketukan Adegan|Alur Bab|Karakter|Daftar Karakter|Setting|Tempat|Lokasi))|\n\n\n|$)/i);
+  if (premiseMatch && premiseMatch[1]) {
+    premise = premiseMatch[1].replace(/^\*\*|\*\*$/g, '').trim();
+  }
+
+  // Extract Story Plot / Ketukan Adegan
+  let storyPlot = '';
+  const plotMatch = cleanText.match(/(?:^|\n)(?:\*{1,2}|#{1,4})?\s*(?:Rencana Alur|Story Plot|Ketukan Adegan|Alur Babak|Plot Bab)\s*(?:\*{1,2}|:)?\s*[:\-]?\s*([\s\S]*?)(?=(?:\n(?:\*{1,2}|#{1,4})?\s*(?:Karakter|Detail Karakter|Setting|Tempat|Lokasi|Lore))|\n\n\n\n|$)/i);
+  if (plotMatch && plotMatch[1]) {
+    storyPlot = plotMatch[1].trim();
+  }
+
+  // Extract Karakter Terlibat
+  let characterRoster = '';
+  const charMatch = cleanText.match(/(?:^|\n)(?:\*{1,2}|#{1,4})?\s*(?:Karakter|Detail Karakter Terlibat|Kondisi Karakter|Roster Karakter)\s*(?:\*{1,2}|:)?\s*[:\-]?\s*([\s\S]*?)(?=(?:\n(?:\*{1,2}|#{1,4})?\s*(?:Setting|Tempat|Lokasi|Alat|Item|Lore|Aturan Dunia))|\n\n\n\n|$)/i);
+  if (charMatch && charMatch[1]) {
+    characterRoster = charMatch[1].trim();
+  }
+
+  // Extract Setting & Lore
+  let worldLoreAndSetting = '';
+  const loreMatch = cleanText.match(/(?:^|\n)(?:\*{1,2}|#{1,4})?\s*(?:Setting|Tempat|Lokasi|Alat|Item|Relik|Lore|Aturan Dunia)\s*(?:\*{1,2}|:)?\s*[:\-]?\s*([\s\S]*?)$/i);
+  if (loreMatch && loreMatch[1]) {
+    worldLoreAndSetting = loreMatch[1].trim();
+  }
+
+  // Fallback if premise is empty
+  if (!premise) {
+    const firstParagraphs = cleanText.split('\n\n').filter((p) => !p.startsWith('#') && p.trim().length > 20);
+    if (firstParagraphs.length > 0) {
+      premise = firstParagraphs[0].trim();
+    }
+  }
+
+  // Fallback if storyPlot is empty
+  if (!storyPlot) {
+    storyPlot = cleanText;
+  }
+
+  return {
+    chapterOrder,
+    chapterTitle,
+    premise,
+    storyPlot,
+    characterRoster,
+    worldLoreAndSetting,
+    rawText: cleanText,
   };
 }
 
@@ -37,24 +194,55 @@ export function buildInspirationSystemPrompt(
   // 2. Focused/Pinned Book Deep Context
   let pinnedBookSection = '';
   if (pinnedBook) {
-    const chList = (pinnedBookChapters || [])
-      .sort((a, b) => a.order - b.order)
-      .map((c) => `  * Bab ${c.order}: ${c.title || 'Tanpa Judul'} (${c.wordCount || 0} kata) - Premis: ${c.premise || c.aiSummary || 'Belum ada'}`)
+    const sortedChapters = (pinnedBookChapters || []).sort((a, b) => a.order - b.order);
+    const lastChapter = sortedChapters.length > 0 ? sortedChapters[sortedChapters.length - 1] : null;
+    const nextChapterOrder = lastChapter ? lastChapter.order + 1 : 1;
+
+    const chList = sortedChapters
+      .map((c) => {
+        const sum = c.premise || c.aiSummary || c.notes || 'Belum ada ringkasan';
+        return `  * Bab ${c.order}: "${c.title || 'Tanpa Judul'}" (${c.wordCount || 0} kata) - Ringkasan: ${sum.replace(/\n+/g, ' ')}`;
+      })
       .join('\n');
 
+    // Last chapter closing snippet (anchor for continuation)
+    let lastChapterClosingSnippet = '';
+    if (lastChapter && lastChapter.contentHtml) {
+      const cleanPrev = stripHtmlToCleanText(lastChapter.contentHtml);
+      if (cleanPrev) {
+        const sentences = cleanPrev.split(/(?<=[.!?])\s+/).filter(Boolean);
+        const lastFew = sentences.slice(-5).join(' ');
+        lastChapterClosingSnippet = `\n[Potongan Kalimat/Adegan Terakhir di Penutup Bab ${lastChapter.order}]:\n"${lastFew}"\n`;
+      }
+    }
+
+    // Entities with accurate latest state from previous chapters
+    const earlierDesc = [...sortedChapters].reverse();
     const entList = (pinnedBookEntities || [])
-      .map((e) => `  * [${e.category.toUpperCase()}] ${e.name}: ${e.shortDescription || e.initialDescription || 'Karakter/entitas dunia'}`)
+      .map((e) => {
+        const state = getLatestEntityState(e, nextChapterOrder, earlierDesc);
+        const role = e.role ? `[${e.role.toUpperCase()}]` : `[${e.category.toUpperCase()}]`;
+        let text = `  * ${role} ${e.name}: Kondisi di bab terakhir: "${state.condition}${state.conditionDetails ? ` (${state.conditionDetails})` : ''}"`;
+        const traits = state.traits || e.currentTraits || e.initialTraits;
+        if (traits) text += ` | Sifat: ${traits}`;
+        const desc = state.description || e.shortDescription;
+        if (desc) text += ` | Deskripsi: ${desc.replace(/\n+/g, ' ')}`;
+        return text;
+      })
       .join('\n');
 
     pinnedBookSection = `
-=== BUKU YANG SEDANG DIANALISIS / RUJUKAN UTAMA ===
-Judul: ${pinnedBook.title}
+=== BUKU YANG SEDANG DITAUTKAN / RUJUKAN UTAMA ===
+Judul Buku: ${pinnedBook.title}
 Genre: ${pinnedBook.genre || 'Fiksi'}
-Sinopsis: "${pinnedBook.synopsis || '-'}"
-Daftar Bab Saat Ini:
-${chList || '  (Belum ada bab)'}
+Sinopsis Utama: "${pinnedBook.synopsis || '-'}"
+Status Bab Saat Ini: Buku memiliki ${sortedChapters.length} bab. Bab terakhir adalah Bab ${lastChapter ? lastChapter.order : 0} ("${lastChapter ? lastChapter.title : 'Belum ada bab'}").
+Target Bab Selanjutnya Jika Dibuat: Bab ${nextChapterOrder}.
 
-Daftar Entitas Worldbuilding:
+Kronologi Bab-Bab Sejauh Ini:
+${chList || '  (Belum ada bab yang ditulis)'}
+${lastChapterClosingSnippet}
+Status & Kondisi Karakter / Entitas Dunia Terkini (Berdasarkan Bab Terakhir):
 ${entList || '  (Belum ada entitas)'}
 ===================================================`;
   }
@@ -69,25 +257,33 @@ Peran Anda adalah konsultan sastra elit, kreator worldbuilding kreatif, dan reka
 
 TUGAS UTAMA ANDA:
 1. **Brainstorming Interaktif:** Bantu penulis menggali premis, alur plot, motif karakter, *plot twist*, misteri, dan sistem sihir/teknologi fiksi yang orisinal dan tidak klise.
-2. **Koneksi Naskah:** Jika penulis merujuk bukunya, Anda memiliki akses penuh ke naskah, bab, dan worldbuilding mereka. Berikan saran kelanjutan cerita yang selaras dengan karakter dan peristiwa sebelumnya.
+2. **Koneksi Naskah & Kontinuitas Bab:** Jika buku ditautkan, Anda memiliki akses penuh ke kronologi bab, naskah bab terakhir, dan kondisi mutakhir seluruh tokoh/lore dunia. Pastikan setiap usulan alur menjaga kesinambungan (*continuity*) dari titik penutup bab sebelumnya.
 3. **Pemanfaatan Referensi Luar:** Bila penulis memanggil inspirasi dari D&D/Open5e, kartu Tarot, atau sejarah, rangkai referensi tersebut menjadi elemen narasi yang hidup dan relevan bagi cerita mereka.
-4. **Berdayakan Pilihan Penulis:** Bila diminta ide atau membuat cerita awal, berikan 2–3 alternatif konsep yang bervariasi dengan penamaan jelas (misal: "### Opsi 1: [Judul Ide]" atau "### Opsi A: [Judul Ide]"). Setiap opsi harus memiliki premis ringkas, karakter kunci, dan konflik utama. Jangan menyertakan penanda [STORY_BLUEPRINT_READY] bila masih berupa daftar banyak opsi, agar penulis dapat memilih opsi favoritnya terlebih dahulu.
+4. **Berdayakan Pilihan Penulis:** Bila diminta opsi ide baru, berikan 2–3 alternatif konsep yang bervariasi dengan penamaan jelas (misal: "### Opsi 1: [Judul Ide]" atau "### Opsi A: [Judul Ide]"). Setiap opsi harus memiliki premis ringkas, karakter kunci, dan konflik utama. Jangan menyertakan penanda tag bila masih berupa daftar opsi, agar penulis dapat memilihnya terlebih dahulu.
 5. **Gaya Komunikasi:** Bersahabat, antusias, cerdas, suportif, berwawasan sastra luas, dan terstruktur rapi dengan Markdown.
-6. **Perumusan Blueprint Cerita (Integrasi AI Story Architect):**
-   - Jika penulis meminta Anda: "rancang jadi buku", "buatkan rancangan cerita", "buat blueprint", ATAU jika penulis telah memilih salah satu opsi ide tertentu ("Pilih & Kembangkan"):
-     JANGAN LANGSUNG MEMBUAT 5 BAB SEKALIGUS! Fokuskan secara mendalam pada SATU rancangan komprehensif untuk ide tersebut dengan rincian berikut:
-     - **Judul Konsep & Genre:** (Judul utama yang memikat beserta genre & sub-genre)
-     - **Logline / Premis Inti:** (Ringkasan 1-2 kalimat dramatis konflik inti cerita)
-     - **Karakter Kunci:**
-       * Nama lengkap & peran (Protagonis, Antagonis/Rival, Tokoh Pendukung)
-       * Latar belakang (backstory/asal-usul) masing-masing karakter
-       * Ciri-ciri fisik spesifik (bentuk wajah, sorot mata, rambut, warna kulit, postur/siluet tubuh, busana)
-       * Sifat, kepribadian, kebiasaan unik, luka batin (*flaw/wound*), serta motif (*want* & *need*)
-     - **Tempat / Setting:** Lokasi-lokasi penting di bab pertama beserta suasana/atmosfer visual panca indra
-     - **Alat / Item / Relik:** Senjata, pusaka, perlengkapan, atau artefak kunci beserta fungsi dan dampaknya
-     - **Lore & Aturan Dunia:** Mitos/sejarah masa lalu, sistem supranatural/sains, atau rahasia penting dunia cerita
-     - **Rancangan Plot Bab Pertama (Bab 1):** Alur ketukan adegan (*beat-by-beat scene plot*) yang kaya dan mendalam dari pembuka (*hook*), insiden pengganggu (*inciting incident*), eskalasi ketegangan, hingga penutup/kejutan bab pertama
-   - Dan di bagian paling akhir respon tersebut, WAJIB sertakan penanda: "[STORY_BLUEPRINT_READY]" agar sistem otomatis mengenali dan memunculkan tombol "Rancang Jadi Buku" bagi penulis!
+
+6. **PERUMUSAN BLUEPRINT BUKU BARU (Untuk Pembuatan Buku Baru):**
+   - Jika buku belum ditautkan (Ide Bebas) dan penulis meminta "rancang jadi buku", "buatkan rancangan cerita", ATAU memilih opsi ide tertentu:
+     Fokuskan pada SATU rancangan komprehensif Bab Pertama: Judul Konsep & Genre, Logline/Premis, Karakter Kunci (nama, latar, ciri fisik, sifat, luka batin, want/need), Tempat/Lokasi, Alat/Relik, Lore Dunia, serta Rancangan Plot Bab 1 (beat-by-beat).
+     Di bagian paling akhir, WAJIB sertakan penanda: "[STORY_BLUEPRINT_READY]" agar muncul tombol "Rancang Jadi Buku".
+
+7. **PERUMUSAN STORY PLOT BAB SELANJUTNYA (Untuk Buku yang Sedang Ditautkan):**
+   - Jika buku sedang ditautkan (${pinnedBook ? `"${pinnedBook.title}"` : 'suatu buku'}) dan penulis meminta:
+     "buat bab selanjutnya", "lanjutkan bab", "buat bab baru", "buat ide kasar untuk bab berikutnya", atau mendiskusikan kelanjutan cerita:
+     Anda HARUS menyusun **Rancangan Story Plot Bab Baru** yang presisi sesuai standar Story Plot Schemax dengan format berikut:
+     
+     ### Rancangan Bab [n+1]: [Usulan Judul Bab Baru]
+     - **Rangkuman Latar & Titik Sambung**: Ringkasan singkat kondisi dunia dan konsekuensi langsung dari penutup bab sebelumnya (termasuk potongan adegan terakhir).
+     - **Premis Bab Baru**: 2-3 kalimat fokus dramatis bab ini (tujuan, hambatan utama, dan taruhan emosional).
+     - **Rencana Alur Adegan (Story Plot)**:
+       * *Adegan Pembuka (Hook)*: Respon langsung terhadap penutup bab lalu.
+       * *Perkembangan Adegan & Hambatan*: Eksplorasi konflik atau pertemuan baru.
+       * *Puncak / Titik Konflik*: Momen genting penentuan bab ini.
+       * *Penutup / Cliffhanger*: Resolusi sementara atau pertanyaan besar pemicu bab berikutnya.
+     - **Detail Karakter Terlibat & Kondisi Terkini**: Daftar tokoh yang muncul beserta kondisi fisik/mental mereka (berdasarkan status di bab sebelumnya), serta tujuan/agenda mereka di bab ini.
+     - **Setting, Lokasi & Lore Terlibat**: Lokasi spesifik kejadian, atmosfer visual panca indra, perlengkapan/artefak yang dibawa, dan aturan dunia yang berperan.
+     
+     Di bagian paling akhir respon tersebut, WAJIB sertakan penanda: "[NEXT_CHAPTER_PLAN_READY]" agar sistem otomatis memunculkan tombol **"⚡ Buat Bab [n+1] & Terapkan ke Story Plot"** bagi penulis!
 
 KATALOG BUKU PENULIS SAAT INI:
 ${booksCatalogBrief}

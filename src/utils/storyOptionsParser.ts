@@ -45,8 +45,8 @@ export function parseStoryOptions(text: string): StoryOptionItem[] | null {
     const start = matches[i].index;
     const end = i < matches.length - 1 ? matches[i + 1].index : text.length;
     const rawContent = text.slice(start, end).trim();
-    // remove potential ending tags like [STORY_BLUEPRINT_READY]
-    const content = rawContent.replace(/\[STORY_BLUEPRINT_READY\]/g, '').trim();
+    // remove potential ending tags like [STORY_BLUEPRINT_READY] and [NEXT_CHAPTER_PLAN_READY]
+    const content = rawContent.replace(/\[STORY_BLUEPRINT_READY\]|\[NEXT_CHAPTER_PLAN_READY\]/g, '').trim();
 
     // First 2-3 descriptive lines as preview summary
     const lines = content.split('\n').filter(l => l.trim().length > 0);
