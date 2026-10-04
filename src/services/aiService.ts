@@ -748,6 +748,11 @@ export async function generateWithSmartFallback(
         }
 
         // Catatan: Jika terkena PROHIBITED_CONTENT pada satu model, JANGAN langsung hentikan proses!
+        if (errorMessage.includes('PROHIBITED_CONTENT')) {
+          console.warn(`[Schemax AI] PROHIBITED_CONTENT terdeteksi pada model ${model}, melewati provider ${slot.provider} dan melanjutkan ke slot berikutnya.`);
+          // Break out of current model loop; outer slot loop will continue with next slot (mis. Groq/OpenRouter)
+          break;
+        }
         // Beri kesempatan model lain dalam slot yang sama (misal Gemini 1.5 Pro vs 2.5 Flash memiliki toleransi filter berbeda),
         // lalu lanjutkan ke Slot Gemini berikutnya, Slot Groq, dan Slot OpenRouter secara bertingkat.
       }
