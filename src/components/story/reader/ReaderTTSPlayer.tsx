@@ -32,6 +32,9 @@ import {
   getVoicesForEngine,
   generateUnifiedSpeechAudio,
   generateWasmSpeechAudio,
+  generateEdgeSpeechAudio,
+  EDGE_VOICES,
+  EDGE_TTS_MODELS,
   WASM_VOICES,
   WASM_TTS_MODELS,
   GEMINI_VOICES,
@@ -85,17 +88,18 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
 
   const savedExtra = loadTTSExtraConfig();
 
-  // Engine selection: 'auto' | 'wasm' | 'gemini' | 'groq' | 'browser'
+  // Engine selection: 'auto' | 'edge' | 'wasm' | 'gemini' | 'groq' | 'browser'
   const [ttsEngine, setTtsEngine] = useState<FullTTSEngine>(savedExtra.selectedEngine || 'auto');
 
   // Unified engine model & voice state
   const [selectedModel, setSelectedModel] = useState<string>(() => {
+    if (savedExtra.selectedEngine === 'edge') return 'edge-neural-free';
     if (savedExtra.selectedEngine === 'gemini') return savedExtra.selectedGeminiModel || '';
     if (savedExtra.selectedEngine === 'groq') return savedExtra.selectedGroqModel || '';
     if (savedExtra.selectedEngine === 'wasm') return 'wasm-mobile-free';
     return 'auto-pipeline';
   });
-  const [selectedVoice, setSelectedVoice] = useState<string>(savedExtra.selectedVoice || 'id-free-natural');
+  const [selectedVoice, setSelectedVoice] = useState<string>(savedExtra.selectedVoice || 'id-ID-ArdiNeural');
 
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [engineNotice, setEngineNotice] = useState<string | null>(null);
@@ -207,9 +211,15 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
         modelToUse = cfg.selectedGeminiModel;
       } else if (newEngine === 'groq' && cfg.selectedGroqModel) {
         modelToUse = cfg.selectedGroqModel;
+      } else if (newEngine === 'edge') {
+        modelToUse = 'edge-neural-free';
       }
 
-      const voiceToUse = cfg.selectedVoice || voices[0]?.id || '';
+      const voiceValidForNewEngine = voices.some((v) => v.id === selectedVoice);
+      const voiceToUse = voiceValidForNewEngine
+        ? selectedVoice
+        : (newEngine === 'edge' ? 'id-ID-ArdiNeural' : (voices[0]?.id || ''));
+
       setSelectedModel(modelToUse);
       setSelectedVoice(voiceToUse);
     }
@@ -486,8 +496,8 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
 
           if (playbackSessionIdRef.current !== currentSession || !isPlayingRef.current) return;
 
-          // Jika gagal saat memutar gemini/groq, beralih ke WASM dulu
-          if (ttsEngine === 'gemini' || ttsEngine === 'groq') {
+          // Jika gagal saat memutar edge/gemini/groq, beralih ke WASM dulu
+          if (ttsEngine === 'edge' || ttsEngine === 'gemini' || ttsEngine === 'groq') {
             setEngineNotice('Suara AI gagal diputar. Mengalihkan ke WASM Free...');
             setTtsEngine('wasm');
             try {
@@ -539,8 +549,8 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
 
             if (playbackSessionIdRef.current !== currentSession || !isPlayingRef.current) return;
 
-            // Jika gagal saat memutar gemini/groq, beralih ke WASM dulu
-            if (ttsEngine === 'gemini' || ttsEngine === 'groq') {
+            // Jika gagal saat memutar edge/gemini/groq, beralih ke WASM dulu
+            if (ttsEngine === 'edge' || ttsEngine === 'gemini' || ttsEngine === 'groq') {
               setEngineNotice('Gagal memutar audio AI. Mengalihkan ke WASM Free...');
               setTtsEngine('wasm');
               try {
@@ -828,6 +838,8 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
     switch (ttsEngine) {
       case 'auto':
         return '✨ Auto-Fallback (Pintar)';
+      case 'edge':
+        return '🌟 Edge Neural AI (Alami)';
       case 'wasm':
         return '🛡️ WASM / Mobile Free';
       case 'gemini':
@@ -961,7 +973,7 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
             </div>
           </div>
 
-          {/* Engine Switcher Bar: [ Auto ] [ WASM ] [ Gemini ] [ Groq ] [ Browser ] */}
+          {/* Engine Switcher Bar: [ Auto ] [ Edge AI ] [ WASM ] [ Gemini ] [ Groq ] [ Browser ] */}
           <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 text-[10px] overflow-x-auto no-scrollbar">
             <span className="font-bold text-slate-500 dark:text-slate-400 pl-1.5 flex-shrink-0 hidden xs:inline">
               Mesin:
@@ -975,10 +987,24 @@ export const ReaderTTSPlayer: React.FC<ReaderTTSPlayerProps> = ({
                     ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-xs'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
-                title="Auto-Fallback Pintar: Gemini TTS (Kunci Mandiri) ➔ WASM Mobile Free"
+                title="Auto-Fallback Pintar: Edge Neural (Suara Alami) ➔ Model AI Pilihan ➔ WASM Free"
               >
                 <Sparkles className="w-3 h-3" />
                 <span>Auto</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleEngineChange('edge')}
+                className={`flex-shrink-0 py-1 px-2.5 rounded-xl font-bold transition flex items-center justify-center gap-1 ${
+                  ttsEngine === 'edge'
+                    ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-xs font-black'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+                title="Edge Neural AI: Suara Manusia Asli Indonesia (Ardi & Gadis) - 100% Bebas Kuota"
+              >
+                <Sparkles className="w-3 h-3 text-cyan-300" />
+                <span>Edge AI</span>
               </button>
 
               <button

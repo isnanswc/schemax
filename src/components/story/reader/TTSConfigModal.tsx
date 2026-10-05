@@ -76,8 +76,24 @@ export const TTSConfigModal: React.FC<TTSConfigModalProps> = ({
               <span className="font-bold text-slate-900 dark:text-slate-100 block">
                 Hemat Kuota Menulis Anda!
               </span>
-              Gunakan kunci Google AI Studio (Gemini) khusus untuk pembacaan audio agar kuota naskah cerita utama Anda tidak tersedot. Jika dikosongkan, sistem otomatis menggunakan mesin <strong>WASM / Mobile Free</strong> (100% gratis tanpa kuota).
+              Gunakan kunci Google AI Studio (Gemini) khusus untuk pembacaan audio jika ingin model suara studio. Secara default, sistem otomatis menggunakan mesin <strong>Edge Neural AI</strong> (100% gratis, suara manusia asli Ardi &amp; Gadis tanpa perlu kunci API).
             </div>
+          </div>
+
+          {/* Section 0: Edge Neural AI (100% Gratis - Suara Manusia Asli) */}
+          <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/25 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-100">
+                <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+                <span>Edge Neural AI (Suara Manusia Asli)</span>
+              </div>
+              <span className="text-[9px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-700 dark:text-blue-300 font-bold">
+                100% Gratis • Bebas Kuota
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-tight">
+              Teknologi neural AI dengan artikulasi alami manusia berbahasa Indonesia (<strong>Ardi - Pria Narator</strong> &amp; <strong>Gadis - Wanita Jernih</strong>). Berjalan langsung di browser tanpa limit, tanpa kartu kredit, dan tanpa menyedot kuota naskah cerita utama Anda.
+            </p>
           </div>
 
           {/* Section 1: Dedicated Gemini Key (100% Gratis Tanpa Billing/Kartu Kredit) */}
@@ -85,15 +101,15 @@ export const TTSConfigModal: React.FC<TTSConfigModalProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-100">
                 <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                <span>Google AI Studio (Gemini Khusus TTS)</span>
+                <span>Google AI Studio (Gemini Khusus TTS - Opsional)</span>
               </div>
               <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold">
-                100% Free • No Credit Card
+                Opsional • No Credit Card
               </span>
             </div>
 
             <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-tight">
-              Dapatkan di <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-amber-600 dark:text-amber-400 font-bold underline">aistudio.google.com</a> secara gratis tanpa kartu kredit. Gunakan akun Gmail lain atau API Key terpisah agar <strong>kuota naskah cerita utama Anda 100% aman dan tidak tersedot TTS</strong>.
+              Dapatkan di <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-amber-600 dark:text-amber-400 font-bold underline">aistudio.google.com</a> secara gratis tanpa kartu kredit jika ingin menggunakan suara Gemini Studio. Gunakan akun terpisah agar kuota naskah utama tetap aman.
             </p>
 
             <div>
@@ -114,8 +130,8 @@ export const TTSConfigModal: React.FC<TTSConfigModalProps> = ({
           <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-start gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
             <div className="text-[10px] leading-tight text-emerald-800 dark:text-emerald-200">
-              <span className="font-bold block text-[11px]">WASM / Mobile Free (Bebas Kuota &amp; Tanpa Kunci):</span>
-              Jika kunci di atas dikosongkan, Schemax otomatis menggunakan audio gateway bebas kuota dengan pemecah kalimat cerdas. 100% gratis, aman, dan tanpa limit di HP maupun PC.
+              <span className="font-bold block text-[11px]">WASM / Offline Fallback:</span>
+              Jika jaringan lambat atau terputus, Schemax memiliki cadangan pemecah kalimat cerdas dan sintesis suara browser lokal agar pembacaan novel tetap lancar kapan saja.
             </div>
           </div>
 
