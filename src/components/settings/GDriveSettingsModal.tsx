@@ -20,6 +20,7 @@ export const GDriveSettingsModal: React.FC<GDriveSettingsModalProps> = ({
   onSaved,
 }) => {
   const [folderUrl, setFolderUrl] = useState('');
+  const [obsidianFolderUrl, setObsidianFolderUrl] = useState('');
   const [scriptUrl, setScriptUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [folderInfo, setFolderInfo] = useState<{ name: string; fileCount: number } | null>(null);
@@ -33,6 +34,7 @@ export const GDriveSettingsModal: React.FC<GDriveSettingsModalProps> = ({
     if (isOpen) {
       const config = loadGDriveConfig();
       setFolderUrl(config.folderUrl || (config.folderId ? `https://drive.google.com/drive/folders/${config.folderId}` : ''));
+      setObsidianFolderUrl(config.obsidianFolderUrl || (config.obsidianFolderId ? `https://drive.google.com/drive/folders/${config.obsidianFolderId}` : ''));
       setScriptUrl(config.scriptUrl || '');
       setApiKey(config.apiKey || '');
       setTestError(null);
@@ -76,10 +78,13 @@ export const GDriveSettingsModal: React.FC<GDriveSettingsModalProps> = ({
 
   const handleSave = () => {
     const folderId = extractGDriveFolderId(folderUrl);
+    const obsidianFolderId = extractGDriveFolderId(obsidianFolderUrl);
     const config = {
       folderUrl: folderUrl.trim(),
       folderId: folderId || undefined,
       folderName: folderInfo?.name,
+      obsidianFolderUrl: obsidianFolderUrl.trim() || undefined,
+      obsidianFolderId: obsidianFolderId || undefined,
       scriptUrl: scriptUrl.trim() || undefined,
       apiKey: apiKey.trim() || undefined,
       lastSyncedAt: Date.now(),
@@ -126,57 +131,71 @@ function doGet(e) {
     var files = folder.getFiles();
     var result = [];
 
-    // 2. Daftar File Cadangan (.schemax atau .json)
-    if (action === "listBackups") {
-      var targetFolder = folder;
-      // Cari subfolder backup secara fleksibel & case-insensitive
-      if (folder.getName().toLowerCase() !== "backup") {
-        var subdirs = folder.getFolders();
-        while (subdirs.hasNext()) {
-          var sd = subdirs.next();
-          var sdName = sd.getName().toLowerCase().trim();
-          if (sdName === "backup" || sdName === "backups" || sdName === "cadangan") {
-            targetFolder = sd;
-            break;
+    // 2. Daftar File Cadangan (.schemax/.json untuk Backup, atau .zip untuk Obsidian)
+    if (action === "listBackups" || action === "listObsidian" || action === "listAll") {
+      var isObsidian = (action === "listObsidian");
+      var isAll = (action === "listAll");
+
+      function scanFolder(fld, checkType) {
+        var it = fld.getFiles();
+        while (it.hasNext()) {
+          var f = it.next();
+          var name = f.getName();
+          var lower = name.toLowerCase();
+          var isMatch = false;
+          if (checkType === "obsidian" || checkType === "all") {
+            if (lower.indexOf(".zip") !== -1 || lower.indexOf("obsidian") !== -1) isMatch = true;
           }
-        }
-      }
-
-      var filesIterator = targetFolder.getFiles();
-      while (filesIterator.hasNext()) {
-        var f = filesIterator.next();
-        var name = f.getName();
-        var lower = name.toLowerCase();
-        if (lower.indexOf(".json") !== -1 || lower.indexOf(".schemax") !== -1) {
-          result.push({
-            id: f.getId(),
-            name: name,
-            size: f.getSize(),
-            updatedAt: f.getLastUpdated().toISOString()
-          });
-        }
-      }
-
-      // Sertakan cadangan dari root folder jika targetFolder berbeda (kompatibilitas mundur)
-      if (targetFolder.getId() !== folder.getId()) {
-        var rootFiles = folder.getFiles();
-        while (rootFiles.hasNext()) {
-          var rf = rootFiles.next();
-          var rname = rf.getName();
-          var rlower = rname.toLowerCase();
-          if ((rlower.indexOf(".json") !== -1 || rlower.indexOf(".schemax") !== -1) && !result.some(function(it){ return it.id === rf.getId(); })) {
+          if (checkType === "backup" || checkType === "all") {
+            if (lower.indexOf(".json") !== -1 || lower.indexOf(".schemax") !== -1) isMatch = true;
+          }
+          if (isMatch && !result.some(function(itItem){ return itItem.id === f.getId(); })) {
             result.push({
-              id: rf.getId(),
-              name: rname,
-              size: rf.getSize(),
-              updatedAt: rf.getLastUpdated().toISOString()
+              id: f.getId(),
+              name: name,
+              size: f.getSize(),
+              updatedAt: f.getLastUpdated().toISOString()
             });
           }
         }
       }
 
+      if (isAll) {
+        // Pindai subfolder backup dan obsidian
+        var subdirs = folder.getFolders();
+        while (subdirs.hasNext()) {
+          var sd = subdirs.next();
+          var sdName = sd.getName().toLowerCase().trim();
+          if (sdName === "obsidian") {
+            scanFolder(sd, "obsidian");
+          } else if (sdName === "backup" || sdName === "backups" || sdName === "cadangan") {
+            scanFolder(sd, "backup");
+          }
+        }
+        // Pindai juga root folder
+        scanFolder(folder, "all");
+      } else {
+        var targetFolder = folder;
+        var lookName = isObsidian ? "obsidian" : "backup";
+        if (folder.getName().toLowerCase() !== lookName) {
+          var subdirs = folder.getFolders();
+          while (subdirs.hasNext()) {
+            var sd = subdirs.next();
+            var sdName = sd.getName().toLowerCase().trim();
+            if (isObsidian ? (sdName === "obsidian") : (sdName === "backup" || sdName === "backups" || sdName === "cadangan")) {
+              targetFolder = sd;
+              break;
+            }
+          }
+        }
+        scanFolder(targetFolder, isObsidian ? "obsidian" : "backup");
+        if (targetFolder.getId() !== folder.getId() && !isObsidian) {
+          scanFolder(folder, "backup");
+        }
+      }
+
       return ContentService.createTextOutput(JSON.stringify({
-        folderName: targetFolder.getName(),
+        folderName: folder.getName(),
         files: result
       })).setMimeType(ContentService.MimeType.JSON);
     }
@@ -217,7 +236,7 @@ function doGet(e) {
   }
 }
 
-// Handler Simpan Cadangan Buku Schemax ke Google Drive
+// Handler Simpan Cadangan Buku Schemax ke Google Drive (Format Schemax & Obsidian Vault)
 function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
@@ -225,16 +244,19 @@ function doPost(e) {
       var rootFolder = DriveApp.getFolderById(data.folderId);
       var fileName = data.fileName || "schemax_backup.json";
       var content = data.content;
+      var targetFolderName = data.targetFolderName || "backup";
+      var isBase64 = data.isBase64 || false;
 
-      // 📁 Pastikan ada subfolder "backup", cari secara case-insensitive
+      // 📁 Pastikan ada subfolder (backup atau Obsidian), cari secara case-insensitive
       var targetFolder = rootFolder;
-      if (rootFolder.getName().toLowerCase() !== "backup") {
+      var reqLower = targetFolderName.toLowerCase().trim();
+      if (rootFolder.getName().toLowerCase() !== reqLower) {
         var subdirs = rootFolder.getFolders();
         var foundFolder = null;
         while (subdirs.hasNext()) {
           var sd = subdirs.next();
           var sdName = sd.getName().toLowerCase().trim();
-          if (sdName === "backup" || sdName === "backups" || sdName === "cadangan") {
+          if (sdName === reqLower || (reqLower === "backup" && (sdName === "backups" || sdName === "cadangan"))) {
             foundFolder = sd;
             break;
           }
@@ -242,18 +264,28 @@ function doPost(e) {
         if (foundFolder) {
           targetFolder = foundFolder;
         } else {
-          targetFolder = rootFolder.createFolder("backup");
+          targetFolder = rootFolder.createFolder(targetFolderName);
         }
       }
 
-      // Cek apakah file sudah ada di subfolder backup, jika ada timpa, jika tidak buat baru
+      // Cek apakah file sudah ada di subfolder target, jika ada timpa, jika tidak buat baru
       var existing = targetFolder.getFilesByName(fileName);
       var file;
-      if (existing.hasNext()) {
-        file = existing.next();
-        file.setContent(content);
+      if (isBase64) {
+        var bytes = Utilities.base64Decode(content);
+        var mime = data.mimeType || "application/zip";
+        var blob = Utilities.newBlob(bytes, mime, fileName);
+        if (existing.hasNext()) {
+          existing.next().setTrashed(true);
+        }
+        file = targetFolder.createFile(blob);
       } else {
-        file = targetFolder.createFile(fileName, content, "application/json");
+        if (existing.hasNext()) {
+          file = existing.next();
+          file.setContent(content);
+        } else {
+          file = targetFolder.createFile(fileName, content, "application/json");
+        }
       }
 
       return ContentService.createTextOutput(JSON.stringify({
@@ -410,6 +442,29 @@ function doPost(e) {
             </div>
             <p className="text-[10px] text-slate-500">
               Pastikan akses folder Google Drive disetel ke <i>"Anyone with the link can view"</i>.
+            </p>
+          </div>
+
+          {/* Obsidian Folder URL Input (Optional) */}
+          <div className="space-y-1.5 p-3 rounded-2xl bg-purple-50/60 dark:bg-purple-950/20 border border-purple-200/60 dark:border-purple-800/40">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-purple-900 dark:text-purple-300 uppercase tracking-wider">
+                Link Folder Obsidian (Opsional)
+              </label>
+              <span className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">Khusus Arsip .zip Vault</span>
+            </div>
+            <div className="relative">
+              <Folder className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-purple-500" />
+              <input
+                type="text"
+                value={obsidianFolderUrl}
+                onChange={(e) => setObsidianFolderUrl(e.target.value)}
+                placeholder="https://drive.google.com/drive/folders/1OBSIDIAN_xyz... (Opsional)"
+                className="w-full pl-10 pr-3 py-2 bg-white dark:bg-slate-950 border border-purple-200 dark:border-purple-800/80 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-400 font-mono shadow-sm"
+              />
+            </div>
+            <p className="text-[10px] text-purple-700/80 dark:text-purple-300/70">
+              Jika dikosongkan, Schemax akan otomatis mencari subfolder bernama <strong>"Obsidian"</strong> di dalam folder utama Google Drive Anda.
             </p>
           </div>
 

@@ -324,32 +324,49 @@ export interface GDriveBackupItem {
 }
 
 /**
- * Unggah file cadangan (.schemax.json) langsung ke folder Google Drive
+ * Unggah file cadangan (.schemax.json atau .zip Obsidian) langsung ke folder Google Drive
+ * Mengarahkan otomatis ke subfolder "backup" atau "Obsidian" sesuai kategori
  */
 export async function uploadBackupToGDrive(
   folderId: string,
   fileName: string,
-  backupJsonString: string,
-  credentialInput?: string
+  backupContent: string,
+  credentialInput?: string,
+  targetCategory: 'backup' | 'obsidian' = 'backup',
+  isBase64Binary: boolean = false
 ): Promise<{ success: boolean; fileId?: string; name?: string; folderName?: string }> {
   const credential = (credentialInput || '').trim() || getEffectiveGoogleApiKey();
   if (!credential) {
     throw new Error('Google Apps Script URL belum diatur di Pengaturan Google Drive.');
   }
 
+  const config = loadGDriveConfig();
+
   if (credential.includes('script.google.com')) {
-    // 📁 Cek terlebih dahulu apakah sudah ada subfolder bernama "backup" (case-insensitive & bypass cache)
     let targetFolderId = folderId;
-    try {
-      const items = await fetchGDriveFolderItems(folderId, credential, true);
-      const existingBackupFolder = items.find(
-        (it) => it.isFolder && /^(backup|backups|cadangan)$/i.test(it.name.trim())
-      );
-      if (existingBackupFolder) {
-        targetFolderId = existingBackupFolder.id;
+    const targetFolderKeyword = targetCategory === 'obsidian' ? 'Obsidian' : 'backup';
+
+    // 1. Jika untuk Obsidian dan user sudah mengatur obsidianFolderId khusus
+    if (targetCategory === 'obsidian' && config.obsidianFolderId) {
+      targetFolderId = config.obsidianFolderId;
+    } else {
+      // 2. Cek subfolder di dalam folderId utama
+      try {
+        const items = await fetchGDriveFolderItems(folderId, credential, true);
+        const matchedFolder = items.find((it) => {
+          if (!it.isFolder) return false;
+          const trimmed = it.name.trim();
+          if (targetCategory === 'obsidian') {
+            return /^obsidian$/i.test(trimmed);
+          }
+          return /^(backup|backups|cadangan)$/i.test(trimmed);
+        });
+        if (matchedFolder) {
+          targetFolderId = matchedFolder.id;
+        }
+      } catch {
+        // Abaikan jika listing folder gagal, fallback ke folderId utama
       }
-    } catch {
-      // Abaikan jika listing folder gagal, fallback ke folderId utama
     }
 
     // Unggah via Google Apps Script Web App (POST)
@@ -363,8 +380,11 @@ export async function uploadBackupToGDrive(
         body: JSON.stringify({
           action: 'uploadBackup',
           folderId: targetFolderId,
+          targetFolderName: targetFolderKeyword,
           fileName,
-          content: backupJsonString,
+          content: backupContent,
+          isBase64: isBase64Binary,
+          mimeType: isBase64Binary ? 'application/zip' : 'application/json',
         }),
       });
 
@@ -414,36 +434,32 @@ export async function uploadBackupToGDrive(
 }
 
 /**
- * Daftar file cadangan (.schemax.json atau .json) yang ada di folder Google Drive
- * Secara cerdas memeriksa subfolder "backup" serta folder root utama
+ * Daftar file cadangan (.schemax.json atau .zip Obsidian) yang ada di folder Google Drive
+ * Secara cerdas memeriksa subfolder "backup" atau "Obsidian" sesuai kategori
  */
 export async function listBackupFilesFromGDrive(
   folderId: string,
-  credentialInput?: string
+  credentialInput?: string,
+  category: 'backup' | 'obsidian' | 'all' = 'backup'
 ): Promise<GDriveBackupItem[]> {
   const credential = (credentialInput || '').trim() || getEffectiveGoogleApiKey();
   if (!credential) {
     throw new Error('Kredensial Google Drive belum diatur.');
   }
 
-  // 1. Periksa apakah terdapat subfolder bernama "backup" di dalam folderId utama (bypass cache)
-  let backupFolderId: string | null = null;
-  try {
-    const folderItems = await fetchGDriveFolderItems(folderId, credential, true);
-    const backupFolder = folderItems.find(
-      (item) => item.isFolder && /^(backup|backups|cadangan)$/i.test(item.name.trim())
-    );
-    if (backupFolder) {
-      backupFolderId = backupFolder.id;
-    }
-  } catch (e) {
-    console.warn('Gagal membaca subfolder backup:', e);
-  }
+  const config = loadGDriveConfig();
 
   // Helper untuk mengambil file dari satu folder ID tertentu
-  const fetchFromFolderId = async (targetId: string): Promise<GDriveBackupItem[]> => {
+  const fetchFromFolderId = async (
+    targetId: string,
+    folderCategory: 'backup' | 'obsidian' | 'all'
+  ): Promise<GDriveBackupItem[]> => {
     if (credential.includes('script.google.com')) {
-      const url = `${credential}${credential.includes('?') ? '&' : '?'}folderId=${encodeURIComponent(targetId)}&action=listBackups`;
+      let actionParam = 'listBackups';
+      if (folderCategory === 'obsidian') actionParam = 'listObsidian';
+      else if (folderCategory === 'all') actionParam = 'listAll';
+
+      const url = `${credential}${credential.includes('?') ? '&' : '?'}folderId=${encodeURIComponent(targetId)}&action=${actionParam}`;
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`Gagal membaca daftar cadangan dari Google Drive (HTTP ${response.status}).`);
@@ -458,6 +474,12 @@ export async function listBackupFilesFromGDrive(
       return files
         .filter((f: any) => {
           const n = (f.name || '').toLowerCase();
+          if (folderCategory === 'obsidian') {
+            return n.endsWith('.zip') || n.includes('obsidian');
+          }
+          if (folderCategory === 'all') {
+            return n.endsWith('.json') || n.endsWith('.schemax') || n.endsWith('.zip') || n.includes('.schemax.') || n.includes('.json');
+          }
           return (
             n.endsWith('.json') ||
             n.endsWith('.schemax') ||
@@ -473,7 +495,14 @@ export async function listBackupFilesFromGDrive(
         }));
     } else {
       // Mode Google API Key
-      const query = `'${targetId}' in parents and trashed = false and (name contains '.json' or name contains '.schemax')`;
+      let queryFilter = `(name contains '.json' or name contains '.schemax')`;
+      if (folderCategory === 'obsidian') {
+        queryFilter = `(name contains '.zip' or name contains 'Obsidian')`;
+      } else if (folderCategory === 'all') {
+        queryFilter = `(name contains '.json' or name contains '.schemax' or name contains '.zip')`;
+      }
+
+      const query = `'${targetId}' in parents and trashed = false and ${queryFilter}`;
       const fields = 'files(id, name, size, modifiedTime)';
       const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=${encodeURIComponent(fields)}&pageSize=50&orderBy=modifiedTime desc&key=${credential}`;
 
@@ -496,33 +525,67 @@ export async function listBackupFilesFromGDrive(
   const results: GDriveBackupItem[] = [];
   const seenIds = new Set<string>();
 
-  // Prioritas 1: Ambil dari subfolder "backup" jika ditemukan
-  if (backupFolderId) {
+  // Temukan subfolder "backup" dan "obsidian"
+  let backupSubfolderId: string | null = null;
+  let obsidianSubfolderId: string | null = config.obsidianFolderId || null;
+
+  try {
+    const folderItems = await fetchGDriveFolderItems(folderId, credential, true);
+    for (const item of folderItems) {
+      if (!item.isFolder) continue;
+      const trimmed = item.name.trim();
+      if (/^(backup|backups|cadangan)$/i.test(trimmed) && !backupSubfolderId) {
+        backupSubfolderId = item.id;
+      }
+      if (/^obsidian$/i.test(trimmed) && !obsidianSubfolderId) {
+        obsidianSubfolderId = item.id;
+      }
+    }
+  } catch (e) {
+    console.warn('Gagal membaca daftar subfolder Google Drive:', e);
+  }
+
+  // 1. Ambil dari folder Backup (jika kategori 'backup' atau 'all')
+  if ((category === 'backup' || category === 'all') && backupSubfolderId) {
     try {
-      const backupFiles = await fetchFromFolderId(backupFolderId);
-      for (const item of backupFiles) {
+      const items = await fetchFromFolderId(backupSubfolderId, 'backup');
+      for (const item of items) {
         if (!seenIds.has(item.id)) {
           seenIds.add(item.id);
           results.push(item);
         }
       }
     } catch (err) {
-      console.warn('Gagal membaca isi subfolder backup:', err);
+      console.warn('Gagal membaca subfolder backup:', err);
     }
   }
 
-  // Prioritas 2: Ambil dari folder utama (root) untuk menangkap cadangan di root atau jika script sudah scan subfolder
+  // 2. Ambil dari folder Obsidian (jika kategori 'obsidian' atau 'all')
+  if ((category === 'obsidian' || category === 'all') && obsidianSubfolderId) {
+    try {
+      const items = await fetchFromFolderId(obsidianSubfolderId, 'obsidian');
+      for (const item of items) {
+        if (!seenIds.has(item.id)) {
+          seenIds.add(item.id);
+          results.push(item);
+        }
+      }
+    } catch (err) {
+      console.warn('Gagal membaca subfolder obsidian:', err);
+    }
+  }
+
+  // 3. Ambil dari folder Utama / Root
   try {
-    const rootFiles = await fetchFromFolderId(folderId);
-    for (const item of rootFiles) {
+    const rootItems = await fetchFromFolderId(folderId, category);
+    for (const item of rootItems) {
       if (!seenIds.has(item.id)) {
         seenIds.add(item.id);
         results.push(item);
       }
     }
   } catch (err) {
-    console.warn('Gagal membaca isi folder root Google Drive:', err);
-    // Jika sudah ada file dari subfolder backup, jangan lemparkan error
+    console.warn('Gagal membaca folder root Google Drive:', err);
     if (results.length === 0) {
       throw err;
     }

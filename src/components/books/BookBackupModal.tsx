@@ -23,6 +23,9 @@ import {
   Clock,
   BookOpen,
   Search,
+  Boxes,
+  Sparkles,
+  Gem,
 } from 'lucide-react';
 import { Book } from '../../types';
 import { db } from '../../db';
@@ -36,6 +39,7 @@ import {
   SchemaxBookBackupBundle,
   BackupPreviewStats,
 } from '../../services/bookBackupService';
+import { exportBookToObsidianZip } from '../../services/obsidianExportService';
 import {
   loadGDriveConfig,
   uploadBackupToGDrive,
@@ -58,6 +62,7 @@ export interface ParsedBackupFileItem extends GDriveBackupItem {
   backupDate: Date;
   displayDateStr: string;
   relativeTimeStr: string;
+  isObsidianVault: boolean;
 }
 
 function parseBackupFileInfo(fileName: string, updatedAt?: string): {
@@ -65,8 +70,17 @@ function parseBackupFileInfo(fileName: string, updatedAt?: string): {
   backupDate: Date;
   displayDateStr: string;
   relativeTimeStr: string;
+  isObsidianVault: boolean;
 } {
-  const clean = fileName.replace(/\.(schemax\.json|json|schemax)$/i, '');
+  const isObsidianVault =
+    fileName.toLowerCase().endsWith('.zip') ||
+    fileName.toLowerCase().includes('obsidian');
+
+  const clean = fileName
+    .replace(/\.(schemax\.json|json|schemax|zip)$/i, '')
+    .replace(/_Obsidian_Vault$/i, '')
+    .replace(/_Vault$/i, '');
+
   let title = '';
   let date: Date | null = null;
 
@@ -143,6 +157,7 @@ function parseBackupFileInfo(fileName: string, updatedAt?: string): {
     backupDate: date,
     displayDateStr,
     relativeTimeStr,
+    isObsidianVault,
   };
 }
 
@@ -188,6 +203,7 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
   const [backupProgressPercent, setBackupProgressPercent] = useState(0);
   const [backupSuccessMsg, setBackupSuccessMsg] = useState<string | null>(null);
   const [backupErrorMsg, setBackupErrorMsg] = useState<string | null>(null);
+  const [backupFormat, setBackupFormat] = useState<'schemax' | 'obsidian'>('schemax');
 
   // State Proses Restore
   const [selectedBundle, setSelectedBundle] = useState<SchemaxBookBackupBundle | null>(null);
@@ -206,6 +222,7 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
   const [isGDrivePickerOpen, setIsGDrivePickerOpen] = useState(false);
   const [expandedBooks, setExpandedBooks] = useState<Record<string, boolean>>({});
   const [searchBackupQuery, setSearchBackupQuery] = useState('');
+  const [gdriveTypeFilter, setGdriveTypeFilter] = useState<'all' | 'schemax' | 'obsidian'>('all');
 
   // 📚 Kelompokkan file cadangan Google Drive per Judul Buku & Urutkan Tanggal (Terbaru dahulu)
   const groupedBackups = useMemo(() => {
@@ -219,6 +236,7 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
         backupDate: info.backupDate,
         displayDateStr: info.displayDateStr,
         relativeTimeStr: info.relativeTimeStr,
+        isObsidianVault: info.isObsidianVault,
       };
 
       const currentList = map.get(info.bookTitle) || [];
@@ -259,9 +277,23 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
   }, [groupedBackups]);
 
   const filteredGroupedBackups = useMemo(() => {
-    if (!searchBackupQuery.trim()) return groupedBackups;
+    let list = groupedBackups;
+    if (gdriveTypeFilter !== 'all') {
+      list = list
+        .map((group) => {
+          const filteredItems = group.items.filter((it) => {
+            if (gdriveTypeFilter === 'obsidian') return it.isObsidianVault;
+            return !it.isObsidianVault;
+          });
+          if (filteredItems.length === 0) return null;
+          return { ...group, items: filteredItems };
+        })
+        .filter(Boolean) as Array<{ bookTitle: string; items: ParsedBackupFileItem[] }>;
+    }
+
+    if (!searchBackupQuery.trim()) return list;
     const q = searchBackupQuery.toLowerCase();
-    return groupedBackups
+    return list
       .map((group) => {
         const titleMatches = group.bookTitle.toLowerCase().includes(q);
         const filteredItems = group.items.filter(
@@ -272,7 +304,7 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
         return null;
       })
       .filter(Boolean) as Array<{ bookTitle: string; items: ParsedBackupFileItem[] }>;
-  }, [groupedBackups, searchBackupQuery]);
+  }, [groupedBackups, searchBackupQuery, gdriveTypeFilter]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const gdriveConfig = loadGDriveConfig();
@@ -386,14 +418,96 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
   };
 
   // ══════════════════════════════════════════════════════════════
+  // AKSI BACKUP: OBSIDIAN VAULT (UNDUH LOKAL .ZIP)
+  // ══════════════════════════════════════════════════════════════
+  const handleDownloadObsidianBackup = async () => {
+    if (!book) return;
+    setIsBackingUp(true);
+    setBackupSuccessMsg(null);
+    setBackupErrorMsg(null);
+    try {
+      const res = await exportBookToObsidianZip(book.id, (msg, pct) => {
+        setBackupProgressMsg(msg);
+        setBackupProgressPercent(pct);
+      });
+      const url = URL.createObjectURL(res.blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = res.fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+      setBackupSuccessMsg(
+        `Arsip Obsidian Vault "${res.fileName}" (${res.fileCount} berkas) berhasil diunduh ke komputer Anda! Silakan ekstrak ke folder Obsidian Anda.`
+      );
+    } catch (err: any) {
+      console.error('Gagal unduh Obsidian Vault:', err);
+      setBackupErrorMsg(err?.message || 'Gagal membuat arsip Obsidian Vault.');
+    } finally {
+      setIsBackingUp(false);
+    }
+  };
+
+  // ══════════════════════════════════════════════════════════════
+  // AKSI BACKUP: OBSIDIAN VAULT (SIMPAN KE GDRIVE FOLDER OBSIDIAN)
+  // ══════════════════════════════════════════════════════════════
+  const handleUploadGDriveObsidianBackup = async () => {
+    if (!book) return;
+    if (!isGDriveConfigured || !gdriveConfig.folderId) {
+      onOpenGDriveSettings?.();
+      return;
+    }
+
+    setIsBackingUp(true);
+    setBackupSuccessMsg(null);
+    setBackupErrorMsg(null);
+    try {
+      const res = await exportBookToObsidianZip(book.id, (msg, pct) => {
+        setBackupProgressMsg(msg);
+        setBackupProgressPercent(pct);
+      });
+
+      setBackupProgressMsg('Mengunggah arsip Obsidian Vault ke Google Drive (Folder Obsidian)...');
+      const result = await uploadBackupToGDrive(
+        gdriveConfig.folderId,
+        res.fileName,
+        res.base64Data,
+        gdriveConfig.scriptUrl,
+        'obsidian',
+        true
+      );
+
+      setBackupSuccessMsg(
+        `Sukses! Arsip Obsidian Vault "${result.name || res.fileName}" berhasil disimpan ke folder "${result.folderName || 'Obsidian'}" di Google Drive Anda.`
+      );
+    } catch (err: any) {
+      console.error('Gagal simpan Obsidian Vault ke GDrive:', err);
+      setBackupErrorMsg(err?.message || 'Gagal mengunggah arsip Obsidian ke Google Drive.');
+    } finally {
+      setIsBackingUp(false);
+    }
+  };
+
+  // ══════════════════════════════════════════════════════════════
   // AKSI RESTORE: PILIH FILE DARI KOMPUTER
   // ══════════════════════════════════════════════════════════════
   const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Reset value input agar pengguna dapat memilih ulang berkas yang sama bila perlu
+    e.target.value = '';
+
     setRestoreErrorMsg(null);
     setRestoreSuccessMsg(null);
+
+    // Jika pengguna memilih arsip .zip Obsidian
+    if (file.name.toLowerCase().endsWith('.zip')) {
+      setRestoreErrorMsg(
+        'Berkas yang dipilih adalah arsip Obsidian Vault (.zip). Arsip ini berisi berkas catatan Markdown untuk aplikasi Obsidian. Untuk memulihkan buku ke Schemax, silakan gunakan berkas cadangan dengan format .schemax.json atau .json.'
+      );
+      return;
+    }
+
     try {
       const bundle = await readBackupBundleFromFile(file);
       setSelectedBundle(bundle);
@@ -422,12 +536,13 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
     try {
       const files = await listBackupFilesFromGDrive(
         gdriveConfig.folderId,
-        gdriveConfig.scriptUrl || gdriveConfig.apiKey
+        gdriveConfig.scriptUrl || gdriveConfig.apiKey,
+        'all'
       );
       setGdriveBackups(files);
       if (files.length === 0) {
         setGdriveError(
-          'Tidak ada file cadangan (.schemax.json atau .json) yang ditemukan di folder utama maupun subfolder "backup". Pastikan file cadangan memiliki ekstensi .json atau .schemax.json.'
+          'Tidak ada berkas cadangan (.schemax.json atau .zip Obsidian) yang ditemukan di folder utama maupun subfolder Google Drive Anda.'
         );
       }
     } catch (err: any) {
@@ -435,6 +550,11 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
     } finally {
       setIsLoadingGDriveFiles(false);
     }
+  };
+
+  const handleDownloadGDriveZip = (item: GDriveBackupItem) => {
+    const downloadUrl = `https://drive.google.com/uc?export=download&id=${item.id}`;
+    window.open(downloadUrl, '_blank');
   };
 
   const handleSelectGDriveFileToRestore = async (fileItem: GDriveBackupItem) => {
@@ -670,51 +790,173 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
                 </div>
               )}
 
-              {/* Action Buttons */}
-              <div className="space-y-3 pt-2">
-                <button
-                  type="button"
-                  onClick={handleDownloadLocalBackup}
-                  disabled={isBackingUp}
-                  className="w-full py-3.5 px-3 sm:px-4 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition active:scale-98 shadow-md shadow-amber-500/10 disabled:opacity-50 text-center"
-                >
-                  <Download className="w-4 h-4 flex-shrink-0" />
-                  <span className="truncate">Unduh Berkas Cadangan (.schemax.json)</span>
-                </button>
-
-                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Cloud className="w-4 h-4 text-indigo-500" />
-                      <span className="text-xs font-bold text-slate-900 dark:text-white">
-                        Cadangkan ke Google Drive
+              {/* 🌟 PILIHAN FORMAT CADANGAN */}
+              <div className="space-y-2 pt-1">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                  Pilih Format Cadangan:
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Format 1: Standar Schemax (.schemax.json) */}
+                  <div
+                    onClick={() => setBackupFormat('schemax')}
+                    className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all ${
+                      backupFormat === 'schemax'
+                        ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20 shadow-sm ring-1 ring-amber-500/30'
+                        : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600 dark:text-amber-400">
+                          <Boxes className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="text-xs font-extrabold text-slate-900 dark:text-white">
+                          Format Schemax (.json)
+                        </span>
+                      </div>
+                      <span className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${
+                        backupFormat === 'schemax' ? 'border-amber-500 bg-amber-500' : 'border-slate-300'
+                      }`}>
+                        {backupFormat === 'schemax' && <span className="w-1.5 h-1.5 bg-white rounded-full" />}
                       </span>
                     </div>
-                    {isGDriveConfigured ? (
-                      <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                        Terhubung ({gdriveConfig.folderName || 'Folder Drive'})
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={onOpenGDriveSettings}
-                        className="text-[10px] font-bold text-amber-600 dark:text-amber-400 underline hover:opacity-80"
-                      >
-                        Hubungkan Google Drive
-                      </button>
-                    )}
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                      Format lengkap untuk dipulihkan kembali ke Schemax (menyimpan suara AI TTS offline, status bab, &amp; data internal).
+                    </p>
+                    <span className="inline-block mt-2 text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-md">
+                      📁 Target GDrive: Folder "Backup"
+                    </span>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={handleUploadGDriveBackup}
-                    disabled={isBackingUp}
-                    className="w-full py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition active:scale-98 disabled:opacity-50"
+                  {/* Format 2: Obsidian Vault (.zip) */}
+                  <div
+                    onClick={() => setBackupFormat('obsidian')}
+                    className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all ${
+                      backupFormat === 'obsidian'
+                        ? 'border-purple-500 bg-purple-50/50 dark:bg-purple-950/20 shadow-sm ring-1 ring-purple-500/30'
+                        : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 hover:border-slate-300'
+                    }`}
                   >
-                    <Cloud className="w-3.5 h-3.5" />
-                    <span>{isGDriveConfigured ? 'Simpan Cadangan ke Google Drive' : 'Atur Google Drive Terlebih Dahulu'}</span>
-                  </button>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-600 dark:text-purple-400">
+                          <Gem className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="text-xs font-extrabold text-purple-900 dark:text-purple-300">
+                          Obsidian Vault (.zip)
+                        </span>
+                      </div>
+                      <span className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${
+                        backupFormat === 'obsidian' ? 'border-purple-500 bg-purple-500' : 'border-slate-300'
+                      }`}>
+                        {backupFormat === 'obsidian' && <span className="w-1.5 h-1.5 bg-white rounded-full" />}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                      Folder catatan Markdown (.md) + Wikilinks [[...]] + Foto fisik assets/ + Peta Relasi .canvas resmi Obsidian.
+                    </p>
+                    <span className="inline-block mt-2 text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded-md">
+                      💎 Target GDrive: Folder "Obsidian"
+                    </span>
+                  </div>
                 </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-3 pt-2">
+                {backupFormat === 'schemax' ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleDownloadLocalBackup}
+                      disabled={isBackingUp}
+                      className="w-full py-3.5 px-3 sm:px-4 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition active:scale-98 shadow-md shadow-amber-500/10 disabled:opacity-50 text-center"
+                    >
+                      <Download className="w-4 h-4 flex-shrink-0" />
+                      <span className="truncate">Unduh Berkas Cadangan (.schemax.json)</span>
+                    </button>
+
+                    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Cloud className="w-4 h-4 text-indigo-500" />
+                          <span className="text-xs font-bold text-slate-900 dark:text-white">
+                            Cadangkan ke Google Drive
+                          </span>
+                        </div>
+                        {isGDriveConfigured ? (
+                          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                            Terhubung ({gdriveConfig.folderName || 'Folder Drive'})
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={onOpenGDriveSettings}
+                            className="text-[10px] font-bold text-amber-600 dark:text-amber-400 underline hover:opacity-80"
+                          >
+                            Hubungkan Google Drive
+                          </button>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleUploadGDriveBackup}
+                        disabled={isBackingUp}
+                        className="w-full py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition active:scale-98 disabled:opacity-50"
+                      >
+                        <Cloud className="w-3.5 h-3.5" />
+                        <span>{isGDriveConfigured ? 'Simpan Cadangan ke GDrive (Folder Backup)' : 'Atur Google Drive Terlebih Dahulu'}</span>
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleDownloadObsidianBackup}
+                      disabled={isBackingUp}
+                      className="w-full py-3.5 px-3 sm:px-4 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition active:scale-98 shadow-md shadow-purple-500/15 disabled:opacity-50 text-center"
+                    >
+                      <Gem className="w-4 h-4 flex-shrink-0" />
+                      <span className="truncate">Unduh Arsip Obsidian Vault (.zip)</span>
+                    </button>
+
+                    <div className="p-4 rounded-2xl bg-purple-50/40 dark:bg-purple-950/20 border border-purple-200/80 dark:border-purple-800/40 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Cloud className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                          <span className="text-xs font-bold text-purple-950 dark:text-purple-200">
+                            Cadangkan ke Google Drive (Folder Obsidian)
+                          </span>
+                        </div>
+                        {isGDriveConfigured ? (
+                          <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">
+                            Folder "Obsidian" Siap
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={onOpenGDriveSettings}
+                            className="text-[10px] font-bold text-purple-600 dark:text-purple-400 underline hover:opacity-80"
+                          >
+                            Hubungkan Google Drive
+                          </button>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleUploadGDriveObsidianBackup}
+                        disabled={isBackingUp}
+                        className="w-full py-2.5 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition active:scale-98 disabled:opacity-50"
+                      >
+                        <Cloud className="w-3.5 h-3.5" />
+                        <span>{isGDriveConfigured ? 'Simpan Obsidian Vault ke GDrive (Folder Obsidian)' : 'Atur Google Drive Terlebih Dahulu'}</span>
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           ) : (
@@ -1022,9 +1264,9 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
               </div>
             </div>
 
-            {/* Search Input */}
+            {/* Search Input & Category Filters */}
             {gdriveBackups.length > 0 && (
-              <div className="p-3 sm:px-5 sm:py-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex-shrink-0">
+              <div className="p-3 sm:px-5 sm:py-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex-shrink-0 space-y-2.5">
                 <div className="relative">
                   <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
@@ -1034,6 +1276,47 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
                     placeholder="Cari judul buku atau tanggal cadangan..."
                     className="w-full pl-9 pr-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-indigo-400"
                   />
+                </div>
+
+                {/* Filter Chips: Semua / Schemax / Obsidian */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setGdriveTypeFilter('all')}
+                    className={`px-3 py-1 rounded-lg font-bold text-[11px] transition whitespace-nowrap ${
+                      gdriveTypeFilter === 'all'
+                        ? 'bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900'
+                        : 'bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                    }`}
+                  >
+                    Semua ({gdriveBackups.length})
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setGdriveTypeFilter('schemax')}
+                    className={`px-3 py-1 rounded-lg font-bold text-[11px] flex items-center gap-1.5 transition whitespace-nowrap ${
+                      gdriveTypeFilter === 'schemax'
+                        ? 'bg-amber-500 text-slate-950 font-extrabold'
+                        : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20'
+                    }`}
+                  >
+                    <Boxes className="w-3 h-3" />
+                    <span>Format Schemax</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setGdriveTypeFilter('obsidian')}
+                    className={`px-3 py-1 rounded-lg font-bold text-[11px] flex items-center gap-1.5 transition whitespace-nowrap ${
+                      gdriveTypeFilter === 'obsidian'
+                        ? 'bg-purple-600 text-white font-extrabold'
+                        : 'bg-purple-500/10 text-purple-700 dark:text-purple-300 hover:bg-purple-500/20'
+                    }`}
+                  >
+                    <Gem className="w-3 h-3" />
+                    <span>Obsidian Vault (.zip)</span>
+                  </button>
                 </div>
               </div>
             )}
@@ -1071,9 +1354,9 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
                 <div className="py-10 text-center space-y-2 text-slate-400">
                   <Database className="w-8 h-8 mx-auto opacity-40" />
                   <p className="text-xs font-bold">
-                    {searchBackupQuery
-                      ? 'Tidak ada cadangan yang cocok dengan pencarian.'
-                      : 'Belum ada file cadangan (.schemax.json) di folder Google Drive Anda.'}
+                    {searchBackupQuery || gdriveTypeFilter !== 'all'
+                      ? 'Tidak ada cadangan yang cocok dengan kriteria pencarian/filter.'
+                      : 'Belum ada berkas cadangan di folder Google Drive Anda.'}
                   </p>
                 </div>
               ) : (
@@ -1112,7 +1395,7 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
 
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                              {group.items.length} Cadangan
+                              {group.items.length} Berkas
                             </span>
                             <div
                               className={`p-1 rounded-lg text-slate-400 transition-transform duration-200 ${
@@ -1130,9 +1413,9 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
                             {group.items.map((item, idx) => (
                               <div
                                 key={item.id}
-                                className="p-3 rounded-xl border border-slate-200/90 dark:border-slate-800 hover:border-amber-400 dark:hover:border-amber-400 bg-white dark:bg-slate-950 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 transition shadow-xs"
+                                className="p-3 rounded-xl border border-slate-200/90 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-950 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 transition shadow-xs"
                               >
-                                <div className="space-y-1 min-w-0">
+                                <div className="space-y-1.5 min-w-0">
                                   <div className="flex items-center gap-2 flex-wrap">
                                     <Clock className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" />
                                     <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white">
@@ -1148,25 +1431,49 @@ export const BookBackupModal: React.FC<BookBackupModalProps> = ({
                                     </span>
                                   </div>
 
-                                  <div className="flex items-center gap-2 text-[10px] text-slate-400">
-                                    <span className="font-semibold text-slate-500 dark:text-slate-400">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {item.isObsidianVault ? (
+                                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 flex items-center gap-1">
+                                        <Gem className="w-2.5 h-2.5" />
+                                        <span>Obsidian Vault (.zip)</span>
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 flex items-center gap-1">
+                                        <Boxes className="w-2.5 h-2.5" />
+                                        <span>Cadangan Schemax (.json)</span>
+                                      </span>
+                                    )}
+
+                                    <span className="text-[10px] text-slate-400">
                                       {formatBytes(item.size)}
                                     </span>
-                                    <span>•</span>
-                                    <span className="font-mono truncate max-w-[220px] sm:max-w-xs text-slate-400" title={item.name}>
-                                      {item.name}
-                                    </span>
+                                  </div>
+
+                                  <div className="text-[10px] font-mono truncate max-w-[240px] sm:max-w-xs text-slate-400" title={item.name}>
+                                    {item.name}
                                   </div>
                                 </div>
 
-                                <button
-                                  type="button"
-                                  onClick={() => handleSelectGDriveFileToRestore(item)}
-                                  className="w-full sm:w-auto py-2 px-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-sm flex items-center justify-center gap-1.5 active:scale-95 transition flex-shrink-0"
-                                >
-                                  <span>Pilih Cadangan Ini</span>
-                                  <ArrowRight className="w-3.5 h-3.5" />
-                                </button>
+                                {item.isObsidianVault ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDownloadGDriveZip(item)}
+                                    className="w-full sm:w-auto py-2 px-3.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-sm flex items-center justify-center gap-1.5 active:scale-95 transition flex-shrink-0"
+                                    title="Unduh arsip zip Obsidian Vault ini ke komputer Anda"
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
+                                    <span>Unduh Arsip Vault (.zip)</span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSelectGDriveFileToRestore(item)}
+                                    className="w-full sm:w-auto py-2 px-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-sm flex items-center justify-center gap-1.5 active:scale-95 transition flex-shrink-0"
+                                  >
+                                    <span>Pilih Cadangan Ini</span>
+                                    <ArrowRight className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
                               </div>
                             ))}
                           </div>

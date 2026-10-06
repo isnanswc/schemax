@@ -330,6 +330,10 @@ export interface GDriveConfig {
   folderUrl?: string;
   folderId?: string;
   folderName?: string;
+  // Folder Khusus Arsip Obsidian Vault di Google Drive
+  obsidianFolderUrl?: string;
+  obsidianFolderId?: string;
+  obsidianFolderName?: string;
   lastSyncedAt?: number;
 }
 
